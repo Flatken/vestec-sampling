@@ -1,6 +1,8 @@
 ## Description
 Evaluation tool for the execution of a Python based catalyst pipeline. The tool emulates a running simulation by loading a time dpendent dataset timestep for timestep from disc and forwards these data to the paraview catalyst pipeline for execution. The tool supports the evaluation of filters using distributed memory parallelizm by splitting each dataset to the given number of MPI processes. Each MPI process then gets only a portion (chunk) of the total domain. Furthermore, the repository includes own Paraview plugins with VTK filters for data sampling of the raw data. 
 
+The idea is to use topological information extracted using the Topology Toolkit (TTK) together with a pathline snippet tracing algorithm to sample the original raw data. From these information it should be possible to reconstruct an approximated dataset.
+
 Prerequirements to build the Software:
 
 - GCC (Linux) or MSVC (Windows) Compiler with C++17 support
@@ -22,7 +24,7 @@ The software is funded by the [VESTEC EU Project](https://www.vestec-project.eu/
 Clone the git repository to your local hard drive 
 ```
 cd $FOLDER
-git clone ... src
+git clone https://github.com/Flatken/vestec-sampling.git src
 ```
 
 Update and initialize the git submodules recursivly. 
@@ -50,7 +52,7 @@ src/make_release.sh
 - Exporting a ParaView Catalyst pipeline
 	- See TKK tutorials on Catalyst 
 - Requirements
-	- At the moment only VTK\_STRUCTURED\_GRID data in legacy format is supported
+	- At the moment only VTK\_STRUCTURED\_POINTS data in legacy format is supported
 	- The data naming for an unsteady dataset needs to be in the following format. Each file needs to be placed in the same directory. 
 		- snapshot_??.vtk
 			- Where ?? is the timestep with leading zeros
