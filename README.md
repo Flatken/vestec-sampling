@@ -65,7 +65,17 @@ src/make_release.sh
 	cd $FOLDER/install/linux-release/bin
 	- ./start.sh [DATA_PATH] [TIME STEPSIZE/DELTA] [CATALYST SCRIPT]
 ```
+## Hints when using Phyton version 3.4
+There seems to be a bug in paraview which leads to crashes when executing the application. You have to fix the following file
+and then call src/make_release.sh again.
 
-
+FIX: 
+```
+vim $FOLDER/install/linux-externals/lib/python3.4/site-packages/paraview/vtk.py
+```
+Change the following line by replacing version 3,4 with version 3,5!
+```
+if sys.version_info < (3,4):
+```
 ## Support
 If you have any questions or comments just write an e-mail to: markus.flatken@dlr.de
