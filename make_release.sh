@@ -36,10 +36,11 @@ cd $BUILD_DIR
 cmake -G "Eclipse CDT4 - Unix Makefiles" -DCMAKE_BUILD_TYPE=Release \
 -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
 -DEXTERNALS_DIR=$EXTERNALS_INSTALL_DIR \
--DParaView_DIR=$Paraview_DIR -DUSE_CATALYST=On \
+-DParaView_DIR=$Paraview_DIR \
+-DUSE_CATALYST=ON \
 $CMAKE_DIR 
 
 
 # compilation & installation ---------------------------------------------------
-make all
-make install
+make -j install
+

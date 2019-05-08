@@ -25,8 +25,8 @@ cmake -E make_directory "$INSTALL_DIR/bin"
 cmake -E make_directory "$INSTALL_DIR/include"
 
 # TTK patch paraview--------------------------------------------------------------------------------
-#cd $EXTERNALS_DIR/ttk/paraview/patch/
-#./patch-paraview-5.6.0.sh $EXTERNALS_DIR/paraview-5.6
+cd $EXTERNALS_DIR/ttk/paraview/patch/
+./patch-paraview-5.6.0.sh $EXTERNALS_DIR/paraview-5.6
 
 # Paraview -----------------------------------------------------------------------------------------
 echo "Building and installing Paraview 5.6 ..."
@@ -43,7 +43,7 @@ cmake -G "Eclipse CDT4 - Unix Makefiles" -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" \
       -DPARAVIEW_USE_MPI=ON \
       -DPARAVIEW_ENABLE_CATALYST=ON \
       -DCMAKE_BUILD_TYPE=Release "$EXTERNALS_DIR/paraview-5.6" 
-cmake --build . --target install --parallel 8
+cmake --build . --target install --parallel 12
 
 # TTK -------------------------------------------------------------------------------------------
 
@@ -56,7 +56,7 @@ cmake -G "Eclipse CDT4 - Unix Makefiles" -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" \
       -DCMAKE_PREFIX_PATH=$INSTALL_DIR/lib/cmake/paraview-5.6 \
       -DParaView_CMAKE_DIR=$INSTALL_DIR/lib/cmake/paraview-5.6 \
       -DCMAKE_BUILD_TYPE=Release "$EXTERNALS_DIR/ttk"
-cmake --build . --target install --parallel 8
+cmake --build . --target install --parallel 12
 
 ## --------------------------------------------------------------------------------------------------
 echo "Finished successfully."
