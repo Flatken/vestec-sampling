@@ -61,7 +61,10 @@ src/make_release.sh
 				- snapshot_01.vtk
 		
 - Call the evaluation tool
+```
+	cd $FOLDER/install/linux-release/bin
 	- ./start.sh [DATA_PATH] [TIME STEPSIZE/DELTA] [CATALYST SCRIPT]
+```
 
 
 ## Support
