@@ -60,10 +60,10 @@ src/make_release.sh
 				- snapshot_00.vtk
 				- snapshot_01.vtk
 		
-- Call the evaluation tool
+- Call the evaluation tool. You can also have look to the start.sh shell script
 ```
 	cd $FOLDER/install/linux-release/bin
-	- ./start.sh [DATA_PATH] [TIME STEPSIZE/DELTA] [CATALYST SCRIPT]
+	mpiexec -np 1 ./VestecCatalystEmulator [DATA_PATH] [TIME STEPSIZE/DELTA] [CATALYST SCRIPT]
 ```
 ## Hints when using Phyton version 3.4
 There seems to be a bug in paraview which leads to crashes when executing the application. You have to fix the following file
