@@ -9,7 +9,7 @@ Prerequirements to build the Software:
 - MPI installation of your choise (MVAPICH2, Microsoft MPI on Windows)
 - CMake >= 3.12
 - Python >= 3.4
-- Boost > 1.66
+- Boost >= 1.69
 
 
 The tool has the following external dependencies:
