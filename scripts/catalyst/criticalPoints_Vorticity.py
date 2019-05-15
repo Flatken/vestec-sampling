@@ -115,17 +115,18 @@ def CreateCoProcessor():
       vestecSamplingAlgorithm = VestecSamplingAlgorithm(Grid=grid_,Seeds=tTKScalarFieldCriticalPoints1)
       vestecSamplingAlgorithm.Vectors = ['POINTS', 'Vel']
       
-      #SetActiveSource(vestecSamplingAlgorithm)
+      SetActiveSource(vestecSamplingAlgorithm)
 
       # Now any catalyst writers
       xMLPPolyDataWriter1 = servermanager.writers.XMLPPolyDataWriter(Input=vestecSamplingAlgorithm)
       coprocessor.RegisterWriter(xMLPPolyDataWriter1, filename='VestecSamplingAlgorithm1_%t.pvtp', freq=1, paddingamount=0)
 
-      #ParallelUnstructuredGridWriter1 = coprocessor.CreateWriter( XMLPUnstructuredGridWriter, "seeds_%t.pvtu", 1 )
+      #xMLPImageDataWriter1 = servermanager.writers.XMLPImageDataWriter(Input=grid_)
+      #coprocessor.RegisterWriter(xMLPImageDataWriter1, filename='grid_%t.pvti', freq=1, paddingamount=0)
 
       # ----------------------------------------------------------------
       # finally, restore active source
-      # SetActiveSource(grid)
+      SetActiveSource(grid)
       # ----------------------------------------------------------------
     return Pipeline()
 

@@ -11,7 +11,12 @@
 #include <vtkDataSetWriter.h>
 #include <vtkAppendPolyData.h>
 #include <vtkDataSetReader.h>
+#include <vtkGeometryFilter.h>
+#include <vtkDuplicatePolyData.h>
+#include <vtkUnstructuredGrid.h>
+#include <vtkFloatArray.h>
 #include <sstream>
+#include <stdlib.h>
 
 vtkStandardNewMacro(VestecSamplingAlgorithm);
 vtkStandardNewMacro(UnsteadySource);
@@ -40,12 +45,11 @@ VestecSamplingAlgorithm::VestecSamplingAlgorithm()
   m_pStreaklineFilter->SetDisableResetCache(1);
   m_pStreaklineFilter->SetComputeVorticity(0);
 
-  vtkNew<vtkDataSetReader> pReader;
-	pReader->SetFileName("/unsecured/flat_ma/vestec/datasets/seeds/seeds_karman.vtk");
-	pReader->ReadAllScalarsOn();
-	pReader->Update();
-  m_pStreaklineFilter->SetInputData(1, pReader->GetOutput()); //Seeds
- 
+  //vtkNew<vtkDataSetReader> pReader;
+	//pReader->SetFileName("/unsecured/flat_ma/vestec/datasets/seeds/seeds_karman.vtk");
+	//pReader->ReadAllScalarsOn();
+	//pReader->Update();
+  //m_pStreaklineFilter->SetInputData(1, pReader->GetOutput()); //Seeds
 }
 
 //----------------------------------------------------------------------------
@@ -208,7 +212,7 @@ int VestecSamplingAlgorithm::RequestData(
 {
   vtkMultiProcessController *ctrl = vtkMultiProcessController::GetGlobalController();
 	int mpiRank  	= ctrl->GetLocalProcessId();
-
+  int numProcs  = ctrl->GetNumberOfProcesses();
   //Later on RequestData (RD) happens.
   //During RD each filter examines any inputs it has, then fills in that empty data object with real data.
 
@@ -221,6 +225,21 @@ int VestecSamplingAlgorithm::RequestData(
   vtkInformation *inInfoSeeds = inputVector[1]->GetInformationObject(0);
   vtkDataSet *inputSeeds = dynamic_cast<vtkDataSet*>(inInfoSeeds->Get(vtkDataObject::DATA_OBJECT()));
 
+
+  ////TODO: Collect input seeds from all processes
+  //if(mpiRank != 0)
+  //{
+  //  ctrl->Send(inputSeeds, 0, 999);
+  //}else{
+  //  for(int p = 0; p < numProcs; ++p)
+  //  {
+  //    vtmpiRankkPolyData* pd = vtkPolyData::New();
+  //    controller->Receive(pd, i, 999);
+  //    app->AddInputData(pd);
+  //    pd->Delete();
+  //  }
+  //}
+  
   double* d = inInfoGrid->Get(vtkStreamingDemandDrivenPipeline::TIME_STEPS());
   int n  = inInfoGrid->Length(vtkStreamingDemandDrivenPipeline::TIME_STEPS());
   double t = inInfoGrid->Get(vtkStreamingDemandDrivenPipeline::UPDATE_TIME_STEP());
@@ -250,18 +269,26 @@ int VestecSamplingAlgorithm::RequestData(
     return 1;
   }
 
-  //TODO: Prepare Seeds
-  //if(inputSeeds->GetNumberOfPoints() > 0)
+  //Collect seeds from every process since the tracer needs a consistent number of seeds accross MPI processes
+  vtkUnstructuredGrid * pInputSeeds = vtkUnstructuredGrid::SafeDownCast(inputSeeds);
+  vtkPoints * pSend = vtkPoints::New();
+  vtkPoints * pRecv = vtkPoints::New();
+
+  if(pInputSeeds->GetNumberOfPoints() > 0)
   {
-    std::cout << "############## Integrating from t: " << (t - 0.02) << " to " << t << std::endl; 
-    //TODO: Collect all seed points
-    m_pStreaklineFilter->SetInputData(1, inputSeeds); //Seeds
-    m_pStreaklineFilter->SetInputConnection(0,m_pUnsteadyData->GetOutputPort()); //Grid 
-    m_pStreaklineFilter->SetStartTime(t - 0.02);
-    m_pStreaklineFilter->SetTerminationTime(t);
-    m_pStreaklineFilter->Update();
-    std::cout << "############## Integrating done for t: " << (t - 0.02) << " to " << t << std::endl; 
+    pSend->ShallowCopy(pInputSeeds->GetPoints());
   }
+  ctrl->AllGatherV(pSend->GetData(), pRecv->GetData());
+
+  vtkUnstructuredGrid * pCollectedSeeds = vtkUnstructuredGrid::New();
+  pCollectedSeeds->SetPoints(pRecv);
+  m_pStreaklineFilter->SetInputData(1, pCollectedSeeds); //Seeds
+  m_pStreaklineFilter->SetInputConnection(0,m_pUnsteadyData->GetOutputPort()); //Grid 
+  m_pStreaklineFilter->SetStartTime(t - 0.02);
+  m_pStreaklineFilter->SetTerminationTime(t);
+  m_pStreaklineFilter->Update();
+  std::cout << "############## Integrating done for t: " << (t - 0.02) << " to " << t << std::endl; 
+  std::cout << "###################################################################" << std::endl; 
   
   output->ShallowCopy(m_pStreaklineFilter->GetOutput());
   timestepindex++;
