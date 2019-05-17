@@ -52,13 +52,6 @@ void CatalystInitialize(std::vector<std::string> input, double deltaT, int numSc
     	Processor->AddPipeline(pipeline.GetPointer());
 		std::cout << "Adding script " << scripts[i] << " to catalyst pipeline" << std::endl;
 	}
-	//Create our Catalyst pipeline
-	//TODO: How to establish such a pipeline using the vtkCPPythonScriptPipeline with our filter? 
-	//SamplingPipeline* pPathlineFilter = SamplingPipeline::New();
-	//vtkCPPythonScriptPipeline* pPythonPipeline = vtkCPPythonScriptPipeline::New();
-	//pPythonPipeline-
-	//pPathlineFilter->InitTimingInformation(input.size(), deltaT);
-	//Processor->AddPipeline(pPathlineFilter);
 }
 
 void CatalystFinalize()
@@ -128,11 +121,7 @@ void CatalystCoProcess( double time, unsigned int timeStep, int lastTimeStep)
 			pPartitioner->Delete();
 			pResample->Delete();
 		}
-		else if (pReader->ReadOutputType() == VTK_STRUCTURED_POINTS)
-		{
-
-		}
-		else if (pReader->ReadOutputType() == VTK_STRUCTURED_POINTS)
+		else if (pReader->ReadOutputType() == VTK_UNSTRUCTURED_GRID)
 		{
 
 		}

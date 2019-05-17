@@ -1,0 +1,36 @@
+<ServerManagerConfiguration>
+  <ProxyGroup name="filters">
+   <SourceProxy name="VestecSeedingAlgorithm" class="VestecSeedingAlgorithm" label="VestecSeedingAlgorithm">
+     <Documentation
+        long_help="This filters gets points as input and creates random points around the input points"
+        short_help="This filters gets points as input and creates random points around the input points">
+     </Documentation>
+     <InputProperty
+        name="Points"
+        port_index="0"
+        command="SetInputConnection">
+           <ProxyGroupDomain name="groups">
+             <Group name="sources"/>
+             <Group name="filters"/>
+           </ProxyGroupDomain>
+           <DataTypeDomain name="input_type">
+             <DataType value="vtkDataSet"/>
+           </DataTypeDomain>
+      </InputProperty>
+      <DoubleVectorProperty name="SeedingRadius"
+                            command="SetPercentOfDomain"
+                            number_of_elements="1"
+                            default_values="5">
+      </DoubleVectorProperty>
+
+       <IntVectorProperty name="NumberOfSeeds"
+                     command="SetNumberOfPointsAroundSeed"
+                     number_of_elements="1"
+                     default_values="10">
+       </IntVectorProperty>
+      <Hints>
+        <ShowInMenu category="VESTEC - Sampling" />
+      </Hints>
+   </SourceProxy>
+ </ProxyGroup>
+</ServerManagerConfiguration>

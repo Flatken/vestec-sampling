@@ -111,10 +111,16 @@ def CreateCoProcessor():
       diagonal.Scalars = ['CELLS', 'PairIdentifier']
       diagonal.ThresholdRange = [-1.0, -0.1]
 
+	  # create a new 'TTK SphereFromPoint'
+      seedingStrategy = VestecSeedingAlgorithm(Points=tTKScalarFieldCriticalPoints1)
+      seedingStrategy.SeedingRadius = 7.0
+      seedingStrategy.NumberOfSeeds = 4
+
+
       # Compute streakline snippets
-      vestecSamplingAlgorithm = VestecSamplingAlgorithm(Grid=grid_,Seeds=tTKScalarFieldCriticalPoints1)
-      vestecSamplingAlgorithm.Vectors = ['POINTS', 'Vel']
-      
+      vestecSamplingAlgorithm = VestecSamplingAlgorithm(Grid=grid_,Seeds=seedingStrategy)
+      vestecSamplingAlgorithm.Vectors = ['POINTS', 'Vec']
+	  
       SetActiveSource(vestecSamplingAlgorithm)
 
       # Now any catalyst writers

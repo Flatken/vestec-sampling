@@ -1,28 +1,20 @@
-#ifndef __VESTECSAMPLINGALGORITHM_H
-#define __VESTECSAMPLINGALGORITHM_H
+#ifndef __VESTECSEEDINGALGORITHM_H
+#define __VESTECSEEDINGALGORITHM_H
 
 #include <vtkAlgorithm.h>
 #include <vtkPolyDataAlgorithm.h>
 #include <vtkPStreaklineFilter.h>
 #include <vtkPParticleTracer.h>
-#include <vtkUnstructuredGrid.h>
 #include <map>
 
 class vtkDataSet;
 
-class VTK_EXPORT VestecSamplingAlgorithm : public vtkPolyDataAlgorithm
+class VTK_EXPORT VestecSeedingAlgorithm : public vtkPolyDataAlgorithm
 {
 public:
-  static VestecSamplingAlgorithm *New();
-  vtkTypeMacro(VestecSamplingAlgorithm,vtkPolyDataAlgorithm);
+  static VestecSeedingAlgorithm *New();
+  vtkTypeMacro(VestecSeedingAlgorithm,vtkPolyDataAlgorithm);
   void PrintSelf(ostream& os, vtkIndent indent) override;
-
-  /**
-   * Duration to integrate each particle
-   */
-  vtkSetMacro(IntegrationDuration, double);
-  vtkGetMacro(IntegrationDuration, double);
-
 
   // Description:
   // Get the output data object for a port on this algorithm.
@@ -60,9 +52,22 @@ public:
   void AddInput( vtkDataObject* );
   void AddInput( int, vtkDataObject* );
 
+  /**
+   * Set the number of created seeds around an input point
+   */
+  vtkSetMacro(NumberOfPointsAroundSeed, int);
+  vtkGetMacro(NumberOfPointsAroundSeed, int);
+
+  /**
+   * Set seeding radius in percent of total domain extents
+   */
+  vtkSetMacro(PercentOfDomain, double);
+  vtkGetMacro(PercentOfDomain, double);
+
+
 protected:
-  VestecSamplingAlgorithm();
-  ~VestecSamplingAlgorithm();
+  VestecSeedingAlgorithm();
+  ~VestecSeedingAlgorithm();
 
   // Description:
   // This is called by the superclass.
@@ -98,18 +103,11 @@ protected:
   virtual int FillInputPortInformation( int port, vtkInformation* info ) override;
 
 private:
-  VestecSamplingAlgorithm( const VestecSamplingAlgorithm& ); // Not implemented.
-  void operator = ( const VestecSamplingAlgorithm& );  // Not implemented.
+  VestecSeedingAlgorithm( const VestecSeedingAlgorithm& ); // Not implemented.
+  void operator = ( const VestecSeedingAlgorithm& );  // Not implemented.
 
-  //The tracer
-  vtkPParticleTracer * m_pTracer;
-
-  //Cache of last iteration
-  vtkPolyData* m_pCache;
-
-  //Properties
-  double IntegrationDuration = 0.5;
-  long long timestepindex = 0;
+  int       NumberOfPointsAroundSeed = 10;
+  double    PercentOfDomain = 5;
 };
 
 

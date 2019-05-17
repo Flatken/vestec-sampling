@@ -42,7 +42,7 @@ cmake -G "Eclipse CDT4 - Unix Makefiles" -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" \
       -DPARAVIEW_BUILD_QT_GUI=On \
       -DPARAVIEW_USE_MPI=ON \
       -DPARAVIEW_ENABLE_CATALYST=ON \
-      -DCMAKE_BUILD_TYPE=Release "$EXTERNALS_DIR/paraview-5.6" 
+      -DCMAKE_BUILD_TYPE=Debug "$EXTERNALS_DIR/paraview-5.6" 
 cmake --build . --target install --parallel 12
 
 # TTK -------------------------------------------------------------------------------------------

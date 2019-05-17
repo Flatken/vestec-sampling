@@ -15,10 +15,10 @@ CMAKE_DIR="$( cd "$( dirname "$0" )" && pwd )"
 CURRENT_DIR=$(pwd)
 
 # the build directory can be passed as first parameter
-BUILD_DIR="${1:-$CURRENT_DIR/build/linux-release}"
+BUILD_DIR="${1:-$CURRENT_DIR/build/linux-debug}"
 
 # the install directory can be passed as second parameter
-INSTALL_DIR="${2:-$CURRENT_DIR/install/linux-release}"
+INSTALL_DIR="${2:-$CURRENT_DIR/install/linux-debug}"
 
 # This directory should be the one used as install directory for make_externals.sh.
 EXTERNALS_INSTALL_DIR="${3:-$CURRENT_DIR/install/linux-externals}"
@@ -33,7 +33,7 @@ fi
 export Paraview_DIR=$EXTERNALS_INSTALL_DIR/lib/cmake/paraview-5.6
 
 cd $BUILD_DIR
-cmake -G "Eclipse CDT4 - Unix Makefiles" -DCMAKE_BUILD_TYPE=Release \
+cmake -G "Eclipse CDT4 - Unix Makefiles" -DCMAKE_BUILD_TYPE=Debug \
 -DCMAKE_EXPORT_COMPILE_COMMANDS=YES \
 -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
 -DEXTERNALS_DIR=$EXTERNALS_INSTALL_DIR \

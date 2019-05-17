@@ -1,5 +1,6 @@
-#include "VestecSamplingAlgorithm.h"
+#include "VestecSeedingAlgorithm.h"
 
+#include <vtkPoints.h>
 #include <vtkDataSet.h>
 #include <vtkPolyData.h>
 #include <vtkCommand.h>
@@ -15,74 +16,70 @@
 #include <vtkDuplicatePolyData.h>
 #include <vtkUnstructuredGrid.h>
 #include <vtkFloatArray.h>
-#include <vtkThreshold.h>
-#include <vtkAlgorithmOutput.h>
+
+
 #include <sstream>
+#include <random>
+#include <cmath>
 
-
-
-vtkStandardNewMacro(VestecSamplingAlgorithm);
+vtkStandardNewMacro(VestecSeedingAlgorithm);
 
 //----------------------------------------------------------------------------
-VestecSamplingAlgorithm::VestecSamplingAlgorithm()
+VestecSeedingAlgorithm::VestecSeedingAlgorithm()
 {
-  this->SetNumberOfInputPorts( 2 );
+  this->SetNumberOfInputPorts( 1 );
   this->SetNumberOfOutputPorts( 1 );
-
-  m_pCache = vtkPolyData::New();
-  m_pTracer = vtkPParticleTracer::New();
 }
 
 //----------------------------------------------------------------------------
-VestecSamplingAlgorithm::~VestecSamplingAlgorithm()
+VestecSeedingAlgorithm::~VestecSeedingAlgorithm()
 {
-  //m_pTracer->Delete();
 }
 
 //----------------------------------------------------------------------------
-void VestecSamplingAlgorithm::PrintSelf(ostream& os, vtkIndent indent)
+void VestecSeedingAlgorithm::PrintSelf(ostream& os, vtkIndent indent)
 {
   this->Superclass::PrintSelf(os, indent);
 }
 
 //----------------------------------------------------------------------------
-vtkDataSet* VestecSamplingAlgorithm::GetOutput()
+vtkDataSet* VestecSeedingAlgorithm::GetOutput()
 {
   return this->GetOutput(0);
 }
 
 //----------------------------------------------------------------------------
-vtkDataSet* VestecSamplingAlgorithm::GetOutput(int port)
+vtkDataSet* VestecSeedingAlgorithm::GetOutput(int port)
 {
   return dynamic_cast<vtkDataSet*>(this->GetOutputDataObject(port));
 }
 
 //----------------------------------------------------------------------------
-void VestecSamplingAlgorithm::SetOutput(vtkDataObject* d)
+void VestecSeedingAlgorithm::SetOutput(vtkDataObject* d)
 {
   this->GetExecutive()->SetOutputData(0, d);
 }
 
 //----------------------------------------------------------------------------
-vtkDataObject* VestecSamplingAlgorithm::GetInput()
+vtkDataObject* VestecSeedingAlgorithm::GetInput()
 {
   return this->GetInput(0);
 }
 
 //----------------------------------------------------------------------------
-vtkDataObject* VestecSamplingAlgorithm::GetInput(int port)
+vtkDataObject* VestecSeedingAlgorithm::GetInput(int port)
 {
   return this->GetExecutive()->GetInputData(port, 0);
 }
 
 //----------------------------------------------------------------------------
-vtkDataSet* VestecSamplingAlgorithm::GetLabelHierarchyInput(int port)
+vtkDataSet* VestecSeedingAlgorithm::GetLabelHierarchyInput(int port)
 {
   return dynamic_cast<vtkDataSet*>(this->GetInput(port));
 }
 
 //----------------------------------------------------------------------------
-int VestecSamplingAlgorithm::ProcessRequest(vtkInformation* request,
+int VestecSeedingAlgorithm::ProcessRequest(vtkInformation* request,
                                      vtkInformationVector** inputVector,
                                      vtkInformationVector* outputVector)
 {
@@ -112,7 +109,7 @@ int VestecSamplingAlgorithm::ProcessRequest(vtkInformation* request,
 }
 
 //----------------------------------------------------------------------------
-int VestecSamplingAlgorithm::FillOutputPortInformation(
+int VestecSeedingAlgorithm::FillOutputPortInformation(
     int vtkNotUsed(port), vtkInformation* info)
 {
   // now add our info
@@ -121,7 +118,7 @@ int VestecSamplingAlgorithm::FillOutputPortInformation(
 }
 
 //----------------------------------------------------------------------------
-int VestecSamplingAlgorithm::FillInputPortInformation(
+int VestecSeedingAlgorithm::FillInputPortInformation(
                                                int vtkNotUsed(port), vtkInformation* info)
 {
   info->Set(vtkAlgorithm::INPUT_REQUIRED_DATA_TYPE(), "vtkDataSet");
@@ -129,7 +126,7 @@ int VestecSamplingAlgorithm::FillInputPortInformation(
 }
 
 
-int VestecSamplingAlgorithm::RequestDataObject(vtkInformation* vtkNotUsed(request),
+int VestecSeedingAlgorithm::RequestDataObject(vtkInformation* vtkNotUsed(request),
                                          vtkInformationVector** vtkNotUsed(inputVector),
          vtkInformationVector* outputVector )
     {
@@ -155,7 +152,7 @@ int VestecSamplingAlgorithm::RequestDataObject(vtkInformation* vtkNotUsed(reques
 
 
 //----------------------------------------------------------------------------
-int VestecSamplingAlgorithm::RequestInformation(
+int VestecSeedingAlgorithm::RequestInformation(
                                          vtkInformation* vtkNotUsed(request),
     vtkInformationVector** vtkNotUsed(inputVector),
                                       vtkInformationVector* vtkNotUsed(outputVector))
@@ -165,7 +162,7 @@ int VestecSamplingAlgorithm::RequestInformation(
 }
 
 //----------------------------------------------------------------------------
-int VestecSamplingAlgorithm::RequestUpdateExtent(
+int VestecSeedingAlgorithm::RequestUpdateExtent(
                                           vtkInformation* vtkNotUsed(request),
     vtkInformationVector** inputVector,
     vtkInformationVector* vtkNotUsed(outputVector))
@@ -186,71 +183,70 @@ int VestecSamplingAlgorithm::RequestUpdateExtent(
 //----------------------------------------------------------------------------
 // This is the superclasses style of Execute method.  Convert it into
 // an imaging style Execute method.
-int VestecSamplingAlgorithm::RequestData(
+int VestecSeedingAlgorithm::RequestData(
                                   vtkInformation* vtkNotUsed(request),
     vtkInformationVector **inputVector,
     vtkInformationVector* outputVector )
 {
-  vtkMultiProcessController *ctrl = vtkMultiProcessController::GetGlobalController();
-	int mpiRank  	= ctrl->GetLocalProcessId();
-  int numProcs  = ctrl->GetNumberOfProcesses();
-  //Later on RequestData (RD) happens.
-  //During RD each filter examines any inputs it has, then fills in that empty data object with real data.
-
   vtkInformation* outInfo = outputVector->GetInformationObject(0);
-  vtkDataSet* output = dynamic_cast<vtkDataSet*>(outInfo->Get( vtkDataObject::DATA_OBJECT() ) );
+  vtkPolyData* output = dynamic_cast<vtkPolyData*>(outInfo->Get( vtkDataObject::DATA_OBJECT() ) );
 
   vtkInformation *inInfoGrid = inputVector[0]->GetInformationObject(0);
   vtkDataSet *inputGrid = dynamic_cast<vtkDataSet*>(inInfoGrid->Get(vtkDataObject::DATA_OBJECT()));
 
-  vtkInformation *inInfoSeeds = inputVector[1]->GetInformationObject(0);
-  vtkDataSet *inputSeeds = dynamic_cast<vtkDataSet*>(inInfoSeeds->Get(vtkDataObject::DATA_OBJECT()));
-  
-  double* d = inInfoGrid->Get(vtkStreamingDemandDrivenPipeline::TIME_STEPS());
-  int n  = inInfoGrid->Length(vtkStreamingDemandDrivenPipeline::TIME_STEPS());
-  double t = inInfoGrid->Get(vtkStreamingDemandDrivenPipeline::UPDATE_TIME_STEP());
 
-  //Collect seeds from every process since the tracer needs a consistent number of seeds accross MPI processes
-  vtkPolyData * pInputSeeds = vtkPolyData::SafeDownCast(inputSeeds);
-  vtkPoints * pSend = vtkPoints::New();
-  vtkPoints * pRecv = vtkPoints::New();
+  int numPoints = inputGrid->GetNumberOfPoints();
 
-  if(pInputSeeds->GetNumberOfPoints() > 0)
+  //Resulting points
+  vtkPoints* pPoints = vtkPoints::New();
+  pPoints->Allocate(numPoints * NumberOfPointsAroundSeed);
+
+  // Create a c++11 random number generator
+  std::random_device rd;
+  std::mt19937 gen(rd()); //Standard mersenne_twister_engine seeded with rd()
+
+  for(int p = 0; p < numPoints; ++p)
   {
-    pSend->ShallowCopy(pInputSeeds->GetPoints());
+    //Get the initial position of the point
+    double pos[3];
+    inputGrid->GetPoint(p, pos);
+
+    //Get lengt of each domain axis
+    double bounds[6];
+    inputGrid->GetBounds(bounds);
+
+    //Calculate offset in each dimension
+    double l_x = std::fabs((bounds[1] - bounds[0])) * (PercentOfDomain / 100);
+    double l_y = std::fabs((bounds[3] - bounds[2])) * (PercentOfDomain / 100);
+    double l_z = std::fabs((bounds[5] - bounds[4])) * (PercentOfDomain / 100);
+
+    //Calculate distribution range for each axis
+    std::uniform_real_distribution<> dis_x(pos[0] - l_x, pos[0] + l_x);
+    std::uniform_real_distribution<> dis_y(pos[1] - l_y, pos[1] + l_y);
+    std::uniform_real_distribution<> dis_z(pos[2] - l_z, pos[2] + l_z);
+
+    for(int n = 0; n < NumberOfPointsAroundSeed; ++n)
+    {
+      double new_x = dis_x(gen);
+      double new_y = dis_y(gen);
+      double new_z = dis_z(gen);
+
+      pPoints->InsertNextPoint(new_x, new_y, new_z);
+    }
   }
-  ctrl->AllGatherV(pSend->GetData(), pRecv->GetData());
-
-  vtkPolyData * pCollectedSeeds = vtkPolyData::New();
-  pCollectedSeeds->SetPoints(pRecv);
-  std::cout << " [VESTEC] ############## Number of seeds: " << pCollectedSeeds->GetNumberOfPoints() << std::endl; 
-
-  //Add the new seeds and integrate
-  m_pTracer->SetInputData(1, pCollectedSeeds);
-  m_pTracer->SetInputConnection(0, this->GetInputConnection(0, 0));
-  m_pTracer->SetInputArrayToProcess(0,0,0,vtkDataObject::FIELD_ASSOCIATION_POINTS, "Vec");
-  m_pTracer->SetStaticMesh(1);
-  m_pTracer->SetStaticSeeds(0);
-  m_pTracer->SetForceReinjectionEveryNSteps(1);
-  m_pTracer->SetDisableResetCache(1);
-  m_pTracer->SetComputeVorticity(0);
-  m_pTracer->SetStartTime(t - 0.02);
-  m_pTracer->SetTerminationTime(t);
-  m_pTracer->Update();
   
-  //Copy tp output
-  output->ShallowCopy(m_pTracer->GetOutput());
+  output->SetPoints(pPoints);
   return 1;
 }
 
 //----------------------------------------------------------------------------
-void VestecSamplingAlgorithm::SetInput(vtkDataObject* input)
+void VestecSeedingAlgorithm::SetInput(vtkDataObject* input)
 {
   this->SetInput(0, input);
 }
 
 //----------------------------------------------------------------------------
-void VestecSamplingAlgorithm::SetInput(int index, vtkDataObject* input)
+void VestecSeedingAlgorithm::SetInput(int index, vtkDataObject* input)
 {
   if(input)
   {
@@ -264,13 +260,13 @@ void VestecSamplingAlgorithm::SetInput(int index, vtkDataObject* input)
 }
 
 //----------------------------------------------------------------------------
-void VestecSamplingAlgorithm::AddInput(vtkDataObject* input)
+void VestecSeedingAlgorithm::AddInput(vtkDataObject* input)
 {
   this->AddInput(0, input);
 }
 
 //----------------------------------------------------------------------------
-void VestecSamplingAlgorithm::AddInput(int index, vtkDataObject* input)
+void VestecSeedingAlgorithm::AddInput(int index, vtkDataObject* input)
 {
   if(input)
   {
