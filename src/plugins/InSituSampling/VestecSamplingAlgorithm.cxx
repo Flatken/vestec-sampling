@@ -15,7 +15,7 @@
 #include <vtkDuplicatePolyData.h>
 #include <vtkUnstructuredGrid.h>
 #include <vtkFloatArray.h>
-#include <vtkThreshold.h>
+#include <vtkThresholdPoints.h>
 #include <vtkAlgorithmOutput.h>
 #include <sstream>
 
@@ -225,10 +225,13 @@ int VestecSamplingAlgorithm::RequestData(
   pCollectedSeeds->SetPoints(pRecv);
   std::cout << " [VESTEC] ############## Number of seeds: " << pCollectedSeeds->GetNumberOfPoints() << std::endl; 
 
+  //Get active array
+  vtkDataArray *inScalars = this->GetInputArrayToProcess(0, inputVector);
+
   //Add the new seeds and integrate
   m_pTracer->SetInputData(1, pCollectedSeeds);
   m_pTracer->SetInputConnection(0, this->GetInputConnection(0, 0));
-  m_pTracer->SetInputArrayToProcess(0,0,0,vtkDataObject::FIELD_ASSOCIATION_POINTS, "Vec");
+  m_pTracer->SetInputArrayToProcess(0,0,0,vtkDataObject::FIELD_ASSOCIATION_POINTS, inScalars->GetName());
   m_pTracer->SetStaticMesh(1);
   m_pTracer->SetStaticSeeds(0);
   m_pTracer->SetForceReinjectionEveryNSteps(1);
@@ -237,9 +240,18 @@ int VestecSamplingAlgorithm::RequestData(
   m_pTracer->SetStartTime(t - 0.02);
   m_pTracer->SetTerminationTime(t);
   m_pTracer->Update();
-  
+
+  //Only store particles where the age is less then the IntegrationDuration
+  vtkThresholdPoints* pSelection = vtkThresholdPoints::New();
+  pSelection->ThresholdByLower(IntegrationDuration);
+  pSelection->SetInputData(m_pTracer->GetOutput());
+  pSelection->SetInputArrayToProcess(0,0,0, vtkDataObject::FIELD_ASSOCIATION_POINTS, "ParticleAge");
+  pSelection->Update();
+  std::cout << " [VESTEC] ############## Number of particles after threshold: " << pSelection->GetOutput()->GetNumberOfPoints() << std::endl; 
+
   //Copy tp output
-  output->ShallowCopy(m_pTracer->GetOutput());
+  output->ShallowCopy(pSelection->GetOutput());
+  pSelection->Delete();
   return 1;
 }
 

@@ -15,7 +15,7 @@ namespace filesys = std::experimental::filesystem;
 /**
  * Returns a vector with the full path to each simulation file
  */
-std::vector<std::string> getAllFilesInDir(const std::string &dirPath, const std::vector<std::string> fileSkipList = {})
+std::vector<std::string> getAllFilesInDir(const std::string &dirPath, const std::vector<std::string> fileSelector = {})
 {
 
 	// Create a vector of string
@@ -48,7 +48,7 @@ std::vector<std::string> getAllFilesInDir(const std::string &dirPath, const std:
 				else
 				{
 					string::npos;
-					if (std::find(fileSkipList.begin(), fileSkipList.end(), iter->path().extension()) != fileSkipList.end())
+					if (std::find(fileSelector.begin(), fileSelector.end(), iter->path().extension()) != fileSelector.end())
 					{
 						listOfFiles.push_back(iter->path().string());
 					}	
@@ -97,7 +97,7 @@ int main(int argc, char** argv) {
 	//get number of files (each file represents one timestep of the simulation)
 	std::vector<std::string>files = getAllFilesInDir(std::string(argv[1]), { ".vtk" });
 	std::sort(files.begin(), files.end());
-	
+
 	if(world_rank == 0)
 	{
 		std::cout << "######################################################################## " << std::endl;

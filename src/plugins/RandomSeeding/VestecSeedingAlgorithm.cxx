@@ -16,10 +16,9 @@
 #include <vtkDuplicatePolyData.h>
 #include <vtkUnstructuredGrid.h>
 #include <vtkFloatArray.h>
-
+#include <vtkPointData.h>
 
 #include <sstream>
-#include <random>
 #include <cmath>
 
 vtkStandardNewMacro(VestecSeedingAlgorithm);
@@ -194,7 +193,7 @@ int VestecSeedingAlgorithm::RequestData(
   vtkInformation *inInfoGrid = inputVector[0]->GetInformationObject(0);
   vtkDataSet *inputGrid = dynamic_cast<vtkDataSet*>(inInfoGrid->Get(vtkDataObject::DATA_OBJECT()));
 
-
+  int localNumberOfSeeds = NumberOfPointsAroundSeed;
   int numPoints = inputGrid->GetNumberOfPoints();
 
   //Resulting points
@@ -205,6 +204,7 @@ int VestecSeedingAlgorithm::RequestData(
   std::random_device rd;
   std::mt19937 gen(rd()); //Standard mersenne_twister_engine seeded with rd()
 
+  //For every input point generate n seeds
   for(int p = 0; p < numPoints; ++p)
   {
     //Get the initial position of the point
@@ -220,21 +220,65 @@ int VestecSeedingAlgorithm::RequestData(
     double l_y = std::fabs((bounds[3] - bounds[2])) * (PercentOfDomain / 100);
     double l_z = std::fabs((bounds[5] - bounds[4])) * (PercentOfDomain / 100);
 
-    //Calculate distribution range for each axis
-    std::uniform_real_distribution<> dis_x(pos[0] - l_x, pos[0] + l_x);
-    std::uniform_real_distribution<> dis_y(pos[1] - l_y, pos[1] + l_y);
-    std::uniform_real_distribution<> dis_z(pos[2] - l_z, pos[2] + l_z);
+    double l = 0;
+    if(l_x != 0 && l_y != 0 && l_z != 0)
+      l = std::min(std::min(l_x, l_y), l_z);
+    else
+      l = std::min(l_x, l_y);
+    
+    AbstractGenerator* genAngleY = nullptr;
+    AbstractGenerator* genAngleZ = nullptr;
+    AbstractGenerator* genLenght = nullptr;
 
-    for(int n = 0; n < NumberOfPointsAroundSeed; ++n)
+    if(DistributionMode == 0)
     {
-      double new_x = dis_x(gen);
-      double new_y = dis_y(gen);
-      double new_z = dis_z(gen);
-
-      pPoints->InsertNextPoint(new_x, new_y, new_z);
+      genAngleY = new RandomNumberGenerator<std::uniform_real_distribution<>>(0,M_PI*2);
+      genAngleZ = new RandomNumberGenerator<std::uniform_real_distribution<>>(0,M_PI*2);
+      genLenght = new RandomNumberGenerator<std::uniform_real_distribution<>>(0,l);
+    }else if(DistributionMode == 1)
+    {
+      genAngleY = new RandomNumberGenerator<std::normal_distribution<>>(0,M_PI*2);
+      genAngleZ = new RandomNumberGenerator<std::normal_distribution<>>(0,M_PI*2);
+      genLenght = new RandomNumberGenerator<std::normal_distribution<>>(0,l);
+    }else{
+      std::cout << "Error: Unknown distribution mode" << std::endl;
     }
+
+    //Detetmine the number of seeds with the active scalar value and their range
+    if(UseScalarRange)
+    {
+      vtkDataArray *inScalars = this->GetInputArrayToProcess(0, inputVector);
+      double range[2];
+      inScalars->GetRange(range);
+      std::cout << "Name " << inScalars->GetName() << " Range "<<  range[0] << "  " << range[1] << std::endl;
+      localNumberOfSeeds = 0;
+    }
+
+    //Generate the random seeds and add them to the output point array
+    for(int n = 0; n < localNumberOfSeeds; ++n)
+    {
+      double distance = genLenght->gen();
+      double angleY   = genAngleY->gen();
+      double angleZ   = genAngleZ->gen();
+
+      double new_pos[3];
+      if(l_x != 0 && l_y != 0 && l_z != 0)
+      {
+        new_pos[0] = pos[0] + distance * std::cos(angleZ) * std::sin(angleY);
+        new_pos[1] = pos[1] + distance * std::sin(angleZ);
+        new_pos[2] = pos[2] + distance * std::cos(angleZ) * std::cos(angleY);
+      }else{
+        new_pos[0] = pos[0] + distance * std::cos(angleY);
+        new_pos[1] = pos[1] + distance * std::sin(angleY);
+        new_pos[2] = pos[2];
+      }
+      pPoints->InsertNextPoint(new_pos[0], new_pos[1], new_pos[2]);
+    }
+
+    delete genLenght;
+    delete genAngleY;
+    delete genAngleZ;
   }
-  
   output->SetPoints(pPoints);
   return 1;
 }

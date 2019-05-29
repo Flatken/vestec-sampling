@@ -18,5 +18,5 @@ echo $PYTHONPATH
 SCRIPT_DIR="$( cd "$( dirname "$0" )" && pwd )"
 cd $SCRIPT_DIR
 
-mpiexec -np 2 ./VestecCatalystEmulator /unsecured/flat_ma/vestec/datasets/2D/ 0.02 $1
+mpiexec -np 2 ./VestecCatalystEmulator /unsecured/flat_ma/vestec/datasets/test/ 0.02 $1
 

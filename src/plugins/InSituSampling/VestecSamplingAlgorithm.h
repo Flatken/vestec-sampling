@@ -108,7 +108,7 @@ private:
   vtkPolyData* m_pCache;
 
   //Properties
-  double IntegrationDuration = 0.5;
+  double IntegrationDuration = 1.5;
   long long timestepindex = 0;
 };
 

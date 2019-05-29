@@ -5,9 +5,43 @@
 #include <vtkPolyDataAlgorithm.h>
 #include <vtkPStreaklineFilter.h>
 #include <vtkPParticleTracer.h>
-#include <map>
 
+#include <map>
+#include <string>
+#include <random>
 class vtkDataSet;
+
+
+class AbstractGenerator
+{
+  public:
+    virtual ~AbstractGenerator(){};
+    virtual double gen() = 0;
+};
+
+// A template as generic number generator
+template<class T> class RandomNumberGenerator : public AbstractGenerator
+{
+public:
+    RandomNumberGenerator(double min, double max) 
+    : generator(rd()),
+      distribution(min, max)
+    {}
+    ~RandomNumberGenerator() override {}
+
+    double gen() override
+    {
+      return distribution(generator);
+    } 
+private:
+    double min;
+    double max;
+
+    std::random_device rd;
+    std::mt19937 generator; 
+    T distribution;
+};
+
 
 class VTK_EXPORT VestecSeedingAlgorithm : public vtkPolyDataAlgorithm
 {
@@ -64,6 +98,17 @@ public:
   vtkSetMacro(PercentOfDomain, double);
   vtkGetMacro(PercentOfDomain, double);
 
+  /**
+   * Define the mode how ranRandomNumberGeneratordom seeds are generated within a defined range
+   */
+  vtkSetMacro(DistributionMode, int);
+  vtkGetMacro(DistributionMode, int)
+
+  /**
+   * Use the scalar field range to determine the number of seeds 
+   */
+  vtkSetMacro(UseScalarRange, bool);
+  vtkGetMacro(UseScalarRange, bool)
 
 protected:
   VestecSeedingAlgorithm();
@@ -108,6 +153,10 @@ private:
 
   int       NumberOfPointsAroundSeed = 10;
   double    PercentOfDomain = 5;
+
+  int DistributionMode = 0;
+
+  bool UseScalarRange = 0;
 };
 
 

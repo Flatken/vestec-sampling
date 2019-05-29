@@ -112,14 +112,17 @@ def CreateCoProcessor():
       diagonal.ThresholdRange = [-1.0, -0.1]
 
 	  # create a new 'TTK SphereFromPoint'
-      seedingStrategy = VestecSeedingAlgorithm(Points=tTKScalarFieldCriticalPoints1)
-      seedingStrategy.SeedingRadius = 7.0
-      seedingStrategy.NumberOfSeeds = 4
+      seedingStrategy = VestecSeedingAlgorithm(Input=tTKScalarFieldCriticalPoints1)
+      seedingStrategy.SeedingRadius = 15.0
+      seedingStrategy.NumberOfSeeds = 10
+      seedingStrategy.RandomDistributionMode = 'Normal distribution'
+      seedingStrategy.Array = ['POINTS', 'p']
 
 
       # Compute streakline snippets
       vestecSamplingAlgorithm = VestecSamplingAlgorithm(Grid=grid_,Seeds=seedingStrategy)
       vestecSamplingAlgorithm.Vectors = ['POINTS', 'Vec']
+      vestecSamplingAlgorithm.IntegrationDuration = 1.2
 	  
       SetActiveSource(vestecSamplingAlgorithm)
 
