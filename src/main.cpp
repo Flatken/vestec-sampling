@@ -74,7 +74,7 @@ std::vector<std::string> getAllFilesInDir(const std::string &dirPath, const std:
 int main(int argc, char** argv) {
 	if (argc <= 3)
 	{
-		printf("Usage: VesteVestecSampling [PATH-TO-DATA] [DELTA_TIME] [CATALYST_PYTHON_SCRIPTS] \n");
+		printf("Usage: VesteVestecSampling [PATH-TO-DATA] [FILE-SELECTOR] [DELTA_TIME] [CATALYST_PYTHON_SCRIPTS] \n");
 		return 0;
 	}
 	
@@ -95,29 +95,34 @@ int main(int argc, char** argv) {
     MPI_Get_processor_name(processor_name, &name_len);
 
 	//get number of files (each file represents one timestep of the simulation)
-	std::vector<std::string>files = getAllFilesInDir(std::string(argv[1]), { ".vtk" });
+	std::vector<std::string>files = getAllFilesInDir(std::string(argv[1]), { std::string(argv[2]) });
 	std::sort(files.begin(), files.end());
 
 	if(world_rank == 0)
 	{
-		std::cout << "######################################################################## " << std::endl;
-		std::cout << "This an example programm for VESTEC to calculate proxies and do sampling " << std::endl;
+		std::cout << "############################################################################# " << std::endl;
+		std::cout << "This an example program for VESTEC to calculate proxies and do data sampling " << std::endl;
     	std::cout << "Reading simulation files from: " << std::string(argv[1]) << std::endl;
+		std::cout << "File Selector (string): " << std::string(argv[2]) << std::endl;
 		std::cout << "Number of input files: " << files.size() << std::endl;
-		std::cout << "Delta between timesteps (ms): " << std::string(argv[2]) << std::endl;
-		std::cout << "Catalyst Python script: " << std::string(argv[3]) << std::endl;
-		std::cout << "######################################################################## " << std::endl;
+		std::cout << "Delta between timesteps (ms): " << std::string(argv[3]) << std::endl;
+		std::cout << "Catalyst Python script: " << std::string(argv[4]) << std::endl;
+		std::cout << "############################################################################# " << std::endl;
 	}
 
 	unsigned int numberOfTimeSteps = files.size();
 	unsigned int timeStep = 0;
 	double time = 0;
-	double stepsize = stod(std::string(argv[2]));
+	double stepsize = stod(std::string(argv[3]));
 
+	MPI_Barrier(MPI_COMM_WORLD);
+	std::cout << "Initializing catalyst" << std::endl;
 	#ifdef USE_CATALYST
 		CatalystInitialize(files, stepsize, argc, argv);
 	#endif
-
+	std::cout << "Initializing catalyst done " << std::endl;
+	std::cout << "############################################################################# " << std::endl;
+	MPI_Barrier(MPI_COMM_WORLD);
 	for (timeStep = 0; timeStep < numberOfTimeSteps; timeStep++)
 	{
 		std::cout << "Execute pipeline for t: "<< time <<" and step: " << timeStep << std::endl;
