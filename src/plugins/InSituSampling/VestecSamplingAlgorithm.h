@@ -23,6 +23,12 @@ public:
   vtkSetMacro(IntegrationDuration, double);
   vtkGetMacro(IntegrationDuration, double);
 
+  /**
+   * Set Step size between two timesteps
+   */
+  vtkSetMacro(StepSize, double);
+  vtkGetMacro(StepSize, double);
+
 
   // Description:
   // Get the output data object for a port on this algorithm.
@@ -109,6 +115,7 @@ private:
 
   //Properties
   double IntegrationDuration = 1.5;
+  double StepSize = 1;
   long long timestepindex = 0;
 };
 

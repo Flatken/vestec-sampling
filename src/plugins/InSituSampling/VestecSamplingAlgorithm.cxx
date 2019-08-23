@@ -237,7 +237,7 @@ int VestecSamplingAlgorithm::RequestData(
   m_pTracer->SetForceReinjectionEveryNSteps(1);
   m_pTracer->SetDisableResetCache(1);
   m_pTracer->SetComputeVorticity(0);
-  m_pTracer->SetStartTime(t - 0.02);
+  m_pTracer->SetStartTime(t - StepSize);
   m_pTracer->SetTerminationTime(t);
   m_pTracer->Update();
 
