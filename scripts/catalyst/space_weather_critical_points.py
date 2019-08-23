@@ -21,78 +21,69 @@ for x in glob.glob(
     LoadPlugin(x, ns=globals())
     print("Loading Plugin: "+x)
 #--------------------------------------------------------------
-# Code generated from cpstate.py to create the CoProcessor.
-# paraview version 5.5.2
 
-#--------------------------------------------------------------
+# Global timestep output options
+timeStepToStartOutputAt=0
+forceOutputAtFirstCall=False
+
 # Global screenshot output options
 imageFileNamePadding=0
 rescale_lookuptable=False
 
+# Whether or not to request specific arrays from the adaptor.
+requestSpecificArrays=False
+
+# a root directory under which all Catalyst output goes
+rootDirectory=''
+
+# makes a cinema D index table
+make_cinema_table=False
 
 # ----------------------- CoProcessor definition -----------------------
 
 def CreateCoProcessor():
   def _CreatePipeline(coprocessor, datadescription):
     class Pipeline:
-      # state file generated using paraview version 5.5.2
+      # state file generated using paraview version 5.6.0
 
       # ----------------------------------------------------------------
       # setup the data processing pipelines
       # ----------------------------------------------------------------
 
-      # trace generated using paraview version 5.5.2
+      # trace generated using paraview version 5.6.0
+      #
+      # To ensure correct image size when batch processing, please search 
+      # for and uncomment the line `# renderView*.ViewSize = [*,*]`
 
       #### disable automatic camera reset on 'Show'
       paraview.simple._DisableFirstRenderCameraReset()
 
       # create a new 'Legacy VTK Reader'
       # create a producer from a simulation input
-      grid_ = coprocessor.CreateProducer(datadescription, 'input')
-      
+      politano_B_ = coprocessor.CreateProducer(datadescription, 'input')
+
       # create a new 'Compute Derivatives'
-      computeVorticity = ComputeDerivatives(Input=grid_)
-      computeVorticity.Scalars = ['POINTS', 'p']
-      computeVorticity.Vectors = ['POINTS', 'Vec']
-      computeVorticity.OutputVectorType = 'Vorticity'
-      computeVorticity.OutputTensorType = 'Nothing'
+      computeDerivatives1 = ComputeDerivatives(Input=politano_B_)
+      computeDerivatives1.Scalars = [None, '']
+      computeDerivatives1.Vectors = ['POINTS', 'B']
+      computeDerivatives1.OutputVectorType = 'Vorticity'
 
       # create a new 'Calculator'
-      vorticityMagnitutde = Calculator(Input=computeVorticity)
-      vorticityMagnitutde.AttributeType = 'Cell Data'
-      vorticityMagnitutde.ResultArrayName = 'vortMag'
-      vorticityMagnitutde.Function = 'Vorticity_Z'
+      calculator1 = Calculator(Input=computeDerivatives1)
+      calculator1.AttributeType = 'Cell Data'
+      calculator1.ResultArrayName = 'mag'
+      calculator1.Function = 'mag(Vorticity)'
 
       # create a new 'Cell Data to Point Data'
-      grid = CellDatatoPointData(Input=vorticityMagnitutde)
+      cellDatatoPointData1 = CellDatatoPointData(Input=calculator1)
 
       # create a new 'Tetrahedralize'
-      tetrahedralize1 = Tetrahedralize(Input=grid)
-
-      # create a new 'TTK PersistenceDiagram'
-      tTKPersistenceDiagram1 = TTKPersistenceDiagram(Input=tetrahedralize1)
-      tTKPersistenceDiagram1.ScalarField = 'vortMag'
-      tTKPersistenceDiagram1.InputOffsetField = 'vortMag'
-
-      # create a new 'Threshold'
-      positives = Threshold(Input=tTKPersistenceDiagram1)
-      positives.Scalars = ['CELLS', 'PairIdentifier']
-      positives.ThresholdRange = [0.01, 9184.0]
-
-      # create a new 'Threshold'
-      persistentThreshold = Threshold(Input=positives)
-      persistentThreshold.Scalars = ['CELLS', 'Persistence']
-      persistentThreshold.ThresholdRange = [1.1, 17.0]
-
-      # create a new 'TTK TopologicalSimplification'
-      tTKTopologicalSimplification1 = TTKTopologicalSimplification(Domain=tetrahedralize1,
-          Constraints=persistentThreshold)
-      tTKTopologicalSimplification1.ScalarField = 'vortMag'
+      tetrahedralize1 = Tetrahedralize(Input=cellDatatoPointData1)
 
       # create a new 'TTK ScalarFieldCriticalPoints'
-      tTKScalarFieldCriticalPoints1 = TTKScalarFieldCriticalPoints(Input=tTKTopologicalSimplification1)
-      tTKScalarFieldCriticalPoints1.ScalarField = 'vortMag'
-      tTKScalarFieldCriticalPoints1.Withboundarymask = 0
+      tTKScalarFieldCriticalPoints1 = TTKScalarFieldCriticalPoints(Input=tetrahedralize1)
+      tTKScalarFieldCriticalPoints1.ScalarField = 'mag'
+      tTKScalarFieldCriticalPoints1.InputOffsetfield = 'mag'
 
       # create a new 'Mask Points'
       maskPoints1 = MaskPoints(Input=tTKScalarFieldCriticalPoints1)
@@ -101,7 +92,7 @@ def CreateCoProcessor():
       maskPoints1.GenerateVertices = 1
       maskPoints1.SingleVertexPerCell = 1
 
-      # create a new 'Threfreqs = {'input': [1]}shold' to select minima
+      # create a new 'Threshold' to select minima
       threshold2 = Threshold(Input=maskPoints1)
       threshold2.Scalars = ['POINTS', 'CriticalType']
       threshold2.ThresholdRange = [3.0, 3.0]
@@ -114,29 +105,27 @@ def CreateCoProcessor():
       # create a new 'Append Datasets'
       appendDatasets1 = AppendDatasets(Input=[threshold2, threshold1])
 
-      # Generate seeds around critical points
+      # create a new 'TTK SphereFromPoint'
       vestecSeeding = VestecSeedingAlgorithm(Input=appendDatasets1)
       vestecSeeding.SeedingRadius = 10.0
       vestecSeeding.NumberOfSeeds = 5
       vestecSeeding.RandomDistributionMode = 'Normal distribution'
       vestecSeeding.Array = ['POINTS', 'p']
 
-      # Trace particles
-      vestecSamplingAlgorithm = VestecSamplingAlgorithm(Grid=grid_,Seeds=vestecSeeding)
-      vestecSamplingAlgorithm.Vectors = ['POINTS', 'Vec']
-      vestecSamplingAlgorithm.IntegrationDuration = 1.2
-      vestecSamplingAlgorithm.StepSize = 0.02
-      
+      # Compute streakline snippets
+      vestecSamplingAlgorithm = VestecSamplingAlgorithm(Grid=politano_B_,Seeds=vestecSeeding)
+      vestecSamplingAlgorithm.Vectors = ['POINTS', 'B']
+      vestecSamplingAlgorithm.IntegrationDuration = 3
+      vestecSamplingAlgorithm.StepSize = 1
+
       SetActiveSource(vestecSamplingAlgorithm)
 
       # Now any catalyst writers
       xMLPPolyDataWriter1 = servermanager.writers.XMLPPolyDataWriter(Input=vestecSamplingAlgorithm)
-      coprocessor.RegisterWriter(xMLPPolyDataWriter1, filename='VestecSamplingAlgorithm1_%t.pvtp', freq=1, paddingamount=0)
-
-      
+      coprocessor.RegisterWriter(xMLPPolyDataWriter1, filename='SpaceWeather_%t.pvtp', freq=1, paddingamount=0)
       # ----------------------------------------------------------------
       # finally, restore active source
-      SetActiveSource(grid)
+      SetActiveSource(politano_B_)
       # ----------------------------------------------------------------
     return Pipeline()
 
@@ -148,6 +137,14 @@ def CreateCoProcessor():
   # these are the frequencies at which the coprocessor updates.
   freqs = {'input': [1]}
   coprocessor.SetUpdateFrequencies(freqs)
+  coprocessor.SetInitialOutputOptions(timeStepToStartOutputAt,forceOutputAtFirstCall)
+
+  if rootDirectory:
+      coprocessor.SetRootDirectory(rootDirectory)
+
+  if make_cinema_table:
+      coprocessor.EnableCinemaDTable()
+
   return coprocessor
 
 
@@ -167,13 +164,6 @@ coprocessor.EnableLiveVisualization(False, 1)
 def RequestDataDescription(datadescription):
     "Callback to populate the request for current timestep"
     global coprocessor
-    if datadescription.GetForceOutput() == True:
-        # We are just going to request all fields and meshes from the simulation
-        # code/adaptor.
-        for i in range(datadescription.GetNumberOfInputDescriptions()):
-            datadescription.GetInputDescription(i).AllFieldsOn()
-            datadescription.GetInputDescription(i).GenerateMeshOn()
-        return
 
     # setup requests for all inputs based on the requirements of the
     # pipeline.
