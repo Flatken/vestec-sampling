@@ -37,6 +37,12 @@
                         default_values="1.5">
       </DoubleVectorProperty>
 
+      <DoubleVectorProperty name="StepSize"
+                        command="SetStepSize"
+                        number_of_elements="1"
+                        default_values="1">
+      </DoubleVectorProperty>
+
       <StringVectorProperty name="SelectInputVectors"
                             label="Vectors"
                             command="SetInputArrayToProcess"
