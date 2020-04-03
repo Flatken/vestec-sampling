@@ -72,6 +72,7 @@ cmake %CMAKE_FLAGS% -DCMAKE_INSTALL_PREFIX="%INSTALL_DIR%"^
       -DPARAVIEW_BUILD_QT_GUI=On^
       -DPARAVIEW_USE_MPI=ON^
       -DPARAVIEW_ENABLE_CATALYST=ON^
+	  -DQt5_DIR=C:\Qt\Qt5.14.2\5.14.2\msvc2017_64\lib\cmake\Qt5^
       -DCMAKE_BUILD_TYPE=%BUILD_TYPE% "%EXTERNALS_DIR%/paraview-5.6" 
 cmake --build . --config %BUILD_TYPE% --target install --parallel 12
 
