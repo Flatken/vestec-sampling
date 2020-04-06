@@ -88,6 +88,7 @@ cmake %CMAKE_FLAGS% -DCMAKE_INSTALL_PREFIX="%INSTALL_DIR%"^
       -DCMAKE_PREFIX_PATH=%INSTALL_DIR%/lib/cmake/paraview-5.6^
       -DParaView_CMAKE_DIR=%INSTALL_DIR%/lib/cmake/paraview-5.6^
 	  -DQt5_DIR=C:/Qt/Qt5.14.2/5.14.2/msvc2017_64/lib/cmake/Qt5^
+      -DCMAKE_CXX_FLAGS="/bigobj /EHsc"^
       -DCMAKE_BUILD_TYPE=%BUILD_TYPE% "%EXTERNALS_DIR%/ttk"
 cmake --build . --config %BUILD_TYPE% --target install --parallel 12
 
