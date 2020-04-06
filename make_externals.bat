@@ -72,7 +72,7 @@ cmake %CMAKE_FLAGS% -DCMAKE_INSTALL_PREFIX="%INSTALL_DIR%"^
       -DPARAVIEW_BUILD_QT_GUI=On^
       -DPARAVIEW_USE_MPI=ON^
       -DPARAVIEW_ENABLE_CATALYST=ON^
-	  -DQt5_DIR=C:\Qt\Qt5.14.2\5.14.2\msvc2017_64\lib\cmake\Qt5^
+	  -DQt5_DIR=C:/Qt/Qt5.14.2/5.14.2/msvc2017_64/lib/cmake/Qt5^
       -DCMAKE_BUILD_TYPE=%BUILD_TYPE% "%EXTERNALS_DIR%/paraview-5.6" 
 cmake --build . --config %BUILD_TYPE% --target install --parallel 12
 
@@ -87,6 +87,7 @@ cmake -E make_directory "%BUILD_DIR%/ttk" && cd "%BUILD_DIR%/ttk"
 cmake %CMAKE_FLAGS% -DCMAKE_INSTALL_PREFIX="%INSTALL_DIR%"^
       -DCMAKE_PREFIX_PATH=%INSTALL_DIR%/lib/cmake/paraview-5.6^
       -DParaView_CMAKE_DIR=%INSTALL_DIR%/lib/cmake/paraview-5.6^
+	  -DQt5_DIR=C:/Qt/Qt5.14.2/5.14.2/msvc2017_64/lib/cmake/Qt5^
       -DCMAKE_BUILD_TYPE=%BUILD_TYPE% "%EXTERNALS_DIR%/ttk"
 cmake --build . --config %BUILD_TYPE% --target install --parallel 12
 
