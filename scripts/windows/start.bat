@@ -1,5 +1,7 @@
 @echo off
-set PATH=%PATH%;D:\SoftwareEntwicklung\Catalyst\install\win7.x86_64.msvc15.release\bin
-
-mpiexec /genv PATH D:\SoftwareEntwicklung\Catalyst\install\win7.x86_64.msvc15.release\bin -hosts 1 localhost -cores 1 VestecSampling.exe "D:\\vr_data\\VESTEC\\diseases\\Output"
+set PATH=../lib:%PATH%
+set PYTHONPATH=%PYTHONPATH%:Lib/site-packages
+set PYTHONPATH=%PYTHONPATH%:../bin:../lib
+start smpd -d 3
+mpiexec -hosts 1 localhost -cores 1 VestecCatalystEmulator.exe "D:\\vr_data\\KarmanVortexStreet\\2D" .vtk 0.02 samplingKarman.py
 @echo on
