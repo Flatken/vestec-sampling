@@ -131,7 +131,7 @@ def CreateCoProcessor():
 
       # Now any catalyst writers
       xMLPPolyDataWriter1 = servermanager.writers.XMLPPolyDataWriter(Input=vestecSamplingAlgorithm)
-      coprocessor.RegisterWriter(xMLPPolyDataWriter1, filename='VestecSamplingAlgorithm1_%t.pvtp', freq=1, paddingamount=0)
+      coprocessor.RegisterWriter(xMLPPolyDataWriter1, filename='results/VestecSamplingAlgorithm1_%t.pvtp', freq=1, paddingamount=0)
 
       
       # ----------------------------------------------------------------
