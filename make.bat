@@ -57,7 +57,7 @@ cmake %CMAKE_FLAGS% -DCMAKE_INSTALL_PREFIX="%INSTALL_DIR%"^
 	  -DCMAKE_BUILD_TYPE=%BUILD_TYPE%^
 	  -DParaView_DIR=%Paraview_DIR%^
 	  -DUSE_CATALYST=ON^
-      -DEXTERNALS_DIR="%EXTERNALS_INSTALL_DIR%" "%CMAKE_DIR%"  || exit /b
+    -DEXTERNALS_DIR="%EXTERNALS_INSTALL_DIR%" "%CMAKE_DIR%"  || exit /b
 
 cmake --build . --config %BUILD_TYPE% --target install --parallel 8  || exit /b
 

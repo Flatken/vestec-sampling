@@ -25,8 +25,8 @@ cmake -E make_directory "$INSTALL_DIR/bin"
 cmake -E make_directory "$INSTALL_DIR/include"
 
 # TTK patch paraview--------------------------------------------------------------------------------
-#cd $EXTERNALS_DIR/ttk/paraview/patch/
-#./patch-paraview-5.6.0.sh $EXTERNALS_DIR/paraview-5.6
+cd $EXTERNALS_DIR/ttk/paraview/patch/
+./patch-paraview-5.6.0.sh $EXTERNALS_DIR/paraview-5.6
 
 # Paraview -----------------------------------------------------------------------------------------
 echo "Building and installing Paraview 5.6 ..."
