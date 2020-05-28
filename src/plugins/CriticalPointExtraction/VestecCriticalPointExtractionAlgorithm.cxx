@@ -129,8 +129,7 @@ int VestecCriticalPointExtractionAlgorithm::FillInputPortInformation(
 
 int VestecCriticalPointExtractionAlgorithm::RequestDataObject(vtkInformation* vtkNotUsed(request),
                                          vtkInformationVector** vtkNotUsed(inputVector),
-         vtkInformationVector* outputVector )
-    {
+         vtkInformationVector* outputVector ) {
 //RequestDataObject (RDO) is an earlier pipeline pass.
 //During RDO, each filter is supposed to produce an empty data object of the proper type
 
@@ -149,15 +148,14 @@ int VestecCriticalPointExtractionAlgorithm::RequestDataObject(vtkInformation* vt
   }
 
   return 1;
-    }
+}
 
 
 //----------------------------------------------------------------------------
 int VestecCriticalPointExtractionAlgorithm::RequestInformation(
                                          vtkInformation* vtkNotUsed(request),
     vtkInformationVector** vtkNotUsed(inputVector),
-                                      vtkInformationVector* vtkNotUsed(outputVector))
-{
+                                      vtkInformationVector* vtkNotUsed(outputVector)) {
   // do nothing let subclasses handle it
   return 1;
 }
@@ -195,94 +193,94 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
   vtkInformation *inInfoGrid = inputVector[0]->GetInformationObject(0);
   vtkDataSet *inputGrid = dynamic_cast<vtkDataSet*>(inInfoGrid->Get(vtkDataObject::DATA_OBJECT()));
 
-  int localNumberOfSeeds = NumberOfPointsAroundSeed;
-  int numPoints = inputGrid->GetNumberOfPoints();
+  identify_critical_points(inputGrid);
+  /// to-do MPI implementation
+  ///  
 
-  //Resulting points
-  vtkPoints* pPoints = vtkPoints::New();
-  pPoints->Allocate(numPoints * NumberOfPointsAroundSeed);
+  // int localNumberOfSeeds = NumberOfPointsAroundSeed;
+  // int numPoints = inputGrid->GetNumberOfPoints();
 
-  // Create a c++11 random number generator
-  std::random_device rd;
-  std::mt19937 gen(rd()); //Standard mersenne_twister_engine seeded with rd()
+  // //Resulting points
+  // vtkPoints* pPoints = vtkPoints::New();
+  // pPoints->Allocate(numPoints * NumberOfPointsAroundSeed);
+  
+  // //For every input point generate n seeds
+  // for(int p = 0; p < numPoints; ++p)
+  // {
+  //   //Get the initial position of the point
+  //   double pos[3];
+  //   inputGrid->GetPoint(p, pos);
 
-  //For every input point generate n seeds
-  for(int p = 0; p < numPoints; ++p)
-  {
-    //Get the initial position of the point
-    double pos[3];
-    inputGrid->GetPoint(p, pos);
+  //   //Get lengt of each domain axis
+  //   double bounds[6];
+  //   inputGrid->GetBounds(bounds);
 
-    //Get lengt of each domain axis
-    double bounds[6];
-    inputGrid->GetBounds(bounds);
+  //   //Calculate offset in each dimension
+  //   double l_x = std::fabs((bounds[1] - bounds[0])) * (PercentOfDomain / 100);
+  //   double l_y = std::fabs((bounds[3] - bounds[2])) * (PercentOfDomain / 100);
+  //   double l_z = std::fabs((bounds[5] - bounds[4])) * (PercentOfDomain / 100);
 
-    //Calculate offset in each dimension
-    double l_x = std::fabs((bounds[1] - bounds[0])) * (PercentOfDomain / 100);
-    double l_y = std::fabs((bounds[3] - bounds[2])) * (PercentOfDomain / 100);
-    double l_z = std::fabs((bounds[5] - bounds[4])) * (PercentOfDomain / 100);
-
-    double l = 0;
-    if(l_x != 0 && l_y != 0 && l_z != 0)
-      l = std::min(std::min(l_x, l_y), l_z);
-    else
-      l = std::min(l_x, l_y);
+  //   double l = 0;
+  //   if(l_x != 0 && l_y != 0 && l_z != 0)
+  //     l = std::min(std::min(l_x, l_y), l_z);
+  //   else
+  //     l = std::min(l_x, l_y);
     
-    // AbstractGenerator* genAngleY = nullptr;
-    // AbstractGenerator* genAngleZ = nullptr;
-    // AbstractGenerator* genLenght = nullptr;
+  //   // AbstractGenerator* genAngleY = nullptr;
+  //   // AbstractGenerator* genAngleZ = nullptr;
+  //   // AbstractGenerator* genLenght = nullptr;
 
-    if(DistributionMode == 0)
-    {
-      // genAngleY = new RandomNumberGenerator<std::uniform_real_distribution<>>(0,M_PI*2);
-      // genAngleZ = new RandomNumberGenerator<std::uniform_real_distribution<>>(0,M_PI*2);
-      // genLenght = new RandomNumberGenerator<std::uniform_real_distribution<>>(0,l);
-    }else if(DistributionMode == 1)
-    {
-      // genAngleY = new RandomNumberGenerator<std::normal_distribution<>>(0,M_PI*2);
-      // genAngleZ = new RandomNumberGenerator<std::normal_distribution<>>(0,M_PI*2);
-      // genLenght = new RandomNumberGenerator<std::normal_distribution<>>(0,l);
-    }else{
-      std::cout << "Error: Unknown distribution mode" << std::endl;
-    }
+  //   if(DistributionMode == 0)
+  //   {
+  //     // genAngleY = new RandomNumberGenerator<std::uniform_real_distribution<>>(0,M_PI*2);
+  //     // genAngleZ = new RandomNumberGenerator<std::uniform_real_distribution<>>(0,M_PI*2);
+  //     // genLenght = new RandomNumberGenerator<std::uniform_real_distribution<>>(0,l);
+  //   }else if(DistributionMode == 1)
+  //   {
+  //     // genAngleY = new RandomNumberGenerator<std::normal_distribution<>>(0,M_PI*2);
+  //     // genAngleZ = new RandomNumberGenerator<std::normal_distribution<>>(0,M_PI*2);
+  //     // genLenght = new RandomNumberGenerator<std::normal_distribution<>>(0,l);
+  //   }else{
+  //     std::cout << "Error: Unknown distribution mode" << std::endl;
+  //   }
 
-    //Detetmine the number of seeds with the active scalar value and their range
-    if(UseScalarRange)
-    {
-      vtkDataArray *inScalars = this->GetInputArrayToProcess(0, inputVector);
-      double range[2];
-      inScalars->GetRange(range);
-      std::cout << "Name " << inScalars->GetName() << " Range "<<  range[0] << "  " << range[1] << std::endl;
-      localNumberOfSeeds = 0;
-    }
+  //   //Detetmine the number of seeds with the active scalar value and their range
+  //   if(UseScalarRange)
+  //   {
+  //     vtkDataArray *inScalars = this->GetInputArrayToProcess(0, inputVector);
+  //     double range[2];
+  //     inScalars->GetRange(range);
+  //     std::cout << "Name " << inScalars->GetName() << " Range "<<  range[0] << "  " << range[1] << std::endl;
+  //     localNumberOfSeeds = 0;
+  //   }
 
-    // //Generate the random seeds and add them to the output point array
-    // for(int n = 0; n < localNumberOfSeeds; ++n)
-    // {
-    //   double distance = 0;//genLenght->gen();
-    //   double angleY   = 0;//genAngleY->gen();
-    //   double angleZ   = 0;//genAngleZ->gen();
+  //   // //Generate the random seeds and add them to the output point array
+  //   // for(int n = 0; n < localNumberOfSeeds; ++n)
+  //   // {
+  //   //   double distance = 0;//genLenght->gen();
+  //   //   double angleY   = 0;//genAngleY->gen();
+  //   //   double angleZ   = 0;//genAngleZ->gen();
 
-    //   double new_pos[3];
-    //   if(l_x != 0 && l_y != 0 && l_z != 0)
-    //   {
-    //     new_pos[0] = pos[0] + distance * std::cos(angleZ) * std::sin(angleY);
-    //     new_pos[1] = pos[1] + distance * std::sin(angleZ);
-    //     new_pos[2] = pos[2] + distance * std::cos(angleZ) * std::cos(angleY);
-    //   }else{
-    //     new_pos[0] = pos[0] + distance * std::cos(angleY);
-    //     new_pos[1] = pos[1] + distance * std::sin(angleY);
-    //     new_pos[2] = pos[2];
-    //   }
-    //   pPoints->InsertNextPoint(new_pos[0], new_pos[1], new_pos[2]);
-    // }
+  //   //   double new_pos[3];
+  //   //   if(l_x != 0 && l_y != 0 && l_z != 0)
+  //   //   {
+  //   //     new_pos[0] = pos[0] + distance * std::cos(angleZ) * std::sin(angleY);
+  //   //     new_pos[1] = pos[1] + distance * std::sin(angleZ);
+  //   //     new_pos[2] = pos[2] + distance * std::cos(angleZ) * std::cos(angleY);
+  //   //   }else{
+  //   //     new_pos[0] = pos[0] + distance * std::cos(angleY);
+  //   //     new_pos[1] = pos[1] + distance * std::sin(angleY);
+  //   //     new_pos[2] = pos[2];
+  //   //   }
+  //   //   pPoints->InsertNextPoint(new_pos[0], new_pos[1], new_pos[2]);
+  //   // }
 
-    // delete genLenght;
-    // delete genAngleY;
-    // delete genAngleZ;
-  }
-  output->SetPoints(pPoints);
-  return 1;
+  //   // delete genLenght;
+  //   // delete genAngleY;
+  //   // delete genAngleZ;
+  // }
+  // output->SetPoints(pPoints);
+  // return 1;
 }
 
 //----------------------------------------------------------------------------
@@ -318,4 +316,47 @@ void VestecCriticalPointExtractionAlgorithm::AddInput(int index, vtkDataObject* 
   {
     this->AddInputDataObject(index, input);
   }
+}
+
+//----------------------------------------------------------------------------
+vtkSmartPointer<vtkPolyData> CriticalPointExtractor::identify_critical_points(vtkSmartPointer<vtkDataSet> grid) {
+  vtkSmartPointer<vtkPolyData> output = vtkSmartPointer<vtkPolyData>::New();
+  vtkIdType cells_num = grid->GetNumberOfCells();
+  // bool is_critical = false;
+  for(vtkIdType i=0; i<cells_num; i++) {
+    // vtkSmartPointer<vtkTetra> t = vtkTetra::SafeDownCast(tet_mesh->GetCell(i));
+    // float t_degree = compute_degree(t);
+    // // here we need to understand how to discretize the critical points..
+    // // likely we have to understand 
+    if(PointInCell(grid->GetCell(i)),grid) {
+      // add cell i to output
+    }
+  }
+  return output;
+}
+
+/// can we pass to Positive directly the determinant matrix instead of the cell?
+int CriticalPointExtractor::Positive(vtkCell *cell, vtkSmartPointer<vtkDataSet> grid)
+{
+  vtkSmartPointer<vtkDataArray> vectors = grid->GetPointData()->GetVectors();
+  // 0. initialize vector array of cell points vectors
+  vtkSmartPointer<vtkIdList> ids = cell->GetPointIds();
+  std::vector<std::unique_ptr<double>> points;
+  for (auto i : ids) {
+    points.push_back(vectors->GetTuple(i));
+  }
+  // 1. --> convert to fixed precision (float to long)
+  // 2. sort (check)
+  // 3. create vector matrix and compute determinant sign
+  // 4. check the number of swap operation while sorting
+
+}
+
+bool CriticalPointExtractor::PointInCell(vtkCell *cell, vtkSmartPointer<vtkDataSet> grid) {
+  // 1. compute the sign of the determinant of the cell  
+  // 2. for each facet (i.e. an edge in a triangle or a triangle in a tetrahedron) do
+  // 2.1. replace each row of the matrix with the origin vector (0,0) or (0,0,0)
+  // 2.2. compute the determinant sign again 
+  // 2.3. check if it changes --> if so return false
+  return true; // the cell is critical, since the sign never change
 }

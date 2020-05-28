@@ -5,6 +5,9 @@
 #include <vtkPolyDataAlgorithm.h>
 #include <vtkPStreaklineFilter.h>
 #include <vtkPParticleTracer.h>
+//#include <vtkCell3D.h>
+#include <vtkUnstructuredGrid.h>
+#include <vtkTetra.h>
 
 #include <map>
 #include <string>
@@ -40,6 +43,23 @@ class vtkDataSet;
 //     std::random_device rd;
 //     std::mt19937 generator; 
 //     T distribution;
+// };
+
+/// This class implements the algorithm described in:
+/// "Robust Detection of Singularities in Vector Fields" by Bhatia et al.
+/// -----
+/// add other references here:
+/// 
+// class CriticalPointExtractor {
+//   public:
+//     CriticalPointExtractor() {}
+//     vtkSmartPointer<vtkPolyData> identify_critical_points(vtkSmartPointer<vtkDataSet> grid);
+
+//   private:
+//     // float compute_degree(vtkTetra* tet);
+//     // float compute_solid_angle(vtkTetra* tet);
+//     int Positive(vtkCell *cell, vtkSmartPointer<vtkDataSet> grid);
+//     bool PointInCell(vtkCell *cell, vtkSmartPointer<vtkDataSet> grid);
 // };
 
 
