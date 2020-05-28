@@ -9,6 +9,8 @@
 #include <vtkUnstructuredGrid.h>
 #include <vtkTetra.h>
 
+#include <Eigen/Dense>
+
 #include <map>
 #include <string>
 #include <random>
@@ -49,7 +51,9 @@ class vtkDataSet;
 /// "Robust Detection of Singularities in Vector Fields" by Bhatia et al.
 /// -----
 /// add other references here:
-/// 
+/// (extending this method) "Detection and classification of critical points in piecewise linear vector fields" by Wang et al.
+/// (survey) "A survey of topology‐based methods in visualization" by Heine et al.
+/// (survey) "From numerics to combinatorics: a survey of topological methods for vector field visualization" by Wang et al.
 class CriticalPointExtractor {
   public:
     CriticalPointExtractor() {}

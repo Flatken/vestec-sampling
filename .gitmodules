@@ -4,3 +4,6 @@
 [submodule "externals/ttk"]
 	path = externals/ttk
 	url = https://github.com/topology-tool-kit/ttk.git
+[submodule "externals/eigen"]
+	path = externals/eigen
+	url = https://gitlab.com/libeigen/eigen.git
