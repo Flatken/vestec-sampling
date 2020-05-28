@@ -50,17 +50,17 @@ class vtkDataSet;
 /// -----
 /// add other references here:
 /// 
-// class CriticalPointExtractor {
-//   public:
-//     CriticalPointExtractor() {}
-//     vtkSmartPointer<vtkPolyData> identify_critical_points(vtkSmartPointer<vtkDataSet> grid);
+class CriticalPointExtractor {
+  public:
+    CriticalPointExtractor() {}
+    vtkSmartPointer<vtkPolyData> identify_critical_points(vtkSmartPointer<vtkDataSet> grid);
 
-//   private:
-//     // float compute_degree(vtkTetra* tet);
-//     // float compute_solid_angle(vtkTetra* tet);
-//     int Positive(vtkCell *cell, vtkSmartPointer<vtkDataSet> grid);
-//     bool PointInCell(vtkCell *cell, vtkSmartPointer<vtkDataSet> grid);
-// };
+  private:
+    // float compute_degree(vtkTetra* tet);
+    // float compute_solid_angle(vtkTetra* tet);
+    int Positive(vtkCell *cell, vtkSmartPointer<vtkDataSet> grid);
+    bool PointInCell(vtkCell *cell, vtkSmartPointer<vtkDataSet> grid);
+};
 
 
 class VTK_EXPORT VestecCriticalPointExtractionAlgorithm : public vtkPolyDataAlgorithm

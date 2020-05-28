@@ -193,9 +193,12 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
   vtkInformation *inInfoGrid = inputVector[0]->GetInformationObject(0);
   vtkDataSet *inputGrid = dynamic_cast<vtkDataSet*>(inInfoGrid->Get(vtkDataObject::DATA_OBJECT()));
 
-  identify_critical_points(inputGrid);
+  CriticalPointExtractor cp_extractor;
+  cp_extractor.identify_critical_points(inputGrid);
   /// to-do MPI implementation
   ///  
+
+  return 1;
 
   // int localNumberOfSeeds = NumberOfPointsAroundSeed;
   // int numPoints = inputGrid->GetNumberOfPoints();
@@ -328,7 +331,7 @@ vtkSmartPointer<vtkPolyData> CriticalPointExtractor::identify_critical_points(vt
     // float t_degree = compute_degree(t);
     // // here we need to understand how to discretize the critical points..
     // // likely we have to understand 
-    if(PointInCell(grid->GetCell(i)),grid) {
+    if(PointInCell(grid->GetCell(i),grid)) {
       // add cell i to output
     }
   }
@@ -341,8 +344,8 @@ int CriticalPointExtractor::Positive(vtkCell *cell, vtkSmartPointer<vtkDataSet> 
   vtkSmartPointer<vtkDataArray> vectors = grid->GetPointData()->GetVectors();
   // 0. initialize vector array of cell points vectors
   vtkSmartPointer<vtkIdList> ids = cell->GetPointIds();
-  std::vector<std::unique_ptr<double>> points;
-  for (auto i : ids) {
+  std::vector<double*> points;
+  for (vtkIdType i=0; i<ids->GetNumberOfIds(); i++) {
     points.push_back(vectors->GetTuple(i));
   }
   // 1. --> convert to fixed precision (float to long)
