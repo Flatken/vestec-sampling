@@ -23,6 +23,7 @@
 
 #define M_PI 3.14159
 
+
 vtkStandardNewMacro(VestecCriticalPointExtractionAlgorithm);
 
 //----------------------------------------------------------------------------
@@ -63,9 +64,8 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
   vtkDataSet* input = vtkDataSet::GetData(inputVector[0], 0);
   vtkPolyData* output = vtkPolyData::GetData(outputVector, 0);
 
-  output->Print(std::cout);
-  //CriticalPointExtractor cp_extractor;
-  //cp_extractor.identify_critical_points(inputGrid);
+  CriticalPointExtractor cp_extractor;
+  cp_extractor.identify_critical_points(input, output);
   /// to-do MPI implementation
   ///  
 
@@ -73,44 +73,73 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
 }
 
 //----------------------------------------------------------------------------
-vtkSmartPointer<vtkPolyData> CriticalPointExtractor::identify_critical_points(vtkSmartPointer<vtkDataSet> grid) {
-  vtkSmartPointer<vtkPolyData> output = vtkSmartPointer<vtkPolyData>::New();
-  vtkIdType cells_num = grid->GetNumberOfCells();
-  // bool is_critical = false;
+void CriticalPointExtractor::identify_critical_points(	vtkSmartPointer<vtkDataSet> input,
+																				vtkSmartPointer<vtkDataSet> output) {
+  vtkIdType cells_num = input->GetNumberOfCells();
+ 
+  //Check for every cell if a critical point exists
   for(vtkIdType i=0; i<cells_num; i++) {
-    // vtkSmartPointer<vtkTetra> t = vtkTetra::SafeDownCast(tet_mesh->GetCell(i));
-    // float t_degree = compute_degree(t);
-    // // here we need to understand how to discretize the critical points..
-    // // likely we have to understand 
-    if(PointInCell(grid->GetCell(i),grid)) {
+	
+    if(PointInCell(input->GetCell(i), input)) {
       // add cell i to output
     }
   }
-  return output;
 }
 
 /// can we pass to Positive directly the determinant matrix instead of the cell?
-int CriticalPointExtractor::Positive(vtkCell *cell, vtkSmartPointer<vtkDataSet> grid)
+bool CriticalPointExtractor::Positive(MatrixXl matrix)
 {
-  vtkSmartPointer<vtkDataArray> vectors = grid->GetPointData()->GetVectors();
-  // 0. initialize vector array of cell points vectors
-  vtkSmartPointer<vtkIdList> ids = cell->GetPointIds();
-  std::vector<double*> points;
-  for (vtkIdType i=0; i<ids->GetNumberOfIds(); i++) {
-    points.push_back(vectors->GetTuple(i));
-  }
-  // 1. --> convert to fixed precision (float to long)
-  // 2. sort (check)
-  // 3. create vector matrix and compute determinant sign
-  // 4. check the number of swap operation while sorting
+	bool positivDir = false;
+	// 1. TODO sort (check)
+	// 2. compute determinant sign
+	unsigned long det = matrix.determinant();
+	if (det > 0) positivDir = true; else positivDir = false;
+	// 3. check the number of swap operation while sorting
 
+
+	return positivDir;
 }
 
 bool CriticalPointExtractor::PointInCell(vtkCell *cell, vtkSmartPointer<vtkDataSet> grid) {
-  // 1. compute the sign of the determinant of the cell  
-  // 2. for each facet (i.e. an edge in a triangle or a triangle in a tetrahedron) do
-  // 2.1. replace each row of the matrix with the origin vector (0,0) or (0,0,0)
-  // 2.2. compute the determinant sign again 
-  // 2.3. check if it changes --> if so return false
-  return true; // the cell is critical, since the sign never change
+	vtkSmartPointer<vtkIdList> ids = cell->GetPointIds();
+	vtkSmartPointer<vtkDataArray> vectors = grid->GetPointData()->GetVectors();
+	// 1. compute the sign of the determinant of the cell
+	// 1.1 Create the eigen vector matrix
+	MatrixXl vecMatrix(4, ids->GetNumberOfIds());
+ 
+	for (vtkIdType i = 0; i < ids->GetNumberOfIds(); i++) {
+		double* vecValues = vectors->GetTuple(i);
+		for (vtkIdType tuple = 0; tuple < vectors->GetNumberOfComponents(); tuple++) {
+			//double to fixed precision
+			vecMatrix << toFixed(vecValues[tuple]);
+		}
+		vecMatrix << 1;
+	}
+	// Get the sign (direction)
+	bool initialDirection = Positive(vecMatrix);
+
+	// 2. for each facet (i.e. an edge in a triangle or a triangle in a tetrahedron) do
+	// 2.1. replace each row of the matrix with the origin vector (0,0) or (0,0,0)
+	for (int i = 0; i < ids->GetNumberOfIds(); i++) {
+		MatrixXl pertubationMatrix = vecMatrix;
+		for (int tuple = 0; tuple < vectors->GetNumberOfComponents(); tuple++) 
+		{
+			pertubationMatrix(i, tuple) = 0;
+		}
+
+		// 2.2. compute the determinant sign again 
+		// 2.3. check if it changes --> if so return false
+		bool dir = Positive(pertubationMatrix);
+
+		if (initialDirection != dir)
+			return false;
+	}
+	return true; // the cell is critical, since the sign never change
+}
+
+unsigned long CriticalPointExtractor::toFixed(double val)
+{
+	char str[50];
+	sprintf(str, "%0.*f", 24, val);
+	return atof(str);
 }
