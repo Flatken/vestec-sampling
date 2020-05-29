@@ -3,6 +3,8 @@
 find_package(ParaView REQUIRED)
 include("${PARAVIEW_USE_FILE}")
 
+find_package (Eigen3 3.3 REQUIRED NO_MODULE)
+
 # Target for the emulator====================================================
 set(TARGET_NAME VestecCatalystEmulator)
 
@@ -56,12 +58,21 @@ endif()
 # ==============================================================================	
 add_executable(${TARGET_NAME} ${CPP_SOURCE_FILES} ${CPP_HEADER_FILES})
 if(USE_CATALYST)
-	target_link_libraries(${TARGET_NAME} LINK_PRIVATE Adaptor stdc++fs)
+	IF (WIN32)
+		target_link_libraries(${TARGET_NAME} LINK_PRIVATE Adaptor)
+	ELSE()
+		target_link_libraries(${TARGET_NAME} LINK_PRIVATE Adaptor stdc++fs)
+	ENDIF()
+	
 	include(vtkModuleMacros)
 	include(vtkMPI)
 	vtk_mpi_link(${TARGET_NAME})
 else()
-	target_link_libraries(${TARGET_NAME} LINK_PRIVATE ${MPI_LIBRARIES} stdc++fs) 
+	IF (WIN32)
+		target_link_libraries(${TARGET_NAME} LINK_PRIVATE ${MPI_LIBRARIES})
+	ELSE()
+		target_link_libraries(${TARGET_NAME} LINK_PRIVATE ${MPI_LIBRARIES} stdc++fs)
+    ENDIF()
 endif()
 
 target_include_directories(${TARGET_NAME}

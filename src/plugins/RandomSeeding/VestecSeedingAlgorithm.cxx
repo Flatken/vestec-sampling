@@ -21,6 +21,8 @@
 #include <sstream>
 #include <cmath>
 
+#define M_PI 3.14159
+
 vtkStandardNewMacro(VestecSeedingAlgorithm);
 
 //----------------------------------------------------------------------------

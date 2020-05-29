@@ -22,26 +22,7 @@ endif()
 
 # Compiler settings
 # ==============================================================================
-if(${CMAKE_CXX_COMPILER_ID} STREQUAL "MSVC")
-    # compiler settings for Visual Studio (only tested 10, aka MSVC 1600)
-    if(${MSVC_VERSION} EQUAL   1600 OR
-       ${MSVC_VERSION} GREATER 1600)
-        # make use of SSE2 instructions
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /arch:SSE2")
-        # disable warning C4251: "'T' needs to have dll-interface to be used ..."
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4251")
-        # disable warning C4275: "non dll-interface class 'T' usedas base ..."
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4275")
-		# Enable Multicore Compiling
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /MP")
-    else()
-        message(WARNING "MSVC_VERSION '${MSVC_VERSION}' not recognized - "
-                "can not configure compiler flags")
-    endif()
-else()
-    add_definitions("-std=c++11")
-    set(BUILD_SHARED_LIBS "Off")
-endif()
+set(CMAKE_CXX_STANDARD 17)
 
 set(CMAKE_INSTALL_RPATH
     "${CMAKE_INSTALL_PREFIX}/lib"
