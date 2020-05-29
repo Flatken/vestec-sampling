@@ -51,7 +51,7 @@ if exist "%BUILD_DIR%" goto BUILD_DIR_CREATED
 
 rem configure, compile & install -------------------------------------------------------------------
 set Paraview_DIR=%EXTERNALS_INSTALL_DIR%/lib/cmake/paraview-5.6
-set Eigen_DIR=%BUILD_DIR%/eigen
+set Eigen_DIR=%EXTERNALS_INSTALL_DIR%
 
 cd "%BUILD_DIR%"
 cmake %CMAKE_FLAGS% -DCMAKE_INSTALL_PREFIX="%INSTALL_DIR%"^
