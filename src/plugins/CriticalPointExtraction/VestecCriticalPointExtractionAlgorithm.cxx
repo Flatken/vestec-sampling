@@ -88,6 +88,8 @@ void CriticalPointExtractor::identify_critical_points(	vtkSmartPointer<vtkDataSe
   vtkIdType cells_num = input->GetNumberOfCells();
   std::cout << "Checking " << cells_num << " cells for critical points " << std::endl;
 
+  ZERO_ID = points->GetNumberOfPoints();
+
   unsigned long cp = 0;
   //Check for every cell if a critical point exists
   for(vtkIdType i=0; i < cells_num; i++) {
@@ -122,7 +124,7 @@ bool CriticalPointExtractor::PointInCell(vtkCell *cell, vtkSmartPointer<vtkDataS
 	//std::cout << " ################### Point in Cell ###################################################### " << std::endl;
 	// 1. compute the sign of the determinant of the cell
 	// Get the determinat and direction
-	double initialDeterminant = Positive(ids, vectors);
+	long long initialDeterminant = Positive(ids, vectors);
 	bool initialDirection     = DeterminatCounterClockWise(initialDeterminant);
 
 	// 2. for each facet (i.e. an edge in a triangle or a triangle in a tetrahedron) do
@@ -130,7 +132,7 @@ bool CriticalPointExtractor::PointInCell(vtkCell *cell, vtkSmartPointer<vtkDataS
 	for (int i = 0; i < ids->GetNumberOfIds(); i++) {
 		// 2.2. compute the determinant sign again 
 		// 2.3. check if it changes --> if so return false
-		double tmpDeterminat = Positive(ids, vectors, i);
+		long long tmpDeterminat = Positive(ids, vectors, i);
 		bool tmpDirection    = DeterminatCounterClockWise(tmpDeterminat);
 
 		if (initialDirection != tmpDirection)
@@ -140,32 +142,41 @@ bool CriticalPointExtractor::PointInCell(vtkCell *cell, vtkSmartPointer<vtkDataS
 }
 
 /// can we pass to Positive directly the determinant matrix instead of the cell?
-double CriticalPointExtractor::Positive(vtkSmartPointer<vtkIdList> ids, vtkSmartPointer<vtkDataArray> vectors, long pertubationID){
+long long CriticalPointExtractor::Positive(vtkSmartPointer<vtkIdList> ids, vtkSmartPointer<vtkDataArray> vectors, long pertubationID){
+
+	if (pertubationID != -1)
+	{
+		ids->SetId(pertubationID,ZERO_ID);
+	}
 	// 1. Sort and check swap operations (check)
     // TODO: More generic version required. How to handle per pertubation
 	int swapOperations = 0;
 	if (ids->GetNumberOfIds() == 3) //TRIANGLES(2D)
 		swapOperations = Sort3(ids);
-
+	
 	//create an eigen matrix
 	MatrixXl vecMatrix;
 	for (vtkIdType tuple = 0; tuple < ids->GetNumberOfIds(); tuple++) {
-		double * vecValues = vectors->GetTuple(ids->GetId(tuple));
+		double * vecValues;
+		if(ids->GetId(tuple)!=ZERO_ID)
+			vecValues = vectors->GetTuple(ids->GetId(tuple));
+		else
+			vecValues = new double[3] {0.0,0.0,0.0};
 		
 		for (vtkIdType i = 0; i < vectors->GetNumberOfComponents(); i++) {
-			//TODO: double to fixed precision
-			vecMatrix(tuple, i) = vecValues[i];
-			//vecMatrix(i, tuple) = toFixed(vecValues[i]);
+			//TODO: long long to fixed precision
+			//vecMatrix(tuple, i) = vecValues[i];
+			vecMatrix(tuple, i) = toFixed(vecValues[i]);
 		}
 		vecMatrix(tuple,2) = 1;
 	}
 
-	//TODO: HACK 
-	if (pertubationID != -1)
-	{
-		for (vtkIdType i = 0; i < vectors->GetNumberOfComponents() - 1; i++)
-			vecMatrix(pertubationID, i) = 0;
-	}
+	// //TODO: HACK 
+	// if (pertubationID != -1)
+	// {	
+	// 	for (vtkIdType i = 0; i < vectors->GetNumberOfComponents() - 1; i++)
+	// 		vecMatrix(pertubationID, i) = toFixed(0);
+	// }
 	
 	//std::cout << " \t ######################################################################### " << std::endl;
 	//std::cout << " \t\t" << vecMatrix(0, 0) << " " << vecMatrix(0, 1) << " " << vecMatrix(0, 2) << std::endl;
@@ -174,7 +185,7 @@ double CriticalPointExtractor::Positive(vtkSmartPointer<vtkIdList> ids, vtkSmart
 	//std::cout << " \t ######################################################################### " << std::endl;
 
 	// 2. compute determinant sign
-	double det = vecMatrix.determinant();
+	long long det = vecMatrix.determinant();
 
 	// 3. check the number of swap operation while sorting
 	if (swapOperations % 2 != 0) //Odd
@@ -190,7 +201,12 @@ double CriticalPointExtractor::Positive(vtkSmartPointer<vtkIdList> ids, vtkSmart
 long long CriticalPointExtractor::toFixed(double val)
 {
 	//TODO: Some magic here
-	return val * 100000000;
+	auto tofixed = cnl::fixed_point<long long, -14, 15>{val};
+	// static_assert(tofixed==val, "fixed-point type was unable to store the value");
+
+	//std::cout << val << " " << to_rep(tofixed) << std::endl;
+
+	return to_rep(tofixed);
 }
 
 int CriticalPointExtractor::Sort3(vtkSmartPointer<vtkIdList> ids)
@@ -223,7 +239,7 @@ int CriticalPointExtractor::Sort3(vtkSmartPointer<vtkIdList> ids)
 	return swaps;
 }
 
-bool CriticalPointExtractor::DeterminatCounterClockWise(double det)
+bool CriticalPointExtractor::DeterminatCounterClockWise(long long det)
 {
 	if (det > 0)
 		return true;

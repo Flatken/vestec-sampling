@@ -12,9 +12,10 @@
 #include <random>
 
 #include <Eigen/Dense>
+#include <cnl/all.h>
 
 
-typedef Eigen::Matrix<double, 3, 3> MatrixXl;
+typedef Eigen::Matrix<long long, 3, 3> MatrixXl;
 
 
 class vtkDataSet;
@@ -34,10 +35,12 @@ class CriticalPointExtractor {
 
   private:
 	int	 Sort3(vtkSmartPointer<vtkIdList> ids);
-	double Positive(vtkSmartPointer<vtkIdList> ids, vtkSmartPointer<vtkDataArray> vectors, long pertubationID = -1);
+	long long Positive(vtkSmartPointer<vtkIdList> ids, vtkSmartPointer<vtkDataArray> vectors, long pertubationID = -1);
     bool PointInCell(vtkCell *cell, vtkSmartPointer<vtkDataSet> grid);
 	long long toFixed(double val);
-	bool DeterminatCounterClockWise(double det);
+	bool DeterminatCounterClockWise(long long det);
+
+  vtkIdType ZERO_ID;
 };
 
 
