@@ -10,7 +10,12 @@
 
 #include <map>
 #include <string>
+#include <vector>
 #include <random>
+
+typedef Eigen::Matrix<double, 3, 3> MatrixXl;
+
+
 class vtkDataSet;
 
 /// This class implements the algorithm described in:
@@ -23,11 +28,15 @@ class vtkDataSet;
 class CriticalPointExtractor {
   public:
     CriticalPointExtractor() {}
-    vtkSmartPointer<vtkPolyData> identify_critical_points(vtkSmartPointer<vtkDataSet> grid);
+	void identify_critical_points(	vtkSmartPointer<vtkDataSet> input,
+								    vtkSmartPointer<vtkDataSet> output);
 
   private:
-    int Positive(vtkCell *cell, vtkSmartPointer<vtkDataSet> grid);
+	int	 Sort3(vtkSmartPointer<vtkIdList> ids);
+	double Positive(vtkSmartPointer<vtkIdList> ids, vtkSmartPointer<vtkDataArray> vectors, long pertubationID = -1);
     bool PointInCell(vtkCell *cell, vtkSmartPointer<vtkDataSet> grid);
+	long long toFixed(double val);
+	bool DeterminatCounterClockWise(double det);
 };
 
 

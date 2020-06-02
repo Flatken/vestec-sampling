@@ -17,6 +17,7 @@
 #include <vtkUnstructuredGrid.h>
 #include <vtkFloatArray.h>
 #include <vtkPointData.h>
+#include <vtkCellArray.h>
 
 #include <sstream>
 #include <cmath>
@@ -80,20 +81,117 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
 //----------------------------------------------------------------------------
 void CriticalPointExtractor::identify_critical_points(	vtkSmartPointer<vtkDataSet> input,
 																				vtkSmartPointer<vtkDataSet> output) {
+  vtkSmartPointer<vtkPolyData> outputData = vtkPolyData::SafeDownCast(output);
+  vtkSmartPointer<vtkPoints> points = vtkSmartPointer<vtkPoints>::New();
+  vtkSmartPointer<vtkCellArray> cells = vtkSmartPointer<vtkCellArray>::New();
+  
   vtkIdType cells_num = input->GetNumberOfCells();
   std::cout << "Checking " << cells_num << " cells for critical points " << std::endl;
 
   unsigned long cp = 0;
   //Check for every cell if a critical point exists
   for(vtkIdType i=0; i < cells_num; i++) {
-    if(PointInCell(input->GetCell(i), input)) {
-        //add cell i to output
-		cp++;
+	  vtkCell *cell = input->GetCell(i);
+
+	  //If the cell contains a critical point add them to the output
+	  if(PointInCell(cell, input)) {
+		  vtkSmartPointer<vtkIdList> ids = cell->GetPointIds();
+		  vtkSmartPointer<vtkIdList> new_ids = vtkSmartPointer<vtkIdList>::New();;
+		  for (int index = 0; index < ids->GetNumberOfIds(); index++)
+		  {
+			  double pCoords[3];
+			  input->GetPoint(ids->GetId(index), pCoords);
+			  new_ids->InsertNextId(points->InsertNextPoint(pCoords[0], pCoords[1], pCoords[2])); 
+		  }
+
+		  cells->InsertNextCell(new_ids);
+		  cp++;
     }
   }
+
+  //Add points and cells to polydata
+  outputData->SetPoints(points); 
+  outputData->SetPolys(cells);
   std::cout << "Critical points found: " << cp << std::endl;
 }
 
+bool CriticalPointExtractor::PointInCell(vtkCell *cell, vtkSmartPointer<vtkDataSet> grid) {
+	vtkSmartPointer<vtkIdList> ids = cell->GetPointIds();
+	vtkSmartPointer<vtkDataArray> vectors = grid->GetPointData()->GetVectors();
+
+	//std::cout << " ################### Point in Cell ###################################################### " << std::endl;
+	// 1. compute the sign of the determinant of the cell
+	// Get the determinat and direction
+	double initialDeterminant = Positive(ids, vectors);
+	bool initialDirection     = DeterminatCounterClockWise(initialDeterminant);
+
+	// 2. for each facet (i.e. an edge in a triangle or a triangle in a tetrahedron) do
+	// 2.1. replace each row of the matrix with the origin vector (0,0) or (0,0,0)
+	for (int i = 0; i < ids->GetNumberOfIds(); i++) {
+		// 2.2. compute the determinant sign again 
+		// 2.3. check if it changes --> if so return false
+		double tmpDeterminat = Positive(ids, vectors, i);
+		bool tmpDirection    = DeterminatCounterClockWise(tmpDeterminat);
+
+		if (initialDirection != tmpDirection)
+			return false;
+	}
+	return true; // the cell is critical, since the sign never change
+}
+
+/// can we pass to Positive directly the determinant matrix instead of the cell?
+double CriticalPointExtractor::Positive(vtkSmartPointer<vtkIdList> ids, vtkSmartPointer<vtkDataArray> vectors, long pertubationID){
+	// 1. Sort and check swap operations (check)
+    // TODO: More generic version required. How to handle per pertubation
+	int swapOperations = 0;
+	if (ids->GetNumberOfIds() == 3) //TRIANGLES(2D)
+		swapOperations = Sort3(ids);
+
+	//create an eigen matrix
+	MatrixXl vecMatrix;
+	for (vtkIdType tuple = 0; tuple < ids->GetNumberOfIds(); tuple++) {
+		double * vecValues = vectors->GetTuple(ids->GetId(tuple));
+		
+		for (vtkIdType i = 0; i < vectors->GetNumberOfComponents(); i++) {
+			//TODO: double to fixed precision
+			vecMatrix(tuple, i) = vecValues[i];
+			//vecMatrix(i, tuple) = toFixed(vecValues[i]);
+		}
+		vecMatrix(tuple,2) = 1;
+	}
+
+	//TODO: HACK 
+	if (pertubationID != -1)
+	{
+		for (vtkIdType i = 0; i < vectors->GetNumberOfComponents() - 1; i++)
+			vecMatrix(pertubationID, i) = 0;
+	}
+	
+	//std::cout << " \t ######################################################################### " << std::endl;
+	//std::cout << " \t\t" << vecMatrix(0, 0) << " " << vecMatrix(0, 1) << " " << vecMatrix(0, 2) << std::endl;
+	//std::cout << " \t\t" << vecMatrix(1, 0) << " " << vecMatrix(1, 1) << " " << vecMatrix(1, 2) << std::endl;
+	//std::cout << " \t\t" << vecMatrix(2, 0) << " " << vecMatrix(2, 1) << " " << vecMatrix(2, 2) << std::endl;
+	//std::cout << " \t ######################################################################### " << std::endl;
+
+	// 2. compute determinant sign
+	double det = vecMatrix.determinant();
+
+	// 3. check the number of swap operation while sorting
+	if (swapOperations % 2 != 0) //Odd
+	{
+		//positivDir *= -1;
+		if(det > 0)
+			det *= -1;
+	}
+	//std::cout << "\t\t Determinat: " << det << " Swaps:" << swapOperations << std::endl;
+	return det;
+}
+
+long long CriticalPointExtractor::toFixed(double val)
+{
+	//TODO: Some magic here
+	return val * 100000000;
+}
 
 //int basic_isort3(int *a, int *b, int *c)
 ///* Input/Output: a, b, c. */
@@ -111,7 +209,7 @@ void CriticalPointExtractor::identify_critical_points(	vtkSmartPointer<vtkDataSe
 //	return (swaps);
 //}
 
-int CriticalPointExtractor::Sort3(vtkSmartPointer<vtkIdList> ids) 
+int CriticalPointExtractor::Sort3(vtkSmartPointer<vtkIdList> ids)
 {
 	unsigned int tmp;
 	unsigned int swaps = 0;
@@ -141,93 +239,10 @@ int CriticalPointExtractor::Sort3(vtkSmartPointer<vtkIdList> ids)
 	return swaps;
 }
 
-int CriticalPointExtractor::Sort2(vtkSmartPointer<vtkIdList> ids)
+bool CriticalPointExtractor::DeterminatCounterClockWise(double det)
 {
-	unsigned int tmp;
-	unsigned int swaps = 0;
-	if (ids->GetId(0) > ids->GetId(1))
-	{
-		tmp = ids->GetId(0);
-		ids->SetId(0, ids->GetId(1));
-		ids->SetId(1, tmp);
-		swaps++;
-	}
-	return swaps;
-}
-
-/// can we pass to Positive directly the determinant matrix instead of the cell?
-bool CriticalPointExtractor::Positive(vtkSmartPointer<vtkIdList> ids, vtkSmartPointer<vtkDataArray> vectors, unsigned long pertubationID)
-{
-	bool positivDir = false;
-
-	// 1. Sort and check swap operations (check)
-    // TODO: More generic version required. How to handle per pertubation
-	int swapOperations = 0;
-	if (ids->GetNumberOfIds() == 3) //TRIANGLES
-		swapOperations = Sort3(ids);
-
-	//create an eigen matrix
-	MatrixXl vecMatrix(3, 3);
-	for (vtkIdType i = 0; i < ids->GetNumberOfIds(); i++) {
-		double * vecValues = vectors->GetTuple(ids->GetId(i));
-		
-		for (vtkIdType tuple = 0; tuple < vectors->GetNumberOfComponents(); tuple++) {
-			//double to fixed precision
-			vecMatrix(i, tuple) = toFixed(vecValues[tuple]);
-		}
-		vecMatrix(i,2) = 1;
-	}
-
-	//TODO: HACK 
-	if (pertubationID != -1)
-	{
-		for (vtkIdType tuple = 0; tuple < vectors->GetNumberOfComponents() - 1; tuple++)
-			vecMatrix(pertubationID, tuple) = 0;
-	}
-		
-	//std::cout << " ######################################################################### " << std::endl;
-	//std::cout << " " << vecMatrix(0, 0) << " " << vecMatrix(0, 1) << " " << vecMatrix(0, 2) << std::endl;
-	//std::cout << " " << vecMatrix(1, 0) << " " << vecMatrix(1, 1) << " " << vecMatrix(1, 2) << std::endl;
-	//std::cout << " " << vecMatrix(2, 0) << " " << vecMatrix(2, 1) << " " << vecMatrix(2, 2) << std::endl;
-	//std::cout << " ######################################################################### " << std::endl;
-
-	// 2. compute determinant sign
-	unsigned long det = vecMatrix.determinant();
-	if (det > 0) positivDir = true; else positivDir = false;
-
-	// 3. check the number of swap operation while sorting
-	if (swapOperations % 2 != 0) //Odd
-	{
-		//positivDir *= -1;
-		positivDir = false;
-	}
-
-	return positivDir;
-}
-
-bool CriticalPointExtractor::PointInCell(vtkCell *cell, vtkSmartPointer<vtkDataSet> grid) {
-	vtkSmartPointer<vtkIdList> ids = cell->GetPointIds();
-	vtkSmartPointer<vtkDataArray> vectors = grid->GetPointData()->GetVectors();
-
-	// 1. compute the sign of the determinant of the cell
-	// Get the sign (direction)
-	bool initialDirection = Positive(ids, vectors);
-	// 2. for each facet (i.e. an edge in a triangle or a triangle in a tetrahedron) do
-	// 2.1. replace each row of the matrix with the origin vector (0,0) or (0,0,0)
-	for (int i = 0; i < ids->GetNumberOfIds(); i++) {
-		// 2.2. compute the determinant sign again 
-		// 2.3. check if it changes --> if so return false
-		bool dir = Positive(ids, vectors, i);
-
-		if (initialDirection != dir)
-			return false;
-	}
-	return true; // the cell is critical, since the sign never change
-}
-
-unsigned long CriticalPointExtractor::toFixed(double val)
-{
-	//TODO: Some magic here
-	val *= 100000000;
-	return val * 100000000;
+	if (det > 0)
+		return true;
+	else
+		return false;
 }
