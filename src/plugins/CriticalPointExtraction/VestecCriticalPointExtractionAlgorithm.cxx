@@ -22,6 +22,8 @@
 #include <sstream>
 #include <cmath>
 
+#include <Eigen/Dense>
+
 #define M_PI 3.14159
 
 
@@ -192,22 +194,6 @@ long long CriticalPointExtractor::toFixed(double val)
 	//TODO: Some magic here
 	return val * 100000000;
 }
-
-//int basic_isort3(int *a, int *b, int *c)
-///* Input/Output: a, b, c. */
-///* Sorts (&a,&b,&c) with <= 3 comparisons and <= 3 swaps. */
-//{
-//	int swaps = 0, aux;
-//	if (*a > *b)
-//		swap(*a, *b);
-//	if (*b > *c)
-//	{
-//		swap(*b, *c);
-//		if (*a > *b)
-//			swap(*a, *b);
-//	}
-//	return (swaps);
-//}
 
 int CriticalPointExtractor::Sort3(vtkSmartPointer<vtkIdList> ids)
 {

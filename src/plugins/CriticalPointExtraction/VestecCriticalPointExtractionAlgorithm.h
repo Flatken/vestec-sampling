@@ -6,8 +6,6 @@
 #include <vtkPolyData.h>
 #include <vtkCell.h>
 
-#include <Eigen/Dense>
-
 #include <map>
 #include <string>
 #include <vector>
