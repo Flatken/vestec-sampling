@@ -6,8 +6,6 @@
 #include <vtkPolyData.h>
 #include <vtkCell.h>
 
-#include <Eigen/Dense>
-
 #include <map>
 #include <string>
 #include <random>
@@ -23,11 +21,16 @@ class vtkDataSet;
 class CriticalPointExtractor {
   public:
     CriticalPointExtractor() {}
-    vtkSmartPointer<vtkPolyData> identify_critical_points(vtkSmartPointer<vtkDataSet> grid);
+    void identify_critical_points(vtkSmartPointer<vtkDataSet> input, vtkSmartPointer<vtkDataSet> output);
 
   private:
-    int Positive(vtkCell *cell, vtkSmartPointer<vtkDataSet> grid);
+    // int Positive(vtkCell *cell, vtkSmartPointer<vtkDataSet> grid);
+    bool Positive(vtkSmartPointer<vtkIdList> ids, vtkSmartPointer<vtkDataArray> vectors, long pertubationID = -1);
     bool PointInCell(vtkCell *cell, vtkSmartPointer<vtkDataSet> grid);
+    // to check if we need all the following procedures
+    int Sort3(vtkSmartPointer<vtkIdList> ids);
+    int Sort2(vtkSmartPointer<vtkIdList> ids);
+    unsigned long toFixed(double val);
 };
 
 

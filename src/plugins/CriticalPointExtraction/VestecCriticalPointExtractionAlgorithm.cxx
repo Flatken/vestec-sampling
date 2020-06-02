@@ -21,6 +21,8 @@
 #include <sstream>
 #include <cmath>
 
+#include <Eigen/Dense>
+
 #define M_PI 3.14159
 
 
@@ -156,7 +158,7 @@ int CriticalPointExtractor::Sort2(vtkSmartPointer<vtkIdList> ids)
 }
 
 /// can we pass to Positive directly the determinant matrix instead of the cell?
-bool CriticalPointExtractor::Positive(vtkSmartPointer<vtkIdList> ids, vtkSmartPointer<vtkDataArray> vectors, unsigned long pertubationID)
+bool CriticalPointExtractor::Positive(vtkSmartPointer<vtkIdList> ids, vtkSmartPointer<vtkDataArray> vectors, long pertubationID)
 {
 	bool positivDir = false;
 
@@ -167,7 +169,7 @@ bool CriticalPointExtractor::Positive(vtkSmartPointer<vtkIdList> ids, vtkSmartPo
 		swapOperations = Sort3(ids);
 
 	//create an eigen matrix
-	MatrixXl vecMatrix(3, 3);
+	Eigen::MatrixXf vecMatrix(3, 3); // Notice MatrixXl does not exists!
 	for (vtkIdType i = 0; i < ids->GetNumberOfIds(); i++) {
 		double * vecValues = vectors->GetTuple(ids->GetId(i));
 		
@@ -179,7 +181,7 @@ bool CriticalPointExtractor::Positive(vtkSmartPointer<vtkIdList> ids, vtkSmartPo
 	}
 
 	//TODO: HACK 
-	if (pertubationID != -1)
+	if (pertubationID != -1) // we cannot use unsigned then for have this hack working
 	{
 		for (vtkIdType tuple = 0; tuple < vectors->GetNumberOfComponents() - 1; tuple++)
 			vecMatrix(pertubationID, tuple) = 0;
