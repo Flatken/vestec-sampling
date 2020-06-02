@@ -11,6 +11,9 @@
 #include <vector>
 #include <random>
 
+#include <Eigen/Dense>
+
+
 typedef Eigen::Matrix<double, 3, 3> MatrixXl;
 
 

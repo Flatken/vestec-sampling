@@ -22,8 +22,6 @@
 #include <sstream>
 #include <cmath>
 
-#include <Eigen/Dense>
-
 #define M_PI 3.14159
 
 
