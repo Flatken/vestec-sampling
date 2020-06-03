@@ -18,9 +18,13 @@
 #include <vtkFloatArray.h>
 #include <vtkPointData.h>
 #include <vtkCellArray.h>
+#include <vtkGenericCell.h>
 
 #include <sstream>
 #include <cmath>
+
+
+#include <omp.h>
 
 #define M_PI 3.14159
 
@@ -69,9 +73,18 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
   vtkDataArray *inScalars = this->GetInputArrayToProcess(0, inputVector);
   input->GetPointData()->SetActiveVectors(inScalars->GetName());
 
-  //Compute critical pints
+  //Compute critical points
+  std::vector<double*> singularities;
+  double p1[3] = {0, 0, 0};
+  double p2[3] = {0.001, 0.001, 0};
+  double p3[3] = {0.01, 0.01, 0};
+  double p4[3] = {0.02, 0.02, 0};
+  singularities.push_back(p1);
+  singularities.push_back(p2);
+  singularities.push_back(p3);
+  singularities.push_back(p4);
   CriticalPointExtractor cp_extractor;
-  cp_extractor.identify_critical_points(input, output);
+  cp_extractor.identify_critical_points(input, output, singularities);
   /// to-do MPI implementation
   ///  
 
@@ -80,41 +93,58 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
 
 //----------------------------------------------------------------------------
 void CriticalPointExtractor::identify_critical_points(	vtkSmartPointer<vtkDataSet> input,
-																				vtkSmartPointer<vtkDataSet> output) {
-  vtkSmartPointer<vtkPolyData> outputData = vtkPolyData::SafeDownCast(output);
-  vtkSmartPointer<vtkPoints> points = vtkSmartPointer<vtkPoints>::New();
-  vtkSmartPointer<vtkCellArray> cells = vtkSmartPointer<vtkCellArray>::New();
+																				vtkSmartPointer<vtkDataSet> output, std::vector<double*> singlarities) {
+	vtkSmartPointer<vtkPolyData> outputData = vtkPolyData::SafeDownCast(output);
+	vtkSmartPointer<vtkPoints> points = vtkSmartPointer<vtkPoints>::New();
+	vtkSmartPointer<vtkCellArray> cells = vtkSmartPointer<vtkCellArray>::New();
   
-  vtkIdType cells_num = input->GetNumberOfCells();
-  std::cout << "Checking " << cells_num << " cells for critical points " << std::endl;
+	vtkIdType cells_num = input->GetNumberOfCells();
+	std::cout << "Checking " << cells_num << " cells for critical points " << std::endl;
 
-  ZERO_ID = points->GetNumberOfPoints();
+	//Set zero id to end 
+	ZERO_ID = input->GetNumberOfPoints();
 
-  unsigned long cp = 0;
-  //Check for every cell if a critical point exists
-  for(vtkIdType i=0; i < cells_num; i++) {
-	  vtkCell *cell = input->GetCell(i);
+	//Set the singularity vector value (normally 0 in any dimension)
+	currentSingularity[0] = singlarities[0][0];
+	currentSingularity[1] = singlarities[0][1];
+	currentSingularity[2] = singlarities[0][2];
+#
+	//Prepare for parallel computation
+	int numThreads = 12;
+	omp_set_num_threads(numThreads);
+	std::vector<vtkSmartPointer<vtkGenericCell>> vecCellPerThread;
+	for(int x=0; x < numThreads; x++)
+		vecCellPerThread.push_back(vtkSmartPointer<vtkGenericCell>::New());
+	
+	//Check for every cell if a critical point exists
+	#pragma omp parallel for 
+	for(vtkIdType i = 0; i < cells_num; i++) {
+		//get the cell for the current thread
+		int threadIdx = omp_get_thread_num();
+		input->GetCell(i, vecCellPerThread[threadIdx]);
 
-	  //If the cell contains a critical point add them to the output
-	  if(PointInCell(cell, input)) {
-		  vtkSmartPointer<vtkIdList> ids = cell->GetPointIds();
-		  vtkSmartPointer<vtkIdList> new_ids = vtkSmartPointer<vtkIdList>::New();;
-		  for (int index = 0; index < ids->GetNumberOfIds(); index++)
-		  {
-			  double pCoords[3];
-			  input->GetPoint(ids->GetId(index), pCoords);
-			  new_ids->InsertNextId(points->InsertNextPoint(pCoords[0], pCoords[1], pCoords[2])); 
-		  }
-
-		  cells->InsertNextCell(new_ids);
-		  cp++;
-    }
-  }
+		//If the cell contains a critical point add them to the output
+		if(PointInCell(vecCellPerThread[threadIdx], input)) {
+			vtkSmartPointer<vtkIdList> ids = vecCellPerThread[threadIdx]->GetPointIds();
+			vtkSmartPointer<vtkIdList> new_ids = vtkSmartPointer<vtkIdList>::New();;
+			for (int index = 0; index < ids->GetNumberOfIds(); index++)
+			{
+				double pCoords[3];
+				vtkIdType newCellID;
+				input->GetPoint(ids->GetId(index), pCoords);
+#pragma omp critical
+				newCellID = points->InsertNextPoint(pCoords[0], pCoords[1], pCoords[2]);
+				new_ids->InsertNextId(newCellID);
+			}
+#pragma omp critical
+			cells->InsertNextCell(new_ids);
+		}
+	}
 
   //Add points and cells to polydata
   outputData->SetPoints(points); 
   outputData->SetPolys(cells);
-  std::cout << "Critical points found: " << cp << std::endl;
+  std::cout << "Critical points found: " << cells->GetNumberOfCells() << std::endl;
 }
 
 bool CriticalPointExtractor::PointInCell(vtkCell *cell, vtkSmartPointer<vtkDataSet> grid) {
@@ -124,51 +154,65 @@ bool CriticalPointExtractor::PointInCell(vtkCell *cell, vtkSmartPointer<vtkDataS
 	//std::cout << " ################### Point in Cell ###################################################### " << std::endl;
 	// 1. compute the sign of the determinant of the cell
 	// Get the determinat and direction
-	long long initialDeterminant = Positive(ids, vectors);
+	double initialDeterminant = Positive(ids, vectors);
 	bool initialDirection     = DeterminatCounterClockWise(initialDeterminant);
+
+	//Check for non data values (vector is zero) 
+	if (initialDeterminant == 0)
+		return false;
 
 	// 2. for each facet (i.e. an edge in a triangle or a triangle in a tetrahedron) do
 	// 2.1. replace each row of the matrix with the origin vector (0,0) or (0,0,0)
 	for (int i = 0; i < ids->GetNumberOfIds(); i++) {
 		// 2.2. compute the determinant sign again 
 		// 2.3. check if it changes --> if so return false
-		long long tmpDeterminat = Positive(ids, vectors, i);
+		double tmpDeterminat = Positive(ids, vectors, i);
 		bool tmpDirection    = DeterminatCounterClockWise(tmpDeterminat);
 
 		if (initialDirection != tmpDirection)
 			return false;
 	}
+	//std::cout << " \t\t Cell is critical " << std::endl;
 	return true; // the cell is critical, since the sign never change
 }
 
 /// can we pass to Positive directly the determinant matrix instead of the cell?
-long long CriticalPointExtractor::Positive(vtkSmartPointer<vtkIdList> ids, vtkSmartPointer<vtkDataArray> vectors, long pertubationID){
+double CriticalPointExtractor::Positive(vtkSmartPointer<vtkIdList> ids, vtkSmartPointer<vtkDataArray> vectors, long pertubationID){
+	vtkSmartPointer<vtkIdList> tmpIds = vtkSmartPointer<vtkIdList>::New();
+	tmpIds->DeepCopy(ids);
 
 	if (pertubationID != -1)
 	{
-		ids->SetId(pertubationID,ZERO_ID);
+		tmpIds->SetId(pertubationID,ZERO_ID);
 	}
+
 	// 1. Sort and check swap operations (check)
     // TODO: More generic version required. How to handle per pertubation
 	int swapOperations = 0;
-	if (ids->GetNumberOfIds() == 3) //TRIANGLES(2D)
-		swapOperations = Sort3(ids);
+	if (tmpIds->GetNumberOfIds() == 3) //TRIANGLES(2D)
+		swapOperations = Sort3(tmpIds);
 	
 	//create an eigen matrix
 	MatrixXl vecMatrix;
-	for (vtkIdType tuple = 0; tuple < ids->GetNumberOfIds(); tuple++) {
-		double * vecValues;
-		if(ids->GetId(tuple)!=ZERO_ID)
-			vecValues = vectors->GetTuple(ids->GetId(tuple));
+	for (vtkIdType tuple = 0; tuple < tmpIds->GetNumberOfIds(); tuple++) {
+		double vecValues[3];
+		if (tmpIds->GetId(tuple) != ZERO_ID)
+		{
+			vectors->GetTuple(tmpIds->GetId(tuple), vecValues);
+		}
 		else
-			vecValues = new double[3] {0.0,0.0,0.0};
+		{
+			vecValues[0] = currentSingularity[0];
+			vecValues[1] = currentSingularity[1];
+			vecValues[2] = currentSingularity[2];
+		}
 		
 		for (vtkIdType i = 0; i < vectors->GetNumberOfComponents(); i++) {
 			//TODO: long long to fixed precision
 			//vecMatrix(tuple, i) = vecValues[i];
 			vecMatrix(tuple, i) = toFixed(vecValues[i]);
 		}
-		vecMatrix(tuple,2) = 1;
+		vecMatrix(tuple,2) = toFixed(1);
 	}
 
 	// //TODO: HACK 
@@ -185,28 +229,29 @@ long long CriticalPointExtractor::Positive(vtkSmartPointer<vtkIdList> ids, vtkSm
 	//std::cout << " \t ######################################################################### " << std::endl;
 
 	// 2. compute determinant sign
-	long long det = vecMatrix.determinant();
+	double det = vecMatrix.determinant();
 
 	// 3. check the number of swap operation while sorting
 	if (swapOperations % 2 != 0) //Odd
 	{
-		//positivDir *= -1;
-		if(det > 0)
-			det *= -1;
+		det *= -1;
+		//if(det > 0)
+		//	det *= -1;
 	}
 	//std::cout << "\t\t Determinat: " << det << " Swaps:" << swapOperations << std::endl;
 	return det;
 }
 
-long long CriticalPointExtractor::toFixed(double val)
+double CriticalPointExtractor::toFixed(double val)
 {
 	//TODO: Some magic here
-	auto tofixed = cnl::fixed_point<long long, -14, 15>{val};
+	double ret = val * pow(10, 14);
+	//auto tofixed = cnl::fixed_point<unsigned long, -10, 2>(val);
+	//double ret = to_rep(tofixed);
 	// static_assert(tofixed==val, "fixed-point type was unable to store the value");
-
 	//std::cout << val << " " << to_rep(tofixed) << std::endl;
 
-	return to_rep(tofixed);
+	return ret;
 }
 
 int CriticalPointExtractor::Sort3(vtkSmartPointer<vtkIdList> ids)
@@ -239,7 +284,7 @@ int CriticalPointExtractor::Sort3(vtkSmartPointer<vtkIdList> ids)
 	return swaps;
 }
 
-bool CriticalPointExtractor::DeterminatCounterClockWise(long long det)
+bool CriticalPointExtractor::DeterminatCounterClockWise(double det)
 {
 	if (det > 0)
 		return true;

@@ -15,7 +15,7 @@
 #include <cnl/all.h>
 
 
-typedef Eigen::Matrix<long long, 3, 3> MatrixXl;
+typedef Eigen::Matrix<double, 3, 3> MatrixXl;
 
 
 class vtkDataSet;
@@ -30,16 +30,17 @@ class vtkDataSet;
 class CriticalPointExtractor {
   public:
     CriticalPointExtractor() {}
-	void identify_critical_points(	vtkSmartPointer<vtkDataSet> input,
-								    vtkSmartPointer<vtkDataSet> output);
+    void identify_critical_points(	vtkSmartPointer<vtkDataSet> input,
+                      vtkSmartPointer<vtkDataSet> output, std::vector<double*> singlarities);
 
   private:
-	int	 Sort3(vtkSmartPointer<vtkIdList> ids);
-	long long Positive(vtkSmartPointer<vtkIdList> ids, vtkSmartPointer<vtkDataArray> vectors, long pertubationID = -1);
+    int	 Sort3(vtkSmartPointer<vtkIdList> ids);
+    double Positive(vtkSmartPointer<vtkIdList> ids, vtkSmartPointer<vtkDataArray> vectors, long pertubationID = -1);
     bool PointInCell(vtkCell *cell, vtkSmartPointer<vtkDataSet> grid);
-	long long toFixed(double val);
-	bool DeterminatCounterClockWise(long long det);
+    double toFixed(double val);
+    bool DeterminatCounterClockWise(double det);
 
+  double currentSingularity[3] = {0, 0, 0};
   vtkIdType ZERO_ID;
 };
 
