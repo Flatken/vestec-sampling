@@ -35,13 +35,11 @@ class CriticalPointExtractor {
 
   private:
     int	 Sort3(vtkSmartPointer<vtkIdList> ids);
-    double Positive(vtkSmartPointer<vtkIdList> ids, vtkSmartPointer<vtkDataArray> vectors, long pertubationID = -1);
-    bool PointInCell(vtkCell *cell, vtkSmartPointer<vtkDataSet> grid);
+    double Positive(vtkSmartPointer<vtkIdList> ids, vtkSmartPointer<vtkDataSet> grid, double *currentSingularity, long pertubationID = -1);
+    bool PointInCell(vtkCell *cell, vtkSmartPointer<vtkDataSet> grid, double* currentSingularity);
     double toFixed(double val);
     bool DeterminatCounterClockWise(double det);
-
-  double currentSingularity[3] = {0, 0, 0};
-  vtkIdType ZERO_ID;
+	vtkIdType ZERO_ID;
 };
 
 
