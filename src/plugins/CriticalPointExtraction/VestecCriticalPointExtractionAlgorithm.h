@@ -15,8 +15,9 @@
 #include <cnl/all.h>
 
 
-typedef Eigen::Matrix<double, 3, 3> MatrixXl;
-
+//typedef Eigen::Matrix<double, 3, 3> Matrix33;
+//typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> DynamicMatrix;
+typedef Eigen::Matrix<double, 3, 3> DynamicMatrix;
 
 class vtkDataSet;
 
@@ -34,7 +35,9 @@ class CriticalPointExtractor {
                       vtkSmartPointer<vtkDataSet> output, std::vector<double*> singlarities);
 
   private:
+	int  Sort(vtkSmartPointer<vtkIdList> ids);
     int	 Sort3(vtkSmartPointer<vtkIdList> ids);
+	int  Sort4(vtkSmartPointer<vtkIdList> ids);
     double Positive(vtkSmartPointer<vtkIdList> ids, vtkSmartPointer<vtkDataSet> grid, double *currentSingularity, long pertubationID = -1);
     bool PointInCell(vtkCell *cell, vtkSmartPointer<vtkDataSet> grid, double* currentSingularity);
     double toFixed(double val);

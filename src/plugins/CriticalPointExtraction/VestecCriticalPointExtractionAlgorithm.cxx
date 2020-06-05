@@ -94,6 +94,8 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
 //----------------------------------------------------------------------------
 void CriticalPointExtractor::identify_critical_points(	vtkSmartPointer<vtkDataSet> input,
 																				vtkSmartPointer<vtkDataSet> output, std::vector<double*> singlarities) {
+
+	int cp = 0;
 	vtkSmartPointer<vtkPolyData> outputData = vtkPolyData::SafeDownCast(output);
 	vtkSmartPointer<vtkPoints> points = vtkSmartPointer<vtkPoints>::New();
 	vtkSmartPointer<vtkCellArray> cells = vtkSmartPointer<vtkCellArray>::New();
@@ -113,7 +115,7 @@ void CriticalPointExtractor::identify_critical_points(	vtkSmartPointer<vtkDataSe
 #
 
 		//Check for every cell if a critical point (passed singularity as argument) exists
-#pragma omp parallel for
+//#pragma omp parallel for
 		for (vtkIdType i = 0; i < cells_num; i++) {
 			//get the cell for the current thread
 			int threadIdx = omp_get_thread_num();
@@ -142,6 +144,7 @@ void CriticalPointExtractor::identify_critical_points(	vtkSmartPointer<vtkDataSe
 					}
 #pragma omp critical
 					cells->InsertNextCell(new_ids);
+					cp++;
 				}
 				//char n;
 				//std::cout << "Press for next";
@@ -154,7 +157,7 @@ void CriticalPointExtractor::identify_critical_points(	vtkSmartPointer<vtkDataSe
   //Add points and cells to polydata
   outputData->SetPoints(points); 
   outputData->SetPolys(cells);
-  std::cout << "Critical points found: " << cells->GetNumberOfCells() << std::endl;
+  std::cout << "Critical points found: " << cp << std::endl;
 }
 
 bool CriticalPointExtractor::PointInCell(vtkCell *cell, vtkSmartPointer<vtkDataSet> grid, double* currentSingularity) {
@@ -164,8 +167,6 @@ bool CriticalPointExtractor::PointInCell(vtkCell *cell, vtkSmartPointer<vtkDataS
 	// 1. compute the initial sign of the determinant of the cell
 	double initialDeterminant = Positive(ids, grid, currentSingularity);
 	bool initialDirection     = DeterminatCounterClockWise(initialDeterminant);
-
-	//grid->Print(std::cout);
 
 	//Check for non data values (vector is zero and determinant also) 
 	if (initialDeterminant == 0)
@@ -199,9 +200,9 @@ double CriticalPointExtractor::Positive(vtkSmartPointer<vtkIdList> ids, vtkSmart
 	//Check for dataset dimension and configure zero vector exchange index
 	double bounds[6];
 	grid->GetBounds(bounds);
-	int xDim = abs(bounds[1] - bounds[1]);
-	int yDim = abs(bounds[3] - bounds[2]);
-	int zDim = abs(bounds[5] - bounds[4]);
+	double xDim = fabs(bounds[1] - bounds[1]);
+	double yDim = fabs(bounds[3] - bounds[2]);
+	double zDim = fabs(bounds[5] - bounds[4]);
 	int zeroDim = 3; //3D dataset 
 	if (xDim == 0) zeroDim = 0; //2D dataset with yz
 	if (yDim == 0) zeroDim = 1; //2D dataset with xz
@@ -215,12 +216,14 @@ double CriticalPointExtractor::Positive(vtkSmartPointer<vtkIdList> ids, vtkSmart
 
 	// 1. Sort and check swap operations (check)
     // TODO: More generic version required. How to handle per pertubation
-	int swapOperations = 0;
-	if (tmpIds->GetNumberOfIds() == 3) //TRIANGLES(2D)
-		swapOperations = Sort3(tmpIds);
+	int swapOperations = Sort(tmpIds);
 
 	//create an eigen matrix
-	MatrixXl vecMatrix;
+	int columns = 3;
+	if (zeroDim == 3) columns = 4;
+
+	DynamicMatrix vecMatrix(tmpIds->GetNumberOfIds(), columns);
+	
 	for (vtkIdType tuple = 0; tuple < tmpIds->GetNumberOfIds(); tuple++) {
 		double vecValues[3];
 		if (tmpIds->GetId(tuple) != ZERO_ID)
@@ -241,13 +244,23 @@ double CriticalPointExtractor::Positive(vtkSmartPointer<vtkIdList> ids, vtkSmart
 		vecMatrix(tuple, zeroDim) = toFixed(1);
 	}
 
-	//std::cout << " \t ######################################################################### " << std::endl;
-	//std::cout << " \t\tVertex IDs " << tmpIds->GetId(0) << " " << tmpIds->GetId(1) << " " << tmpIds->GetId(2) << std::endl;
-	//std::cout << " \t\t" << vecMatrix(0, 0) << " " << vecMatrix(0, 1) << " " << vecMatrix(0, 2) << std::endl;
-	//std::cout << " \t\t" << vecMatrix(1, 0) << " " << vecMatrix(1, 1) << " " << vecMatrix(1, 2) << std::endl;
-	//std::cout << " \t\t" << vecMatrix(2, 0) << " " << vecMatrix(2, 1) << " " << vecMatrix(2, 2) << std::endl;
-	//std::cout << " \t ######################################################################### " << std::endl;
-
+	/*std::cout << " \t ######################################################################### " << std::endl;
+	std::cout << " \t\tVertex IDs ";
+	for (int x = 0; x < tmpIds->GetNumberOfIds(); x++)
+		std::cout << tmpIds->GetId(x) << " ";
+	std::cout << std::endl;
+	std::cout << " \t\tMatrix: " << std::endl;
+	std::cout << " \t\t ";
+	for (int x = 0; x < tmpIds->GetNumberOfIds(); x++)
+	{
+		for (int y = 0; y < columns; y++)
+			std::cout << vecMatrix(x, y) << " ";
+		std::cout << std::endl;
+		std::cout << " \t\t ";
+	}
+	std::cout << std::endl;
+	std::cout << " \t ######################################################################### " << std::endl;
+*/
 	// 2. compute determinant sign
 	double det = vecMatrix.determinant();
 
@@ -255,6 +268,7 @@ double CriticalPointExtractor::Positive(vtkSmartPointer<vtkIdList> ids, vtkSmart
 	if (swapOperations % 2 != 0) //Odd
 	{
 		det *= -1;
+
 		//if(det > 0)
 			//det *= -1;
 	}
@@ -267,17 +281,30 @@ double CriticalPointExtractor::toFixed(double val)
 	//TODO: Some magic here
 	//long long ret =  val * pow(10, 14);
 	double ret = val;
-	//long ret = cnl::fixed_point<long, -10, 2>(val);
-	//double ret = to_rep(tofixed);
-	// static_assert(tofixed==val, "fixed-point type was unable to store the value");
-	//std::cout << val << " " << to_rep(tofixed) << std::endl;
 
 	return ret;
 }
 
+int CriticalPointExtractor::Sort(vtkSmartPointer<vtkIdList> ids)
+{
+	if (ids->GetNumberOfIds() == 3) //Triangle
+	{
+		return Sort3(ids);
+	}
+	else if (ids->GetNumberOfIds() == 4) //QUAD or TERAHERDON
+	{
+		return Sort4(ids);
+	}
+	else
+	{
+		std::cout << "Warning cell type currently not supported" << std::endl;
+		return 0;
+	}
+}
+
 int CriticalPointExtractor::Sort3(vtkSmartPointer<vtkIdList> ids)
 {
-	unsigned int tmp;
+	vtkIdType tmp;
 	unsigned int swaps = 0;
 	if (ids->GetId(0) > ids->GetId(1))
 	{
@@ -299,6 +326,77 @@ int CriticalPointExtractor::Sort3(vtkSmartPointer<vtkIdList> ids)
 			tmp = ids->GetId(0);
 			ids->SetId(0, ids->GetId(1));
 			ids->SetId(1, tmp);
+			swaps++;
+		}
+	}
+	return swaps;
+}
+
+int  CriticalPointExtractor::Sort4(vtkSmartPointer<vtkIdList> ids)
+{
+	unsigned int swaps = 0;
+	vtkIdType tmp;
+
+	if (ids->GetId(0) > ids->GetId(1))
+	{
+		tmp = ids->GetId(0);
+		ids->SetId(0, ids->GetId(1));
+		ids->SetId(1, tmp);
+		swaps++;
+	}
+
+	if (ids->GetId(1) > ids->GetId(2))
+	{
+		tmp = ids->GetId(1);
+		ids->SetId(1, ids->GetId(2));
+		ids->SetId(2, tmp);
+		swaps++;
+
+		if (ids->GetId(0) > ids->GetId(1))
+		{
+			tmp = ids->GetId(0);
+			ids->SetId(0, ids->GetId(1));
+			ids->SetId(1, tmp);
+			swaps++;
+		}
+	}
+
+	if (ids->GetId(3) < ids->GetId(2))
+	{
+		if (ids->GetId(3) < ids->GetId(0))
+		{
+			tmp = ids->GetId(2);
+			ids->SetId(2, ids->GetId(3));
+			ids->SetId(3, tmp);
+			swaps++;
+
+			tmp = ids->GetId(1);
+			ids->SetId(1, ids->GetId(2));
+			ids->SetId(2, tmp);
+			swaps++;
+
+			tmp = ids->GetId(0);
+			ids->SetId(0, ids->GetId(1));
+			ids->SetId(1, tmp);
+			swaps++;
+		}
+		else if (ids->GetId(3) < ids->GetId(1))
+		{
+			tmp = ids->GetId(2);
+			ids->SetId(2, ids->GetId(3));
+			ids->SetId(3, tmp);
+			swaps++;
+
+			tmp = ids->GetId(1);
+			ids->SetId(1, ids->GetId(2));
+			ids->SetId(2, tmp);
+			swaps++;
+		}
+		else
+		{
+			tmp = ids->GetId(2);
+			ids->SetId(2, ids->GetId(3));
+			ids->SetId(3, tmp);
 			swaps++;
 		}
 	}
