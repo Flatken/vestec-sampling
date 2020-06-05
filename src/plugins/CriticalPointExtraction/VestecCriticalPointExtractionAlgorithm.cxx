@@ -157,8 +157,8 @@ void CriticalPointExtractor::identify_critical_points(	vtkSmartPointer<vtkDataSe
 
 				vtkSmartPointer<vtkTriangle> triangle2 = vtkSmartPointer<vtkTriangle>::New();
 				triangle2->GetPointIds()->SetId(0, ids->GetId(1));
-				triangle2->GetPointIds()->SetId(1, ids->GetId(2));
-				triangle2->GetPointIds()->SetId(2, ids->GetId(3));
+				triangle2->GetPointIds()->SetId(1, ids->GetId(3));
+				triangle2->GetPointIds()->SetId(2, ids->GetId(2));
 				vecCells.push_back(triangle2);
 			}
 			else if (VTK_VOXEL == vecCellPerThread[threadIdx]->GetCellType())
@@ -208,7 +208,7 @@ void CriticalPointExtractor::identify_critical_points(	vtkSmartPointer<vtkDataSe
   //Add points and cells to polydata
   outputData->SetPoints(points); 
   outputData->SetPolys(cells);
-  std::cout << "Critical points found: " << cp << std::endl;
+  std::cout << "Critical points found: " << outputData->GetNumberOfCells() << std::endl;
 }
 
 bool CriticalPointExtractor::PointInCell(vtkCell *cell, vtkSmartPointer<vtkDataSet> grid, double* currentSingularity) {
