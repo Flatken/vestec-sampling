@@ -105,7 +105,7 @@ void CriticalPointExtractor::identify_critical_points(	vtkSmartPointer<vtkDataSe
 	ZERO_ID = input->GetNumberOfPoints();
 
 	//Prepare for parallel computation
-	int numThreads = 1;
+	int numThreads = 12;
 	omp_set_num_threads(numThreads);
 	std::vector<vtkSmartPointer<vtkGenericCell>> vecCellPerThread;
 	for(int x=0; x < numThreads; x++)
@@ -196,6 +196,17 @@ double CriticalPointExtractor::Positive(vtkSmartPointer<vtkIdList> ids, vtkSmart
 	vtkSmartPointer<vtkIdList> tmpIds = vtkSmartPointer<vtkIdList>::New();
 	tmpIds->DeepCopy(ids);
 
+	//Check for dataset dimension and configure zero vector exchange index
+	double bounds[6];
+	grid->GetBounds(bounds);
+	int xDim = abs(bounds[1] - bounds[1]);
+	int yDim = abs(bounds[3] - bounds[2]);
+	int zDim = abs(bounds[5] - bounds[4]);
+	int zeroDim = 3; //3D dataset 
+	if (xDim == 0) zeroDim = 0; //2D dataset with yz
+	if (yDim == 0) zeroDim = 1; //2D dataset with xz
+	if (zDim == 0) zeroDim = 2; //2D dataset with xy
+
 	//Exchanges every facet with the zero vector
 	if (pertubationID != -1)
 	{
@@ -227,7 +238,7 @@ double CriticalPointExtractor::Positive(vtkSmartPointer<vtkIdList> ids, vtkSmart
 			//TODO: long long to fixed precision
 			vecMatrix(tuple, i) = toFixed(vecValues[i]);
 		}
-		vecMatrix(tuple, 2) = toFixed(1);
+		vecMatrix(tuple, zeroDim) = toFixed(1);
 	}
 
 	//std::cout << " \t ######################################################################### " << std::endl;
