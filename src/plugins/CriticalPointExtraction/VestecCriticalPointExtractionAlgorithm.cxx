@@ -19,6 +19,10 @@
 #include <vtkPointData.h>
 #include <vtkCellArray.h>
 #include <vtkGenericCell.h>
+#include <vtkTriangle.h>
+#include <vtkTetra.h>
+#include <vtkVoxel.h>
+#include <vtkPixel.h>
 
 #include <sstream>
 #include <cmath>
@@ -115,22 +119,68 @@ void CriticalPointExtractor::identify_critical_points(	vtkSmartPointer<vtkDataSe
 #
 
 		//Check for every cell if a critical point (passed singularity as argument) exists
-//#pragma omp parallel for
+#pragma omp parallel for
 		for (vtkIdType i = 0; i < cells_num; i++) {
 			//get the cell for the current thread
 			int threadIdx = omp_get_thread_num();
 			input->GetCell(i, vecCellPerThread[threadIdx]);
+			
+			std::vector<vtkSmartPointer<vtkCell>> vecCells;
+
+			if (VTK_QUAD == vecCellPerThread[threadIdx]->GetCellType())
+			{
+				//vtkSmartPointer<vtkIdList> ids = vecCellPerThread[threadIdx]->GetPointIds();
+				////CREATE 2 TRIANGLES
+				//vtkSmartPointer<vtkTriangle> triangle = vtkSmartPointer<vtkTriangle>::New();
+				//triangle->GetPointIds()->SetId(0, ids->GetId(0));
+				//triangle->GetPointIds()->SetId(1, ids->GetId(1));
+				//triangle->GetPointIds()->SetId(2, ids->GetId(2));
+				//vecCells.push_back(triangle);
+
+
+				//vtkSmartPointer<vtkTriangle> triangle2 = vtkSmartPointer<vtkTriangle>::New();
+				//triangle2->GetPointIds()->SetId(0, ids->GetId(0));
+				//triangle2->GetPointIds()->SetId(1, ids->GetId(2));
+				//triangle2->GetPointIds()->SetId(2, ids->GetId(3));
+				//vecCells.push_back(triangle2);
+			}
+			else if (VTK_PIXEL == vecCellPerThread[threadIdx]->GetCellType())
+			{
+				vtkSmartPointer<vtkIdList> ids = vecCellPerThread[threadIdx]->GetPointIds();
+				//CREATE 2 TRIANGLES
+				vtkSmartPointer<vtkTriangle> triangle = vtkSmartPointer<vtkTriangle>::New();
+				triangle->GetPointIds()->SetId(0, ids->GetId(0));
+				triangle->GetPointIds()->SetId(1, ids->GetId(1));
+				triangle->GetPointIds()->SetId(2, ids->GetId(2));
+				vecCells.push_back(triangle);
+
+
+				vtkSmartPointer<vtkTriangle> triangle2 = vtkSmartPointer<vtkTriangle>::New();
+				triangle2->GetPointIds()->SetId(0, ids->GetId(1));
+				triangle2->GetPointIds()->SetId(1, ids->GetId(2));
+				triangle2->GetPointIds()->SetId(2, ids->GetId(3));
+				vecCells.push_back(triangle2);
+			}
+			else if (VTK_VOXEL == vecCellPerThread[threadIdx]->GetCellType())
+			{
+				//Create 2 tertra
+			}
+			else if (VTK_TRIANGLE == vecCellPerThread[threadIdx]->GetCellType())
+			{
+				vecCells.push_back(vecCellPerThread[threadIdx]);
+			}
 
 			//Compute if cell contains the given singularity (normally 0 in any dimension)
-			for (auto singularity : singlarities)
+			//std::cout << "Num: " << vecCells.size() << std::endl;
+			for (auto cellFromVec : vecCells)
 			{
 				double currentSingularity[3];
-				currentSingularity[0] = singularity[0];
-				currentSingularity[1] = singularity[1];
-				currentSingularity[2] = singularity[2];
+				currentSingularity[0] = 0;
+				currentSingularity[1] = 0;
+				currentSingularity[2] = 0;
 
 				//If the cell contains a the singularity add them to the output
-				if (PointInCell(vecCellPerThread[threadIdx], input, currentSingularity)) {
+				if (PointInCell(cellFromVec, input, currentSingularity)) {
 					vtkSmartPointer<vtkIdList> ids = vecCellPerThread[threadIdx]->GetPointIds();
 					vtkSmartPointer<vtkIdList> new_ids = vtkSmartPointer<vtkIdList>::New();;
 					for (int index = 0; index < ids->GetNumberOfIds(); index++)
@@ -145,6 +195,7 @@ void CriticalPointExtractor::identify_critical_points(	vtkSmartPointer<vtkDataSe
 #pragma omp critical
 					cells->InsertNextCell(new_ids);
 					cp++;
+					break;
 				}
 				//char n;
 				//std::cout << "Press for next";
@@ -222,7 +273,7 @@ double CriticalPointExtractor::Positive(vtkSmartPointer<vtkIdList> ids, vtkSmart
 	int columns = 3;
 	if (zeroDim == 3) columns = 4;
 
-	DynamicMatrix vecMatrix(tmpIds->GetNumberOfIds(), columns);
+	DynamicMatrix vecMatrix;// (tmpIds->GetNumberOfIds(), columns);
 	
 	for (vtkIdType tuple = 0; tuple < tmpIds->GetNumberOfIds(); tuple++) {
 		double vecValues[3];
@@ -279,8 +330,8 @@ double CriticalPointExtractor::Positive(vtkSmartPointer<vtkIdList> ids, vtkSmart
 double CriticalPointExtractor::toFixed(double val)
 {
 	//TODO: Some magic here
-	//long long ret =  val * pow(10, 14);
-	double ret = val;
+	long long ret =  val * pow(10, 14);
+	//double ret = val;
 
 	return ret;
 }

@@ -65,10 +65,10 @@ def CreateCoProcessor():
       grid_ = coprocessor.CreateProducer(datadescription, 'input')
 
       # create a new 'Tetrahedralize'
-      tetrahedralize1 = Tetrahedralize(Input=grid_)
+      # tetrahedralize1 = Tetrahedralize(Input=grid_)
 
       # create a new 'VestecCriticalPointExtractionAlgorithm'
-      vestecCriticalPointExtractionAlgorithm1 = VestecCriticalPointExtractionAlgorithm(Input=tetrahedralize1)
+      vestecCriticalPointExtractionAlgorithm1 = VestecCriticalPointExtractionAlgorithm(Input=grid_)
       vestecCriticalPointExtractionAlgorithm1.Array = ['POINTS', 'Vec']
 
       # ----------------------------------------------------------------
