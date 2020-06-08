@@ -69,6 +69,7 @@ def CreateCoProcessor():
 
       # create a new 'VestecCriticalPointExtractionAlgorithm'
       vestecCriticalPointExtractionAlgorithm1 = VestecCriticalPointExtractionAlgorithm(Input=grid_)
+      # vestecCriticalPointExtractionAlgorithm1 = VestecCriticalPointExtractionAlgorithm(Input=tetrahedralize1)
       vestecCriticalPointExtractionAlgorithm1.Array = ['POINTS', 'Vec']
 
       # ----------------------------------------------------------------

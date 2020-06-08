@@ -17,7 +17,7 @@
 
 //typedef Eigen::Matrix<double, 3, 3> Matrix33;
 //typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> DynamicMatrix;
-typedef Eigen::Matrix<double, 3, 3> DynamicMatrix;
+typedef Eigen::Matrix<double, 4, 4> DynamicMatrix;
 
 class vtkDataSet;
 

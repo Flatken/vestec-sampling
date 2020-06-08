@@ -142,19 +142,21 @@ void CriticalPointExtractor::identify_critical_points(	vtkSmartPointer<vtkDataSe
 
 			// std::vector<vtkSmartPointer<vtkCell>> vecCells;
 			std::vector<vtkSmartPointer<vtkIdList>> vecCells;
-
+			vtkSmartPointer<vtkIdList> ids = vecCellPerThread[threadIdx]->GetPointIds();
 			
 			if (VTK_QUAD == vecCellPerThread[threadIdx]->GetCellType())
 			{
-				vtkSmartPointer<vtkIdList> ids = vecCellPerThread[threadIdx]->GetPointIds();
+				// vtkSmartPointer<vtkIdList> ids = vecCellPerThread[threadIdx]->GetPointIds();
 				////CREATE 2 TRIANGLES				
 				vtkSmartPointer<vtkIdList> tri_ids1 = vtkSmartPointer<vtkIdList>::New();
+				tri_ids1->SetNumberOfIds(3);
 				tri_ids1->SetId(0, ids->GetId(0));
 				tri_ids1->SetId(1, ids->GetId(1));
 				tri_ids1->SetId(2, ids->GetId(3));
 				vecCells.push_back(tri_ids1);
 				
 				vtkSmartPointer<vtkIdList> tri_ids2 = vtkSmartPointer<vtkIdList>::New();
+				tri_ids2->SetNumberOfIds(3);
 				tri_ids2->SetId(0, ids->GetId(1));
 				tri_ids2->SetId(1, ids->GetId(2));
 				tri_ids2->SetId(2, ids->GetId(3));
@@ -162,7 +164,7 @@ void CriticalPointExtractor::identify_critical_points(	vtkSmartPointer<vtkDataSe
 			}
 			else if (VTK_PIXEL == vecCellPerThread[threadIdx]->GetCellType())
 			{
-				vtkSmartPointer<vtkIdList> ids = vecCellPerThread[threadIdx]->GetPointIds();
+				// vtkSmartPointer<vtkIdList> ids = vecCellPerThread[threadIdx]->GetPointIds();
 				// //CREATE 2 TRIANGLES
 				/// DO NOT USE VTKTRIANGLE <---- MUCH SLOWER
 				vtkSmartPointer<vtkIdList> tri_ids1 = vtkSmartPointer<vtkIdList>::New();	
@@ -182,10 +184,26 @@ void CriticalPointExtractor::identify_critical_points(	vtkSmartPointer<vtkDataSe
 			else if (VTK_VOXEL == vecCellPerThread[threadIdx]->GetCellType())
 			{
 				//Create 2 tertra
+
 			}
 			else if (VTK_TRIANGLE == vecCellPerThread[threadIdx]->GetCellType())
 			{
-				//vecCells.push_back(vecCellPerThread[threadIdx]);
+				vtkSmartPointer<vtkIdList> tri_ids1 = vtkSmartPointer<vtkIdList>::New();	
+				tri_ids1->SetNumberOfIds(3);
+				tri_ids1->SetId(0, ids->GetId(0));
+				tri_ids1->SetId(1, ids->GetId(1));
+				tri_ids1->SetId(2, ids->GetId(2));
+				vecCells.push_back(tri_ids1);
+			}
+			else if (VTK_TETRA == vecCellPerThread[threadIdx]->GetCellType())
+			{
+				vtkSmartPointer<vtkIdList> tet = vtkSmartPointer<vtkIdList>::New();	
+				tet->SetNumberOfIds(4);
+				tet->SetId(0, ids->GetId(0));
+				tet->SetId(1, ids->GetId(1));
+				tet->SetId(2, ids->GetId(2));
+				tet->SetId(3, ids->GetId(3));
+				vecCells.push_back(tet);
 			}
 
 			//Compute if one of the cells contains the given singularity (normally 0 in any dimension)
