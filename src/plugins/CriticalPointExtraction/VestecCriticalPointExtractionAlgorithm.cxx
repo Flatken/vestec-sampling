@@ -186,7 +186,46 @@ void CriticalPointExtractor::identify_critical_points(
 			}
 			else if (VTK_VOXEL == vecCellPerThread[threadIdx]->GetCellType())
 			{
-				//Create 2 tertra
+				//Create 5 tetra
+				vtkSmartPointer<vtkIdList> tet_ids1 = vtkSmartPointer<vtkIdList>::New();	
+				tet_ids1->SetNumberOfIds(4);
+				tet_ids1->SetId(0, ids->GetId(0));
+				tet_ids1->SetId(1, ids->GetId(1));
+				tet_ids1->SetId(2, ids->GetId(3));
+				tet_ids1->SetId(3, ids->GetId(5));
+				vecCells.push_back(tet_ids1);
+
+				vtkSmartPointer<vtkIdList> tet_ids2 = vtkSmartPointer<vtkIdList>::New();	
+				tet_ids2->SetNumberOfIds(4);
+				tet_ids2->SetId(0, ids->GetId(0));
+				tet_ids2->SetId(1, ids->GetId(3));
+				tet_ids2->SetId(2, ids->GetId(5));
+				tet_ids2->SetId(3, ids->GetId(6));
+				vecCells.push_back(tet_ids2);
+
+				vtkSmartPointer<vtkIdList> tet_ids3 = vtkSmartPointer<vtkIdList>::New();	
+				tet_ids3->SetNumberOfIds(4);
+				tet_ids3->SetId(0, ids->GetId(0));
+				tet_ids3->SetId(1, ids->GetId(2));
+				tet_ids3->SetId(2, ids->GetId(3));
+				tet_ids3->SetId(3, ids->GetId(6));
+				vecCells.push_back(tet_ids3);
+
+				vtkSmartPointer<vtkIdList> tet_ids4 = vtkSmartPointer<vtkIdList>::New();	
+				tet_ids4->SetNumberOfIds(4);
+				tet_ids4->SetId(0, ids->GetId(0));
+				tet_ids4->SetId(1, ids->GetId(4));
+				tet_ids4->SetId(2, ids->GetId(5));
+				tet_ids4->SetId(3, ids->GetId(6));
+				vecCells.push_back(tet_ids4);
+
+				vtkSmartPointer<vtkIdList> tet_ids5 = vtkSmartPointer<vtkIdList>::New();	
+				tet_ids5->SetNumberOfIds(4);
+				tet_ids5->SetId(0, ids->GetId(3));
+				tet_ids5->SetId(1, ids->GetId(5));
+				tet_ids5->SetId(2, ids->GetId(6));
+				tet_ids5->SetId(3, ids->GetId(7));
+				vecCells.push_back(tet_ids5);
 
 			}
 			else if (VTK_TRIANGLE == vecCellPerThread[threadIdx]->GetCellType())
