@@ -25,6 +25,7 @@
 #include <vtkPixel.h>
 
 #include <sstream>
+#include <chrono>
 #include <cmath>
 
 
@@ -88,7 +89,14 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
   //singularities.push_back(p3);
 
   CriticalPointExtractor cp_extractor;
+
+  auto start = std::chrono::steady_clock::now();
   cp_extractor.identify_critical_points(input, output, singularities);
+  auto end = std::chrono::steady_clock::now();
+
+  std::cout << "Elapsed time in milliseconds : "
+	  << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
+	  << " ms" << std::endl;
   /// to-do MPI implementation
   ///  
 
@@ -99,7 +107,6 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
 void CriticalPointExtractor::identify_critical_points(	vtkSmartPointer<vtkDataSet> input,
 																				vtkSmartPointer<vtkDataSet> output, std::vector<double*> singlarities) {
 
-	int cp = 0;
 	vtkSmartPointer<vtkPolyData> outputData = vtkPolyData::SafeDownCast(output);
 	vtkSmartPointer<vtkPoints> points = vtkSmartPointer<vtkPoints>::New();
 	vtkSmartPointer<vtkCellArray> cells = vtkSmartPointer<vtkCellArray>::New();
@@ -113,18 +120,26 @@ void CriticalPointExtractor::identify_critical_points(	vtkSmartPointer<vtkDataSe
 	//Prepare for parallel computation
 	int numThreads = 12;
 	omp_set_num_threads(numThreads);
+	//Private cell for every thread to work on
 	std::vector<vtkSmartPointer<vtkGenericCell>> vecCellPerThread;
+
+	//Vector of critical cell ids
+	std::vector<vtkIdType> vecCriticalCellIDs;
+
 	for(int x=0; x < numThreads; x++)
 		vecCellPerThread.push_back(vtkSmartPointer<vtkGenericCell>::New());
 #
 
 		//Check for every cell if a critical point (passed singularity as argument) exists
-#pragma omp parallel for
+#pragma omp parallel
+	{
+//Remove synchronization with nowait
+#pragma omp for nowait
 		for (vtkIdType i = 0; i < cells_num; i++) {
 			//get the cell for the current thread
 			int threadIdx = omp_get_thread_num();
 			input->GetCell(i, vecCellPerThread[threadIdx]);
-			
+
 			std::vector<vtkSmartPointer<vtkCell>> vecCells;
 
 			if (VTK_QUAD == vecCellPerThread[threadIdx]->GetCellType())
@@ -170,8 +185,7 @@ void CriticalPointExtractor::identify_critical_points(	vtkSmartPointer<vtkDataSe
 				vecCells.push_back(vecCellPerThread[threadIdx]);
 			}
 
-			//Compute if cell contains the given singularity (normally 0 in any dimension)
-			//std::cout << "Num: " << vecCells.size() << std::endl;
+			//Compute if one of the cells contains the given singularity (normally 0 in any dimension)
 			for (auto cellFromVec : vecCells)
 			{
 				double currentSingularity[3];
@@ -179,36 +193,36 @@ void CriticalPointExtractor::identify_critical_points(	vtkSmartPointer<vtkDataSe
 				currentSingularity[1] = 0;
 				currentSingularity[2] = 0;
 
-				//If the cell contains a the singularity add them to the output
+				//If the cell contains a the singularity add them to the output and we can break
 				if (PointInCell(cellFromVec, input, currentSingularity)) {
-					vtkSmartPointer<vtkIdList> ids = vecCellPerThread[threadIdx]->GetPointIds();
-					vtkSmartPointer<vtkIdList> new_ids = vtkSmartPointer<vtkIdList>::New();;
-					for (int index = 0; index < ids->GetNumberOfIds(); index++)
-					{
-						double pCoords[3];
-						vtkIdType newCellID;
-						input->GetPoint(ids->GetId(index), pCoords);
 #pragma omp critical
-						newCellID = points->InsertNextPoint(pCoords[0], pCoords[1], pCoords[2]);
-						new_ids->InsertNextId(newCellID);
-					}
-#pragma omp critical
-					cells->InsertNextCell(new_ids);
-					cp++;
+					vecCriticalCellIDs.push_back(i);
 					break;
 				}
-				//char n;
-				//std::cout << "Press for next";
-				//std::cin >> n;
-
 			}
 		}
-	
+	}
+	//Prepare output data sequentially. Insert every critical cell to output
+	for (auto cellID : vecCriticalCellIDs)
+	{
+		vtkSmartPointer<vtkCell> cell = input->GetCell(cellID);
+		vtkSmartPointer<vtkIdList> ids = cell->GetPointIds();
+		vtkSmartPointer<vtkIdList> new_ids = vtkSmartPointer<vtkIdList>::New();;
+		for (int index = 0; index < ids->GetNumberOfIds(); index++)
+		{
+			double pCoords[3];
+			vtkIdType newCellID;
+			input->GetPoint(ids->GetId(index), pCoords);
+			newCellID = points->InsertNextPoint(pCoords[0], pCoords[1], pCoords[2]);
+			new_ids->InsertNextId(newCellID);
+		}
+		cells->InsertNextCell(new_ids);
+	}
+	//Add points and cells to polydata
+	outputData->SetPoints(points); 
+	outputData->SetPolys(cells);
 
-  //Add points and cells to polydata
-  outputData->SetPoints(points); 
-  outputData->SetPolys(cells);
-  std::cout << "Critical points found: " << outputData->GetNumberOfCells() << std::endl;
+	std::cout << "Critical points found: " << outputData->GetNumberOfCells() << std::endl;
 }
 
 bool CriticalPointExtractor::PointInCell(vtkCell *cell, vtkSmartPointer<vtkDataSet> grid, double* currentSingularity) {
@@ -225,12 +239,14 @@ bool CriticalPointExtractor::PointInCell(vtkCell *cell, vtkSmartPointer<vtkDataS
 		return false;
 	}
 
+	double tmpDeterminat;
+	bool tmpDirection;
 	// 2. for each facet (i.e. an edge in a triangle or a triangle in a tetrahedron) do
 	// 2.1. replace each row of the matrix with the origin vector (0,0) or (0,0,0) given as i to Positive function
 	for (int i = 0; i < ids->GetNumberOfIds(); i++) {
 		// 2.2. compute the determinant sign again 
-		double tmpDeterminat = Positive(ids, grid, currentSingularity, i);
-		bool tmpDirection    = DeterminatCounterClockWise(tmpDeterminat);
+		tmpDeterminat = Positive(ids, grid, currentSingularity, i);
+		tmpDirection    = DeterminatCounterClockWise(tmpDeterminat);
 
 		// 2.3. check if it changes --> if so return false
 		if (initialDirection != tmpDirection)
@@ -342,7 +358,7 @@ int CriticalPointExtractor::Sort(vtkSmartPointer<vtkIdList> ids)
 	{
 		return Sort3(ids);
 	}
-	else if (ids->GetNumberOfIds() == 4) //QUAD or TERAHERDON
+	else if (ids->GetNumberOfIds() == 4) //TETRA TERAHERDON
 	{
 		return Sort4(ids);
 	}
