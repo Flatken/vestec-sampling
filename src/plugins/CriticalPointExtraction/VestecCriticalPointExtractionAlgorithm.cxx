@@ -104,8 +104,11 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
 }
 
 //----------------------------------------------------------------------------
-void CriticalPointExtractor::identify_critical_points(	vtkSmartPointer<vtkDataSet> input,
-																				vtkSmartPointer<vtkDataSet> output, std::vector<double*> singlarities) {
+void CriticalPointExtractor::identify_critical_points(	
+	vtkSmartPointer<vtkDataSet> input,
+	vtkSmartPointer<vtkDataSet> output,
+	std::vector<double*> singlarities
+) {
 
 	vtkSmartPointer<vtkPolyData> outputData = vtkPolyData::SafeDownCast(output);
 	vtkSmartPointer<vtkPoints> points = vtkSmartPointer<vtkPoints>::New();
@@ -223,7 +226,7 @@ void CriticalPointExtractor::identify_critical_points(	vtkSmartPointer<vtkDataSe
 			}
 		}
 	}
-	//Prepare output data sequentially. Insert every critical cell to output
+	////Prepare output data sequentially. Insert every critical cell to output
 	for (auto cellID : vecCriticalCellIDs)
 	{
 		vtkSmartPointer<vtkCell> cell = input->GetCell(cellID);
@@ -246,9 +249,8 @@ void CriticalPointExtractor::identify_critical_points(	vtkSmartPointer<vtkDataSe
 	std::cout << "Critical points found: " << outputData->GetNumberOfCells() << std::endl;
 }
 
-bool CriticalPointExtractor::PointInCell(vtkSmartPointer<vtkIdList> ids, vtkSmartPointer<vtkDataSet> grid, double* currentSingularity) {
-	// vtkSmartPointer<vtkIdList> ids = cell->GetPointIds();
 
+bool CriticalPointExtractor::PointInCell(vtkSmartPointer<vtkIdList> ids, vtkSmartPointer<vtkDataSet> grid, double* currentSingularity) {
 	//std::cout << " ################### Point in Cell ###################################################### " << std::endl;
 	// 1. compute the initial sign of the determinant of the cell
 	double initialDeterminant = Positive(ids, grid, currentSingularity);	
@@ -259,8 +261,6 @@ bool CriticalPointExtractor::PointInCell(vtkSmartPointer<vtkIdList> ids, vtkSmar
 	{
 		return false;
 	}
-
-	
 
 	double tmpDeterminat;
 	bool tmpDirection;
@@ -283,7 +283,13 @@ bool CriticalPointExtractor::PointInCell(vtkSmartPointer<vtkIdList> ids, vtkSmar
 }
 
 /// can we pass to Positive directly the determinant matrix instead of the cell?
-double CriticalPointExtractor::Positive(vtkSmartPointer<vtkIdList> ids, vtkSmartPointer<vtkDataSet> grid, double currentSingularity[3], long pertubationID){
+double CriticalPointExtractor::Positive(
+	vtkSmartPointer<vtkIdList> ids,
+	vtkSmartPointer<vtkDataSet> grid,
+	double currentSingularity[3],
+	long pertubationID
+){
+	//Copy ids for local modification
 	vtkSmartPointer<vtkDataArray> vectors = grid->GetPointData()->GetVectors();
 	vtkSmartPointer<vtkIdList> tmpIds = vtkSmartPointer<vtkIdList>::New();
 	tmpIds->DeepCopy(ids);
@@ -291,7 +297,7 @@ double CriticalPointExtractor::Positive(vtkSmartPointer<vtkIdList> ids, vtkSmart
 	//Check for dataset dimension and configure zero vector exchange index
 	double bounds[6];
 	grid->GetBounds(bounds);
-	double xDim = fabs(bounds[1] - bounds[1]);
+	double xDim = fabs(bounds[1] - bounds[0]);
 	double yDim = fabs(bounds[3] - bounds[2]);
 	double zDim = fabs(bounds[5] - bounds[4]);
 	int zeroDim = 3; //3D dataset 
@@ -313,7 +319,7 @@ double CriticalPointExtractor::Positive(vtkSmartPointer<vtkIdList> ids, vtkSmart
 	int columns = 3;
 	if (zeroDim == 3) columns = 4;
 
-	DynamicMatrix vecMatrix;// (tmpIds->GetNumberOfIds(), columns);
+	DynamicMatrix vecMatrix(tmpIds->GetNumberOfIds(), columns);// (tmpIds->GetNumberOfIds(), columns);
 	
 	for (vtkIdType tuple = 0; tuple < tmpIds->GetNumberOfIds(); tuple++) {
 		double vecValues[3];
@@ -328,7 +334,7 @@ double CriticalPointExtractor::Positive(vtkSmartPointer<vtkIdList> ids, vtkSmart
 			vecValues[2] = currentSingularity[2];
 		}
 
-		for (vtkIdType i = 0; i < vectors->GetNumberOfComponents(); i++) {
+		for (vtkIdType i = 0; i < columns; i++) {
 			//TODO: long long to fixed precision
 			vecMatrix(tuple, i) = toFixed(vecValues[i]);
 		}
@@ -350,8 +356,8 @@ double CriticalPointExtractor::Positive(vtkSmartPointer<vtkIdList> ids, vtkSmart
 		std::cout << " \t\t ";
 	}
 	std::cout << std::endl;
-	std::cout << " \t ######################################################################### " << std::endl;
-*/
+	std::cout << " \t ######################################################################### " << std::endl;*/
+
 	// 2. compute determinant sign
 	double det = vecMatrix.determinant();
 
@@ -359,9 +365,6 @@ double CriticalPointExtractor::Positive(vtkSmartPointer<vtkIdList> ids, vtkSmart
 	if (swapOperations % 2 != 0) //Odd
 	{
 		det *= -1;
-
-		//if(det > 0)
-			//det *= -1;
 	}
 	//std::cout << "\t\t Determinat: " << det << " Swaps:" << swapOperations << std::endl;
 	return det;
@@ -370,8 +373,8 @@ double CriticalPointExtractor::Positive(vtkSmartPointer<vtkIdList> ids, vtkSmart
 double CriticalPointExtractor::toFixed(double val)
 {
 	//TODO: Some magic here
-	long long ret =  val * pow(10, 14);
-	//double ret = val;
+	//long long ret =  val * pow(10, 14);
+	double ret = val;
 
 	return ret;
 }
