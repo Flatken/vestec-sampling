@@ -98,8 +98,8 @@ int main(int argc, char** argv) {
 	std::vector<std::string>files = getAllFilesInDir(std::string(argv[1]), { std::string(argv[2]) });
 	std::sort(files.begin(), files.end());
 
-	for(auto file: files)
-		std::cout << "File " << file  << std::endl;
+	// for(auto file: files)
+	// 	std::cout << "File " << file  << std::endl;
 
 	if(world_rank == 0)
 	{

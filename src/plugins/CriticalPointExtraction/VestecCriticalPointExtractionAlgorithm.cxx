@@ -120,21 +120,56 @@ void CriticalPointExtractor::identify_critical_points(
 	//Set zero id to end 
 	ZERO_ID = input->GetNumberOfPoints();
 
+	//Check for dataset dimension and configure zero vector exchange index
+	double bounds[6];
+	input->GetBounds(bounds);
+	double xDim = fabs(bounds[1] - bounds[0]);
+	double yDim = fabs(bounds[3] - bounds[2]);
+	double zDim = fabs(bounds[5] - bounds[4]);	
+	zeroDim = 3; //3D dataset 
+	if (xDim == 0.0) zeroDim = 0; //2D dataset with yz
+	if (yDim == 0.0) zeroDim = 1; //2D dataset with xz
+	if (zDim == 0.0) zeroDim = 2; //2D dataset with xy
+
+	// std::cout << bounds[0] << " " << bounds[1] << " " << bounds[2] << " " << bounds[3] << " " << bounds[4] << " " << bounds[5] << std::endl;
+	// std::cout << xDim << " " << yDim << " " << zDim << std::endl;
+	// std::cout << input->GetCell(0)->GetCellDimension() <<std::endl;
+
+	//create an eigen matrix
+	int columns = 3;
+	if (zeroDim == 3) columns = 4;
+
 	//Prepare for parallel computation
-	int numThreads = 12;
+	int numThreads = 8;
 	omp_set_num_threads(numThreads);
 	//Private cell for every thread to work on
 	std::vector<vtkSmartPointer<vtkGenericCell>> vecCellPerThread;
+	std::vector<DynamicMatrix> vecMatrixPerThread;
+	//DynamicMatrix vecMatrix(tmpIds->GetNumberOfIds(), columns);
 
 	//Vector of critical cell ids
 	std::vector<vtkIdType> vecCriticalCellIDs;
 
-	for(int x=0; x < numThreads; x++)
+	int rows = 3;
+	if(zeroDim == 3)
+		rows = 4;//input->GetCell(0)->GetNumberOfPoints();	
+	// std::cout << "columns&rows " << columns << " - " << rows << std::endl;
+	DynamicMatrix tmpMatrix = DynamicMatrix(rows, columns);
+
+	for(int x=0; x < numThreads; x++) {
 		vecCellPerThread.push_back(vtkSmartPointer<vtkGenericCell>::New());
+		// vecMatrixPerThread.push_back(DynamicMatrix(3, 3));
+		vecMatrixPerThread.push_back(tmpMatrix);
+		// std::cout << "vMPT columns&rows " << vecMatrixPerThread.back().cols() << " - " << vecMatrixPerThread.back().rows() << std::endl;
+	}
+
+	// std::cout << "b" << std::endl;
 #
 
+// std::cout << "before for loop" << std::endl;
+
 		//Check for every cell if a critical point (passed singularity as argument) exists
-#pragma omp parallel
+#pragma omp parallel default(shared) shared(vecMatrixPerThread)
 	{
 //Remove synchronization with nowait
 #pragma omp for nowait
@@ -143,13 +178,16 @@ void CriticalPointExtractor::identify_critical_points(
 			int threadIdx = omp_get_thread_num();
 			input->GetCell(i, vecCellPerThread[threadIdx]);
 
+			// std::cout << " tID: " << threadIdx << " - vecCellSize: " << vecCellPerThread.size() << " - vecMatSize: " << vecMatrixPerThread.size() << std::endl << std::flush;
+
+
 			// std::vector<vtkSmartPointer<vtkCell>> vecCells;
 			std::vector<vtkSmartPointer<vtkIdList>> vecCells;
 			vtkSmartPointer<vtkIdList> ids = vecCellPerThread[threadIdx]->GetPointIds();
 			
+			// if (VTK_QUAD == type)
 			if (VTK_QUAD == vecCellPerThread[threadIdx]->GetCellType())
 			{
-				// vtkSmartPointer<vtkIdList> ids = vecCellPerThread[threadIdx]->GetPointIds();
 				////CREATE 2 TRIANGLES				
 				vtkSmartPointer<vtkIdList> tri_ids1 = vtkSmartPointer<vtkIdList>::New();
 				tri_ids1->SetNumberOfIds(3);
@@ -165,9 +203,9 @@ void CriticalPointExtractor::identify_critical_points(
 				tri_ids2->SetId(2, ids->GetId(3));
 				vecCells.push_back(tri_ids2);
 			}
+			// else if (VTK_PIXEL == type)
 			else if (VTK_PIXEL == vecCellPerThread[threadIdx]->GetCellType())
 			{
-				// vtkSmartPointer<vtkIdList> ids = vecCellPerThread[threadIdx]->GetPointIds();
 				// //CREATE 2 TRIANGLES
 				/// DO NOT USE VTKTRIANGLE <---- MUCH SLOWER
 				vtkSmartPointer<vtkIdList> tri_ids1 = vtkSmartPointer<vtkIdList>::New();	
@@ -184,6 +222,7 @@ void CriticalPointExtractor::identify_critical_points(
 				tri_ids2->SetId(2, ids->GetId(2));
 				vecCells.push_back(tri_ids2);
 			}
+			// else if (VTK_VOXEL == type)
 			else if (VTK_VOXEL == vecCellPerThread[threadIdx]->GetCellType())
 			{
 				//Create 5 tetra
@@ -226,8 +265,8 @@ void CriticalPointExtractor::identify_critical_points(
 				tet_ids5->SetId(2, ids->GetId(6));
 				tet_ids5->SetId(3, ids->GetId(7));
 				vecCells.push_back(tet_ids5);
-
 			}
+			// else if (VTK_TRIANGLE == type)
 			else if (VTK_TRIANGLE == vecCellPerThread[threadIdx]->GetCellType())
 			{
 				vtkSmartPointer<vtkIdList> tri_ids1 = vtkSmartPointer<vtkIdList>::New();	
@@ -237,6 +276,7 @@ void CriticalPointExtractor::identify_critical_points(
 				tri_ids1->SetId(2, ids->GetId(2));
 				vecCells.push_back(tri_ids1);
 			}
+			// else if (VTK_TETRA == type)
 			else if (VTK_TETRA == vecCellPerThread[threadIdx]->GetCellType())
 			{
 				vtkSmartPointer<vtkIdList> tet = vtkSmartPointer<vtkIdList>::New();	
@@ -247,6 +287,13 @@ void CriticalPointExtractor::identify_critical_points(
 				tet->SetId(3, ids->GetId(3));
 				vecCells.push_back(tet);
 			}
+			else {
+				int a;
+				std::cout << "unknown cell type" << std::endl;
+				std::cin >> a;
+			}
+
+			// std::cout << "before the loop pointincell" << std::endl;
 
 			//Compute if one of the cells contains the given singularity (normally 0 in any dimension)
 			for (auto cellFromVec : vecCells)
@@ -256,8 +303,10 @@ void CriticalPointExtractor::identify_critical_points(
 				currentSingularity[1] = 0;
 				currentSingularity[2] = 0;
 
+				// std::cout << "befor POintincell" <<std::endl;
+
 				//If the cell contains a the singularity add them to the output and we can break
-				if (PointInCell(cellFromVec, input, currentSingularity)) {
+				if (PointInCell(cellFromVec, input, currentSingularity, vecMatrixPerThread[threadIdx])) {
 #pragma omp critical
 					vecCriticalCellIDs.push_back(i);
 					break;
@@ -289,10 +338,10 @@ void CriticalPointExtractor::identify_critical_points(
 }
 
 
-bool CriticalPointExtractor::PointInCell(vtkSmartPointer<vtkIdList> ids, vtkSmartPointer<vtkDataSet> grid, double* currentSingularity) {
+bool CriticalPointExtractor::PointInCell(vtkSmartPointer<vtkIdList> ids, vtkSmartPointer<vtkDataSet> grid, double* currentSingularity, DynamicMatrix &vecMatrix) {
 	//std::cout << " ################### Point in Cell ###################################################### " << std::endl;
 	// 1. compute the initial sign of the determinant of the cell
-	double initialDeterminant = Positive(ids, grid, currentSingularity);	
+	double initialDeterminant = Positive(ids, grid, currentSingularity, vecMatrix);	
 	bool initialDirection     = DeterminatCounterClockWise(initialDeterminant);	
 
 	//Check for non data values (vector is zero and determinant also) 
@@ -307,7 +356,7 @@ bool CriticalPointExtractor::PointInCell(vtkSmartPointer<vtkIdList> ids, vtkSmar
 	// 2.1. replace each row of the matrix with the origin vector (0,0) or (0,0,0) given as i to Positive function
 	for (int i = 0; i < ids->GetNumberOfIds(); i++) {
 		// 2.2. compute the determinant sign again 
-		tmpDeterminat = Positive(ids, grid, currentSingularity, i);
+		tmpDeterminat = Positive(ids, grid, currentSingularity, vecMatrix, i);
 		tmpDirection    = DeterminatCounterClockWise(tmpDeterminat);
 		
 
@@ -326,23 +375,13 @@ double CriticalPointExtractor::Positive(
 	vtkSmartPointer<vtkIdList> ids,
 	vtkSmartPointer<vtkDataSet> grid,
 	double currentSingularity[3],
+	DynamicMatrix &vecMatrix,
 	long pertubationID
 ){
 	//Copy ids for local modification
 	vtkSmartPointer<vtkDataArray> vectors = grid->GetPointData()->GetVectors();
 	vtkSmartPointer<vtkIdList> tmpIds = vtkSmartPointer<vtkIdList>::New();
 	tmpIds->DeepCopy(ids);
-
-	//Check for dataset dimension and configure zero vector exchange index
-	double bounds[6];
-	grid->GetBounds(bounds);
-	double xDim = fabs(bounds[1] - bounds[0]);
-	double yDim = fabs(bounds[3] - bounds[2]);
-	double zDim = fabs(bounds[5] - bounds[4]);
-	int zeroDim = 3; //3D dataset 
-	if (xDim == 0) zeroDim = 0; //2D dataset with yz
-	if (yDim == 0) zeroDim = 1; //2D dataset with xz
-	if (zDim == 0) zeroDim = 2; //2D dataset with xy
 
 	//Exchanges every facet with the zero vector
 	if (pertubationID != -1)
@@ -354,9 +393,9 @@ double CriticalPointExtractor::Positive(
     // TODO: More generic version required. How to handle per pertubation
 	int swapOperations = Sort(tmpIds);
 
-	//create an eigen matrix
-	int columns = 3;
-	if (zeroDim == 3) columns = 4;
+	////create an eigen matrix
+	//int cols = 3;
+	//if (zeroDim == 3) cols = 4;
 
 	DynamicMatrix vecMatrix(tmpIds->GetNumberOfIds(), columns);// (tmpIds->GetNumberOfIds(), columns);
 	
@@ -373,7 +412,7 @@ double CriticalPointExtractor::Positive(
 			vecValues[2] = currentSingularity[2];
 		}
 
-		for (vtkIdType i = 0; i < columns; i++) {
+		for (vtkIdType i = 0; i < vecMatrix.cols(); i++) {
 			//TODO: long long to fixed precision
 			vecMatrix(tuple, i) = toFixed(vecValues[i]);
 		}
