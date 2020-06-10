@@ -140,55 +140,44 @@ void CriticalPointExtractor::identify_critical_points(
 	if (zeroDim == 3) columns = 4;
 
 	//Prepare for parallel computation
-	int numThreads = 8;
+	int numThreads = 20;
 	omp_set_num_threads(numThreads);
 	//Private cell for every thread to work on
 	std::vector<vtkSmartPointer<vtkGenericCell>> vecCellPerThread; 
-	vecCellPerThread.reserve(numThreads);
 	std::vector<DynamicMatrix> vecMatrixPerThread; 
-	vecMatrixPerThread.reserve(numThreads);
-	//DynamicMatrix vecMatrix(tmpIds->GetNumberOfIds(), columns);
 
 	//Vector of critical cell ids
 	std::vector<vtkIdType> vecCriticalCellIDs;
 
 	int rows = 3;
 	if(zeroDim == 3)
-		rows = 4;//input->GetCell(0)->GetNumberOfPoints();	
-	// std::cout << "columns&rows " << columns << " - " << rows << std::endl;
+		rows = 4;
+
 	DynamicMatrix tmpMatrix = DynamicMatrix(rows, columns);
 
 	for(int x=0; x < numThreads; x++) {
 		vecCellPerThread.push_back(vtkSmartPointer<vtkGenericCell>::New());
-		// vecMatrixPerThread.push_back(DynamicMatrix(3, 3));
 		vecMatrixPerThread.push_back(tmpMatrix);
-		// std::cout << "vMPT columns&rows " << vecMatrixPerThread.back().cols() << " - " << vecMatrixPerThread.back().rows() << std::endl;
 	}
 
-	// std::cout << "b" << std::endl;
-#
-
-// std::cout << "before for loop" << std::endl;
-
 		//Check for every cell if a critical point (passed singularity as argument) exists
-#pragma omp parallel //default(shared) shared(vecMatrixPerThread)
+#pragma omp parallel 
 	{
+		//Variables per thread
+		int threadIdx = omp_get_thread_num(); //Thread ID
+		vtkIdType cellType;
+
 //Remove synchronization with nowait
 #pragma omp for nowait
 		for (vtkIdType i = 0; i < cells_num; i++) {
-			//get the cell for the current thread
-			int threadIdx = omp_get_thread_num();
+			//get the cell i and its point ids and store per thread private for processing
 			input->GetCell(i, vecCellPerThread[threadIdx]);
-
-			// std::cout << " tID: " << threadIdx << " - vecCellSize: " << vecCellPerThread.size() << " - vecMatSize: " << vecMatrixPerThread.size() << std::endl << std::flush;
-
-
-			// std::vector<vtkSmartPointer<vtkCell>> vecCells;
-			std::vector<vtkSmartPointer<vtkIdList>> vecCells;
 			vtkSmartPointer<vtkIdList> ids = vecCellPerThread[threadIdx]->GetPointIds();
 			
-			// if (VTK_QUAD == type)
-			if (VTK_QUAD == vecCellPerThread[threadIdx]->GetCellType())
+			std::vector<vtkSmartPointer<vtkIdList>> vecCells; //Cells to be processed per thread
+			cellType = vecCellPerThread[threadIdx]->GetCellType();
+
+			if (VTK_QUAD == cellType)
 			{
 				////CREATE 2 TRIANGLES				
 				vtkSmartPointer<vtkIdList> tri_ids1 = vtkSmartPointer<vtkIdList>::New();
@@ -205,8 +194,7 @@ void CriticalPointExtractor::identify_critical_points(
 				tri_ids2->SetId(2, ids->GetId(3));
 				vecCells.push_back(tri_ids2);
 			}
-			// else if (VTK_PIXEL == type)
-			else if (VTK_PIXEL == vecCellPerThread[threadIdx]->GetCellType())
+			else if (VTK_PIXEL == cellType)
 			{
 				// //CREATE 2 TRIANGLES
 				/// DO NOT USE VTKTRIANGLE <---- MUCH SLOWER
@@ -224,8 +212,7 @@ void CriticalPointExtractor::identify_critical_points(
 				tri_ids2->SetId(2, ids->GetId(2));
 				vecCells.push_back(tri_ids2);
 			}
-			// else if (VTK_VOXEL == type)
-			else if (VTK_VOXEL == vecCellPerThread[threadIdx]->GetCellType())
+			else if (VTK_VOXEL == cellType)
 			{
 				//Create 5 tetra
 				vtkSmartPointer<vtkIdList> tet_ids1 = vtkSmartPointer<vtkIdList>::New();	
@@ -268,8 +255,7 @@ void CriticalPointExtractor::identify_critical_points(
 				tet_ids5->SetId(3, ids->GetId(7));
 				vecCells.push_back(tet_ids5);
 			}
-			// else if (VTK_TRIANGLE == type)
-			else if (VTK_TRIANGLE == vecCellPerThread[threadIdx]->GetCellType())
+			else if (VTK_TRIANGLE == cellType)
 			{
 				vtkSmartPointer<vtkIdList> tri_ids1 = vtkSmartPointer<vtkIdList>::New();	
 				tri_ids1->SetNumberOfIds(3);
@@ -278,8 +264,7 @@ void CriticalPointExtractor::identify_critical_points(
 				tri_ids1->SetId(2, ids->GetId(2));
 				vecCells.push_back(tri_ids1);
 			}
-			// else if (VTK_TETRA == type)
-			else if (VTK_TETRA == vecCellPerThread[threadIdx]->GetCellType())
+			else if (VTK_TETRA == cellType)
 			{
 				vtkSmartPointer<vtkIdList> tet = vtkSmartPointer<vtkIdList>::New();	
 				tet->SetNumberOfIds(4);
@@ -295,8 +280,6 @@ void CriticalPointExtractor::identify_critical_points(
 				std::cin >> a;
 			}
 
-			// std::cout << "before the loop pointincell" << std::endl;
-
 			//Compute if one of the cells contains the given singularity (normally 0 in any dimension)
 			for (auto cellFromVec : vecCells)
 			{
@@ -304,8 +287,6 @@ void CriticalPointExtractor::identify_critical_points(
 				currentSingularity[0] = 0;
 				currentSingularity[1] = 0;
 				currentSingularity[2] = 0;
-
-				// std::cout << "befor POintincell" <<std::endl;
 
 				//If the cell contains a the singularity add them to the output and we can break
 				if (PointInCell(cellFromVec, input, currentSingularity, vecMatrixPerThread[threadIdx])) {
@@ -358,10 +339,9 @@ bool CriticalPointExtractor::PointInCell(vtkSmartPointer<vtkIdList> ids, vtkSmar
 	// 2.1. replace each row of the matrix with the origin vector (0,0) or (0,0,0) given as i to Positive function
 	for (int i = 0; i < ids->GetNumberOfIds(); i++) {
 		// 2.2. compute the determinant sign again 
-		tmpDeterminat = Positive(ids, grid, currentSingularity, vecMatrix, i);
+		tmpDeterminat   = Positive(ids, grid, currentSingularity, vecMatrix, i);
 		tmpDirection    = DeterminatCounterClockWise(tmpDeterminat);
 		
-
 		// 2.3. check if it changes --> if so return false
 		if (initialDirection != tmpDirection)
 		{
@@ -382,26 +362,23 @@ double CriticalPointExtractor::Positive(
 ){
 	//Copy ids for local modification
 	vtkSmartPointer<vtkDataArray> vectors = grid->GetPointData()->GetVectors();
-	// vtkSmartPointer<vtkIdList> tmpIds = vtkSmartPointer<vtkIdList>::New();
-	// tmpIds->DeepCopy(ids);
 	std::vector<vtkIdType> tmpIds(ids->GetNumberOfIds());
 	for (vtkIdType tuple = 0; tuple < ids->GetNumberOfIds(); tuple++)
 		tmpIds[tuple] = ids->GetId(tuple);
-	//return 0.0;
 
 	//Exchanges every facet with the zero vector
 	if (pertubationID != -1)
 	{
-		// tmpIds->SetId(pertubationID, ZERO_ID);
 		tmpIds[pertubationID] = ZERO_ID;
 	}
 
 	// 1. Sort and check swap operations (check)
     // TODO: More generic version required. How to handle per pertubation
 	int swapOperations = Sort(tmpIds);
-
-	for (std::size_t tuple = 0; tuple < tmpIds.size(); tuple++) {
-		double vecValues[3];
+	
+	double vecValues[3];
+	for (std::size_t tuple = 0; tuple < tmpIds.size(); tuple++) 
+	{
 		if (tmpIds[tuple] != ZERO_ID)
 		{
 			vectors->GetTuple(tmpIds[tuple], vecValues);
@@ -417,7 +394,7 @@ double CriticalPointExtractor::Positive(
 			//TODO: long long to fixed precision
 			vecMatrix(tuple, i) = toFixed(vecValues[i]);
 		}
-		vecMatrix(tuple, zeroDim) = toFixed(1);
+		vecMatrix(tuple, zeroDim) = toFixed(tmp);
 	}
 
 	/*std::cout << " \t ######################################################################### " << std::endl;
@@ -449,7 +426,7 @@ double CriticalPointExtractor::Positive(
 	return det;
 }
 
-double CriticalPointExtractor::toFixed(double val)
+double CriticalPointExtractor::toFixed(double& val)
 {
 	//TODO: Some magic here
 	//long long ret =  val * pow(10, 14);
@@ -458,27 +435,13 @@ double CriticalPointExtractor::toFixed(double val)
 	return ret;
 }
 
-// int CriticalPointExtractor::Sort(vtkSmartPointer<vtkIdList> ids)
 int  CriticalPointExtractor::Sort(std::vector<vtkIdType> &ids)
 {
-	// if (ids->GetNumberOfIds() == 3) //Triangle
-	// {
-	// 	return Sort3(ids);
-	// }
-	// else if (ids->GetNumberOfIds() == 4) //TETRA TERAHERDON
-	// {
-	// 	return Sort4(ids);
-	// }
-	// else
-	// {
-	// 	std::cout << "Warning cell type currently not supported" << std::endl;
-	// 	return 0;
-	// }
 	if (ids.size() == 3) //Triangle
 	{
 		return Sort3(ids);
 	}
-	else if (ids.size() == 4) //TETRA TERAHERDON
+	else if (ids.size() == 4) //TETRA 
 	{
 		return Sort4(ids);
 	}
@@ -489,33 +452,22 @@ int  CriticalPointExtractor::Sort(std::vector<vtkIdType> &ids)
 	}
 }
 
-// int CriticalPointExtractor::Sort3(vtkSmartPointer<vtkIdList> ids)
 int  CriticalPointExtractor::Sort3(std::vector<vtkIdType> &ids)
 {
-	// vtkIdType tmp;
 	unsigned int swaps = 0;
 	if (ids[0] > ids[1])
 	{
-		// tmp = ids[0];
-		// ids->SetId(0, ids[1]);
-		// ids->SetId(1, tmp);
 		std::swap(ids[0],ids[1]);
 		swaps++;
 	}
 
 	if (ids[1] > ids[2])
 	{
-		// tmp = ids[1];
-		// ids->SetId(1, ids->GetId(2));
-		// ids->SetId(2, tmp);
 		std::swap(ids[1],ids[2]);
 		swaps++;
 
 		if (ids[0] > ids[1])
 		{
-			// tmp = ids[0];
-			// ids->SetId(0, ids[1]);
-			// ids->SetId(1, tmp);
 			std::swap(ids[0],ids[1]);
 			swaps++;
 		}
@@ -523,34 +475,23 @@ int  CriticalPointExtractor::Sort3(std::vector<vtkIdType> &ids)
 	return swaps;
 }
 
-// int  CriticalPointExtractor::Sort4(vtkSmartPointer<vtkIdList> ids)
 int  CriticalPointExtractor::Sort4(std::vector<vtkIdType> &ids)
 {
 	unsigned int swaps = 0;
-	// vtkIdType tmp;
 
 	if (ids[0] > ids[1])
 	{
-		// tmp = ids[0];
-		// ids[0] = ids[1];
-		// ids[1] = tmp;
 		std::swap(ids[0],ids[1]);
 		swaps++;
 	}
 
 	if (ids[1] > ids[2])
 	{
-		// tmp = ids[1];
-		// ids[1] = ids[2];
-		// ids[2] = tmp;
 		std::swap(ids[1],ids[2]);
 		swaps++;
 
 		if (ids[0] > ids[1])
 		{
-			// tmp = ids[0];
-			// ids->SetId(0, ids[1]);
-			// ids->SetId(1, tmp);
 			std::swap(ids[0],ids[1]);
 			swaps++;
 		}
@@ -560,43 +501,25 @@ int  CriticalPointExtractor::Sort4(std::vector<vtkIdType> &ids)
 	{
 		if (ids[3] < ids[0])
 		{
-			// tmp = ids[2];
-			// ids->SetId(2, ids[3]);
-			// ids->SetId(3, tmp);
 			std::swap(ids[2],ids[3]);
 			swaps++;
 
-			// tmp = ids[1];
-			// ids->SetId(1, ids[2]);
-			// ids->SetId(2, tmp);
 			std::swap(ids[1],ids[2]);
 			swaps++;
 
-			// tmp = ids[0];
-			// ids->SetId(0, ids[1]);
-			// ids->SetId(1, tmp);
 			std::swap(ids[0],ids[1]);
 			swaps++;
 		}
 		else if (ids[3] < ids[1])
 		{
-			// tmp = ids[2];
-			// ids->SetId(2, ids[3]);
-			// ids->SetId(3, tmp);
 			std::swap(ids[2],ids[3]);
 			swaps++;
 
-			// tmp = ids[1];
-			// ids->SetId(1, ids[2]);
-			// ids->SetId(2, tmp);
 			std::swap(ids[1],ids[2]);
 			swaps++;
 		}
 		else
 		{
-			// tmp = ids[2];
-			// ids->SetId(2, ids[3]);
-			// ids->SetId(3, tmp);
 			std::swap(ids[2],ids[3]);
 			swaps++;
 		}
@@ -604,7 +527,7 @@ int  CriticalPointExtractor::Sort4(std::vector<vtkIdType> &ids)
 	return swaps;
 }
 
-bool CriticalPointExtractor::DeterminatCounterClockWise(double det)
+bool CriticalPointExtractor::DeterminatCounterClockWise(double& det)
 {
 	if (det > 0)
 		return true;

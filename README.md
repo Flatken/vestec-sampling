@@ -46,7 +46,7 @@ Build the evaluation tool itself uby sing the folowing shell script
 
 ```
 cd $FOLDER
-src/make_release.sh
+src/make.sh
 ```
 
 ## User Guide

@@ -16,7 +16,7 @@
 
 
 //typedef Eigen::Matrix<double, 3, 3> Matrix33;
-typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> DynamicMatrix;
+typedef Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic> DynamicMatrix;
 //typedef Eigen::Matrix<double, 4, 4> DynamicMatrix;
 
 class vtkDataSet;
@@ -43,12 +43,12 @@ class CriticalPointExtractor {
 	  int  Sort4(std::vector<vtkIdType> &ids);
     double Positive(vtkSmartPointer<vtkIdList> ids, vtkSmartPointer<vtkDataSet> grid, double *currentSingularity, DynamicMatrix &vecMatrix, long pertubationID = -1);
     bool PointInCell(vtkSmartPointer<vtkIdList> ids, vtkSmartPointer<vtkDataSet> grid, double* currentSingularity, DynamicMatrix &vecMatrix);
-    double toFixed(double val);
-    bool DeterminatCounterClockWise(double det);
+    double toFixed(double& val);
+    bool DeterminatCounterClockWise(double& det);
 	
   vtkIdType ZERO_ID;
   int zeroDim;
-  //int columns;
+  double tmp = 1;
 };
 
 
