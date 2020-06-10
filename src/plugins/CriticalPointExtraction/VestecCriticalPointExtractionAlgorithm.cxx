@@ -393,12 +393,6 @@ double CriticalPointExtractor::Positive(
     // TODO: More generic version required. How to handle per pertubation
 	int swapOperations = Sort(tmpIds);
 
-	////create an eigen matrix
-	//int cols = 3;
-	//if (zeroDim == 3) cols = 4;
-
-	DynamicMatrix vecMatrix(tmpIds->GetNumberOfIds(), columns);// (tmpIds->GetNumberOfIds(), columns);
-	
 	for (vtkIdType tuple = 0; tuple < tmpIds->GetNumberOfIds(); tuple++) {
 		double vecValues[3];
 		if (tmpIds->GetId(tuple) != ZERO_ID)
