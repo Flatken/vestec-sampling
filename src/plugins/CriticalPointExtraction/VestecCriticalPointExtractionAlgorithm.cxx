@@ -9,11 +9,8 @@
 #include <vtkObjectFactory.h>
 #include <vtkStreamingDemandDrivenPipeline.h>
 #include <vtkMultiProcessController.h>
-#include <vtkDataSetWriter.h>
-#include <vtkAppendPolyData.h>
+
 #include <vtkDataSetReader.h>
-#include <vtkGeometryFilter.h>
-#include <vtkDuplicatePolyData.h>
 #include <vtkUnstructuredGrid.h>
 #include <vtkFloatArray.h>
 #include <vtkPointData.h>
@@ -23,6 +20,7 @@
 #include <vtkTetra.h>
 #include <vtkVoxel.h>
 #include <vtkPixel.h>
+#include <vtkAggregateDataSetFilter.h>
 
 #include <sstream>
 #include <chrono>
@@ -30,6 +28,7 @@
 
 
 #include <omp.h>
+#include <random>
 
 #define M_PI 3.14159
 
@@ -94,6 +93,12 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
   cp_extractor.identify_critical_points(input, output, singularities);
   auto end = std::chrono::steady_clock::now();
 
+  //Collect all critical cells per MPI rank
+  vtkSmartPointer < vtkAggregateDataSetFilter > reducedData = vtkSmartPointer < vtkAggregateDataSetFilter >::New();
+  reducedData->SetInputData(output);
+  reducedData->Update();
+  output->ShallowCopy(reducedData->GetPolyDataOutput());
+  std::cout << "Critical points found: " << output->GetNumberOfCells() << std::endl;
   std::cout << "Elapsed time in milliseconds : "
 	  << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
 	  << " ms" << std::endl;
@@ -115,7 +120,7 @@ void CriticalPointExtractor::identify_critical_points(
 	vtkSmartPointer<vtkCellArray> cells = vtkSmartPointer<vtkCellArray>::New();
   
 	vtkIdType cells_num = input->GetNumberOfCells();
-	std::cout << "Checking " << cells_num << " cells for critical points " << std::endl;
+	///std::cout << "Checking " << cells_num << " cells for critical points " << std::endl;
 
 	//Set zero id to end 
 	ZERO_ID = input->GetNumberOfPoints();
@@ -140,7 +145,7 @@ void CriticalPointExtractor::identify_critical_points(
 	if (zeroDim == 3) columns = 4;
 
 	//Prepare for parallel computation
-	int numThreads = 20;
+	int numThreads = 12;
 	omp_set_num_threads(numThreads);
 	//Private cell for every thread to work on
 	std::vector<vtkSmartPointer<vtkGenericCell>> vecCellPerThread; 
@@ -164,8 +169,9 @@ void CriticalPointExtractor::identify_critical_points(
 #pragma omp parallel 
 	{
 		//Variables per thread
-		int threadIdx = omp_get_thread_num(); //Thread ID
-		vtkIdType cellType;
+		int threadIdx = omp_get_thread_num();	//Thread ID
+		double currentSingularity[3];			//The current singularity value to check for
+		vtkIdType cellType;						//Current cell type
 
 //Remove synchronization with nowait
 #pragma omp for nowait
@@ -275,15 +281,12 @@ void CriticalPointExtractor::identify_critical_points(
 				vecCells.push_back(tet);
 			}
 			else {
-				int a;
-				std::cout << "unknown cell type" << std::endl;
-				std::cin >> a;
+				std::cout << "[CriticalPointExtractor] Error: unknown cell type. Number of point ids " << ids->GetNumberOfIds() << std::endl;
 			}
 
 			//Compute if one of the cells contains the given singularity (normally 0 in any dimension)
 			for (auto cellFromVec : vecCells)
 			{
-				double currentSingularity[3];
 				currentSingularity[0] = 0;
 				currentSingularity[1] = 0;
 				currentSingularity[2] = 0;
@@ -297,7 +300,7 @@ void CriticalPointExtractor::identify_critical_points(
 			}
 		}
 	}
-	////Prepare output data sequentially. Insert every critical cell to output
+	//Prepare output data sequentially. Insert every critical cell to output
 	for (auto cellID : vecCriticalCellIDs)
 	{
 		vtkSmartPointer<vtkCell> cell = input->GetCell(cellID);
@@ -317,7 +320,7 @@ void CriticalPointExtractor::identify_critical_points(
 	outputData->SetPoints(points); 
 	outputData->SetPolys(cells);
 
-	std::cout << "Critical points found: " << outputData->GetNumberOfCells() << std::endl;
+	//std::cout << "Critical points found: " << outputData->GetNumberOfCells() << std::endl;
 }
 
 
@@ -374,7 +377,7 @@ double CriticalPointExtractor::Positive(
 
 	// 1. Sort and check swap operations (check)
     // TODO: More generic version required. How to handle per pertubation
-	int swapOperations = Sort(tmpIds);
+	int swapOperations =  Sort(tmpIds);
 	
 	double vecValues[3];
 	for (std::size_t tuple = 0; tuple < tmpIds.size(); tuple++) 
