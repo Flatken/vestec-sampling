@@ -35,9 +35,12 @@ class CriticalPointExtractor {
                       vtkSmartPointer<vtkDataSet> output, std::vector<double*> singlarities);
 
   private:
-	int  Sort(vtkSmartPointer<vtkIdList> ids);
-    int	 Sort3(vtkSmartPointer<vtkIdList> ids);
-	int  Sort4(vtkSmartPointer<vtkIdList> ids);
+	// int  Sort(vtkSmartPointer<vtkIdList> ids);
+  //   int	 Sort3(vtkSmartPointer<vtkIdList> ids);
+	// int  Sort4(vtkSmartPointer<vtkIdList> ids);
+    int  Sort(std::vector<vtkIdType> &ids);
+    int	 Sort3(std::vector<vtkIdType> &ids);
+	  int  Sort4(std::vector<vtkIdType> &ids);
     double Positive(vtkSmartPointer<vtkIdList> ids, vtkSmartPointer<vtkDataSet> grid, double *currentSingularity, DynamicMatrix &vecMatrix, long pertubationID = -1);
     bool PointInCell(vtkSmartPointer<vtkIdList> ids, vtkSmartPointer<vtkDataSet> grid, double* currentSingularity, DynamicMatrix &vecMatrix);
     double toFixed(double val);

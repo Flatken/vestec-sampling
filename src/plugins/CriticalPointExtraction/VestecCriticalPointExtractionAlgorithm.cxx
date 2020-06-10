@@ -143,8 +143,10 @@ void CriticalPointExtractor::identify_critical_points(
 	int numThreads = 8;
 	omp_set_num_threads(numThreads);
 	//Private cell for every thread to work on
-	std::vector<vtkSmartPointer<vtkGenericCell>> vecCellPerThread;
-	std::vector<DynamicMatrix> vecMatrixPerThread;
+	std::vector<vtkSmartPointer<vtkGenericCell>> vecCellPerThread; 
+	vecCellPerThread.reserve(numThreads);
+	std::vector<DynamicMatrix> vecMatrixPerThread; 
+	vecMatrixPerThread.reserve(numThreads);
 	//DynamicMatrix vecMatrix(tmpIds->GetNumberOfIds(), columns);
 
 	//Vector of critical cell ids
@@ -169,7 +171,7 @@ void CriticalPointExtractor::identify_critical_points(
 // std::cout << "before for loop" << std::endl;
 
 		//Check for every cell if a critical point (passed singularity as argument) exists
-#pragma omp parallel default(shared) shared(vecMatrixPerThread)
+#pragma omp parallel //default(shared) shared(vecMatrixPerThread)
 	{
 //Remove synchronization with nowait
 #pragma omp for nowait
@@ -380,24 +382,29 @@ double CriticalPointExtractor::Positive(
 ){
 	//Copy ids for local modification
 	vtkSmartPointer<vtkDataArray> vectors = grid->GetPointData()->GetVectors();
-	vtkSmartPointer<vtkIdList> tmpIds = vtkSmartPointer<vtkIdList>::New();
-	tmpIds->DeepCopy(ids);
+	// vtkSmartPointer<vtkIdList> tmpIds = vtkSmartPointer<vtkIdList>::New();
+	// tmpIds->DeepCopy(ids);
+	std::vector<vtkIdType> tmpIds(ids->GetNumberOfIds());
+	for (vtkIdType tuple = 0; tuple < ids->GetNumberOfIds(); tuple++)
+		tmpIds[tuple] = ids->GetId(tuple);
+	//return 0.0;
 
 	//Exchanges every facet with the zero vector
 	if (pertubationID != -1)
 	{
-		tmpIds->SetId(pertubationID, ZERO_ID);
+		// tmpIds->SetId(pertubationID, ZERO_ID);
+		tmpIds[pertubationID] = ZERO_ID;
 	}
 
 	// 1. Sort and check swap operations (check)
     // TODO: More generic version required. How to handle per pertubation
 	int swapOperations = Sort(tmpIds);
 
-	for (vtkIdType tuple = 0; tuple < tmpIds->GetNumberOfIds(); tuple++) {
+	for (std::size_t tuple = 0; tuple < tmpIds.size(); tuple++) {
 		double vecValues[3];
-		if (tmpIds->GetId(tuple) != ZERO_ID)
+		if (tmpIds[tuple] != ZERO_ID)
 		{
-			vectors->GetTuple(tmpIds->GetId(tuple), vecValues);
+			vectors->GetTuple(tmpIds[tuple], vecValues);
 		}
 		else
 		{
@@ -451,13 +458,27 @@ double CriticalPointExtractor::toFixed(double val)
 	return ret;
 }
 
-int CriticalPointExtractor::Sort(vtkSmartPointer<vtkIdList> ids)
+// int CriticalPointExtractor::Sort(vtkSmartPointer<vtkIdList> ids)
+int  CriticalPointExtractor::Sort(std::vector<vtkIdType> &ids)
 {
-	if (ids->GetNumberOfIds() == 3) //Triangle
+	// if (ids->GetNumberOfIds() == 3) //Triangle
+	// {
+	// 	return Sort3(ids);
+	// }
+	// else if (ids->GetNumberOfIds() == 4) //TETRA TERAHERDON
+	// {
+	// 	return Sort4(ids);
+	// }
+	// else
+	// {
+	// 	std::cout << "Warning cell type currently not supported" << std::endl;
+	// 	return 0;
+	// }
+	if (ids.size() == 3) //Triangle
 	{
 		return Sort3(ids);
 	}
-	else if (ids->GetNumberOfIds() == 4) //TETRA TERAHERDON
+	else if (ids.size() == 4) //TETRA TERAHERDON
 	{
 		return Sort4(ids);
 	}
@@ -468,101 +489,115 @@ int CriticalPointExtractor::Sort(vtkSmartPointer<vtkIdList> ids)
 	}
 }
 
-int CriticalPointExtractor::Sort3(vtkSmartPointer<vtkIdList> ids)
+// int CriticalPointExtractor::Sort3(vtkSmartPointer<vtkIdList> ids)
+int  CriticalPointExtractor::Sort3(std::vector<vtkIdType> &ids)
 {
-	vtkIdType tmp;
+	// vtkIdType tmp;
 	unsigned int swaps = 0;
-	if (ids->GetId(0) > ids->GetId(1))
+	if (ids[0] > ids[1])
 	{
-		tmp = ids->GetId(0);
-		ids->SetId(0, ids->GetId(1));
-		ids->SetId(1, tmp);
+		// tmp = ids[0];
+		// ids->SetId(0, ids[1]);
+		// ids->SetId(1, tmp);
+		std::swap(ids[0],ids[1]);
 		swaps++;
 	}
 
-	if (ids->GetId(1) > ids->GetId(2))
+	if (ids[1] > ids[2])
 	{
-		tmp = ids->GetId(1);
-		ids->SetId(1, ids->GetId(2));
-		ids->SetId(2, tmp);
+		// tmp = ids[1];
+		// ids->SetId(1, ids->GetId(2));
+		// ids->SetId(2, tmp);
+		std::swap(ids[1],ids[2]);
 		swaps++;
 
-		if (ids->GetId(0) > ids->GetId(1))
+		if (ids[0] > ids[1])
 		{
-			tmp = ids->GetId(0);
-			ids->SetId(0, ids->GetId(1));
-			ids->SetId(1, tmp);
+			// tmp = ids[0];
+			// ids->SetId(0, ids[1]);
+			// ids->SetId(1, tmp);
+			std::swap(ids[0],ids[1]);
 			swaps++;
 		}
 	}
 	return swaps;
 }
 
-int  CriticalPointExtractor::Sort4(vtkSmartPointer<vtkIdList> ids)
+// int  CriticalPointExtractor::Sort4(vtkSmartPointer<vtkIdList> ids)
+int  CriticalPointExtractor::Sort4(std::vector<vtkIdType> &ids)
 {
 	unsigned int swaps = 0;
-	vtkIdType tmp;
+	// vtkIdType tmp;
 
-	if (ids->GetId(0) > ids->GetId(1))
+	if (ids[0] > ids[1])
 	{
-		tmp = ids->GetId(0);
-		ids->SetId(0, ids->GetId(1));
-		ids->SetId(1, tmp);
+		// tmp = ids[0];
+		// ids[0] = ids[1];
+		// ids[1] = tmp;
+		std::swap(ids[0],ids[1]);
 		swaps++;
 	}
 
-	if (ids->GetId(1) > ids->GetId(2))
+	if (ids[1] > ids[2])
 	{
-		tmp = ids->GetId(1);
-		ids->SetId(1, ids->GetId(2));
-		ids->SetId(2, tmp);
+		// tmp = ids[1];
+		// ids[1] = ids[2];
+		// ids[2] = tmp;
+		std::swap(ids[1],ids[2]);
 		swaps++;
 
-		if (ids->GetId(0) > ids->GetId(1))
+		if (ids[0] > ids[1])
 		{
-			tmp = ids->GetId(0);
-			ids->SetId(0, ids->GetId(1));
-			ids->SetId(1, tmp);
+			// tmp = ids[0];
+			// ids->SetId(0, ids[1]);
+			// ids->SetId(1, tmp);
+			std::swap(ids[0],ids[1]);
 			swaps++;
 		}
 	}
 
-	if (ids->GetId(3) < ids->GetId(2))
+	if (ids[3] < ids[2])
 	{
-		if (ids->GetId(3) < ids->GetId(0))
+		if (ids[3] < ids[0])
 		{
-			tmp = ids->GetId(2);
-			ids->SetId(2, ids->GetId(3));
-			ids->SetId(3, tmp);
+			// tmp = ids[2];
+			// ids->SetId(2, ids[3]);
+			// ids->SetId(3, tmp);
+			std::swap(ids[2],ids[3]);
 			swaps++;
 
-			tmp = ids->GetId(1);
-			ids->SetId(1, ids->GetId(2));
-			ids->SetId(2, tmp);
+			// tmp = ids[1];
+			// ids->SetId(1, ids[2]);
+			// ids->SetId(2, tmp);
+			std::swap(ids[1],ids[2]);
 			swaps++;
 
-			tmp = ids->GetId(0);
-			ids->SetId(0, ids->GetId(1));
-			ids->SetId(1, tmp);
+			// tmp = ids[0];
+			// ids->SetId(0, ids[1]);
+			// ids->SetId(1, tmp);
+			std::swap(ids[0],ids[1]);
 			swaps++;
 		}
-		else if (ids->GetId(3) < ids->GetId(1))
+		else if (ids[3] < ids[1])
 		{
-			tmp = ids->GetId(2);
-			ids->SetId(2, ids->GetId(3));
-			ids->SetId(3, tmp);
+			// tmp = ids[2];
+			// ids->SetId(2, ids[3]);
+			// ids->SetId(3, tmp);
+			std::swap(ids[2],ids[3]);
 			swaps++;
 
-			tmp = ids->GetId(1);
-			ids->SetId(1, ids->GetId(2));
-			ids->SetId(2, tmp);
+			// tmp = ids[1];
+			// ids->SetId(1, ids[2]);
+			// ids->SetId(2, tmp);
+			std::swap(ids[1],ids[2]);
 			swaps++;
 		}
 		else
 		{
-			tmp = ids->GetId(2);
-			ids->SetId(2, ids->GetId(3));
-			ids->SetId(3, tmp);
+			// tmp = ids[2];
+			// ids->SetId(2, ids[3]);
+			// ids->SetId(3, tmp);
+			std::swap(ids[2],ids[3]);
 			swaps++;
 		}
 	}
