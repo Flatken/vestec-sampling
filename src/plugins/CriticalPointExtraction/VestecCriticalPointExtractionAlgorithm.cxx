@@ -29,6 +29,7 @@
 
 #include <omp.h>
 #include <random>
+#include <array>
 
 #define M_PI 3.14159
 
@@ -145,7 +146,7 @@ void CriticalPointExtractor::identify_critical_points(
 	if (zeroDim == 3) columns = 4;
 
 	//Prepare for parallel computation
-	int numThreads = 12;
+	int numThreads = 1;
 	omp_set_num_threads(numThreads);
 	//Private cell for every thread to work on
 	std::vector<vtkSmartPointer<vtkGenericCell>> vecCellPerThread; 
@@ -172,7 +173,12 @@ void CriticalPointExtractor::identify_critical_points(
 		int threadIdx = omp_get_thread_num();	//Thread ID
 		double currentSingularity[3];			//The current singularity value to check for
 		vtkIdType cellType;						//Current cell type
-
+		std::array<vtkSmartPointer<vtkIdList>, 5> arrayCells{ vtkSmartPointer<vtkIdList>::New(),
+															  vtkSmartPointer<vtkIdList>::New(),
+															  vtkSmartPointer<vtkIdList>::New(),
+															  vtkSmartPointer<vtkIdList>::New(),
+															  vtkSmartPointer<vtkIdList>::New() };
+		int generatedCells = 1;
 //Remove synchronization with nowait
 #pragma omp for nowait
 		for (vtkIdType i = 0; i < cells_num; i++) {
@@ -180,119 +186,101 @@ void CriticalPointExtractor::identify_critical_points(
 			input->GetCell(i, vecCellPerThread[threadIdx]);
 			vtkSmartPointer<vtkIdList> ids = vecCellPerThread[threadIdx]->GetPointIds();
 			
-			std::vector<vtkSmartPointer<vtkIdList>> vecCells; //Cells to be processed per thread
+			
+			//Cells to be processed per thread
 			cellType = vecCellPerThread[threadIdx]->GetCellType();
 
 			if (VTK_QUAD == cellType)
 			{
-				////CREATE 2 TRIANGLES				
-				vtkSmartPointer<vtkIdList> tri_ids1 = vtkSmartPointer<vtkIdList>::New();
-				tri_ids1->SetNumberOfIds(3);
-				tri_ids1->SetId(0, ids->GetId(0));
-				tri_ids1->SetId(1, ids->GetId(1));
-				tri_ids1->SetId(2, ids->GetId(3));
-				vecCells.push_back(tri_ids1);
-				
-				vtkSmartPointer<vtkIdList> tri_ids2 = vtkSmartPointer<vtkIdList>::New();
-				tri_ids2->SetNumberOfIds(3);
-				tri_ids2->SetId(0, ids->GetId(1));
-				tri_ids2->SetId(1, ids->GetId(2));
-				tri_ids2->SetId(2, ids->GetId(3));
-				vecCells.push_back(tri_ids2);
+				generatedCells = 2;
+
+				arrayCells[0]->SetNumberOfIds(3);
+				arrayCells[0]->SetId(0, ids->GetId(0));
+				arrayCells[0]->SetId(1, ids->GetId(1));
+				arrayCells[0]->SetId(2, ids->GetId(3));
+
+				arrayCells[1]->SetNumberOfIds(3);
+				arrayCells[1]->SetId(0, ids->GetId(1));
+				arrayCells[1]->SetId(1, ids->GetId(2));
+				arrayCells[1]->SetId(2, ids->GetId(3));
 			}
 			else if (VTK_PIXEL == cellType)
 			{
-				// //CREATE 2 TRIANGLES
-				/// DO NOT USE VTKTRIANGLE <---- MUCH SLOWER
-				vtkSmartPointer<vtkIdList> tri_ids1 = vtkSmartPointer<vtkIdList>::New();	
-				tri_ids1->SetNumberOfIds(3);
-				tri_ids1->SetId(0, ids->GetId(0));
-				tri_ids1->SetId(1, ids->GetId(1));
-				tri_ids1->SetId(2, ids->GetId(2));
-				vecCells.push_back(tri_ids1);
+				generatedCells = 2;
 
-				vtkSmartPointer<vtkIdList> tri_ids2 = vtkSmartPointer<vtkIdList>::New();
-				tri_ids2->SetNumberOfIds(3);
-				tri_ids2->SetId(0, ids->GetId(1));
-				tri_ids2->SetId(1, ids->GetId(3));
-				tri_ids2->SetId(2, ids->GetId(2));
-				vecCells.push_back(tri_ids2);
+				arrayCells[0]->SetNumberOfIds(3);
+				arrayCells[0]->SetId(0, ids->GetId(0));
+				arrayCells[0]->SetId(1, ids->GetId(1));
+				arrayCells[0]->SetId(2, ids->GetId(2));
+
+				arrayCells[1]->SetNumberOfIds(3);
+				arrayCells[1]->SetId(0, ids->GetId(1));
+				arrayCells[1]->SetId(1, ids->GetId(3));
+				arrayCells[1]->SetId(2, ids->GetId(2));
 			}
 			else if (VTK_VOXEL == cellType)
 			{
 				//Create 5 tetra
-				vtkSmartPointer<vtkIdList> tet_ids1 = vtkSmartPointer<vtkIdList>::New();	
-				tet_ids1->SetNumberOfIds(4);
-				tet_ids1->SetId(0, ids->GetId(0));
-				tet_ids1->SetId(1, ids->GetId(1));
-				tet_ids1->SetId(2, ids->GetId(3));
-				tet_ids1->SetId(3, ids->GetId(5));
-				vecCells.push_back(tet_ids1);
+				generatedCells = 5;
 
-				vtkSmartPointer<vtkIdList> tet_ids2 = vtkSmartPointer<vtkIdList>::New();	
-				tet_ids2->SetNumberOfIds(4);
-				tet_ids2->SetId(0, ids->GetId(0));
-				tet_ids2->SetId(1, ids->GetId(3));
-				tet_ids2->SetId(2, ids->GetId(5));
-				tet_ids2->SetId(3, ids->GetId(6));
-				vecCells.push_back(tet_ids2);
-
-				vtkSmartPointer<vtkIdList> tet_ids3 = vtkSmartPointer<vtkIdList>::New();	
-				tet_ids3->SetNumberOfIds(4);
-				tet_ids3->SetId(0, ids->GetId(0));
-				tet_ids3->SetId(1, ids->GetId(2));
-				tet_ids3->SetId(2, ids->GetId(3));
-				tet_ids3->SetId(3, ids->GetId(6));
-				vecCells.push_back(tet_ids3);
-
-				vtkSmartPointer<vtkIdList> tet_ids4 = vtkSmartPointer<vtkIdList>::New();	
-				tet_ids4->SetNumberOfIds(4);
-				tet_ids4->SetId(0, ids->GetId(0));
-				tet_ids4->SetId(1, ids->GetId(4));
-				tet_ids4->SetId(2, ids->GetId(5));
-				tet_ids4->SetId(3, ids->GetId(6));
-				vecCells.push_back(tet_ids4);
-
-				vtkSmartPointer<vtkIdList> tet_ids5 = vtkSmartPointer<vtkIdList>::New();	
-				tet_ids5->SetNumberOfIds(4);
-				tet_ids5->SetId(0, ids->GetId(3));
-				tet_ids5->SetId(1, ids->GetId(5));
-				tet_ids5->SetId(2, ids->GetId(6));
-				tet_ids5->SetId(3, ids->GetId(7));
-				vecCells.push_back(tet_ids5);
+				arrayCells[0]->SetNumberOfIds(4);
+				arrayCells[0]->SetId(0, ids->GetId(0));
+				arrayCells[0]->SetId(1, ids->GetId(1));
+				arrayCells[0]->SetId(2, ids->GetId(3));
+				arrayCells[0]->SetId(3, ids->GetId(5));
+				
+				arrayCells[1]->SetNumberOfIds(4);
+				arrayCells[1]->SetId(0, ids->GetId(0));
+				arrayCells[1]->SetId(1, ids->GetId(3));
+				arrayCells[1]->SetId(2, ids->GetId(5));
+				arrayCells[1]->SetId(3, ids->GetId(6));
+				
+				arrayCells[2]->SetNumberOfIds(4);
+				arrayCells[2]->SetId(0, ids->GetId(0));
+				arrayCells[2]->SetId(1, ids->GetId(2));
+				arrayCells[2]->SetId(2, ids->GetId(3));
+				arrayCells[2]->SetId(3, ids->GetId(6));
+				
+				arrayCells[3]->SetNumberOfIds(4);
+				arrayCells[3]->SetId(0, ids->GetId(0));
+				arrayCells[3]->SetId(1, ids->GetId(4));
+				arrayCells[3]->SetId(2, ids->GetId(5));
+				arrayCells[3]->SetId(3, ids->GetId(6));
+				
+				arrayCells[4]->SetNumberOfIds(4);
+				arrayCells[4]->SetId(0, ids->GetId(3));
+				arrayCells[4]->SetId(1, ids->GetId(5));
+				arrayCells[4]->SetId(2, ids->GetId(6));
+				arrayCells[4]->SetId(3, ids->GetId(7));
 			}
 			else if (VTK_TRIANGLE == cellType)
 			{
-				vtkSmartPointer<vtkIdList> tri_ids1 = vtkSmartPointer<vtkIdList>::New();	
-				tri_ids1->SetNumberOfIds(3);
-				tri_ids1->SetId(0, ids->GetId(0));
-				tri_ids1->SetId(1, ids->GetId(1));
-				tri_ids1->SetId(2, ids->GetId(2));
-				vecCells.push_back(tri_ids1);
+				arrayCells[0]->SetNumberOfIds(3);
+				arrayCells[0]->SetId(0, ids->GetId(0));
+				arrayCells[0]->SetId(1, ids->GetId(1));
+				arrayCells[0]->SetId(2, ids->GetId(2));
 			}
 			else if (VTK_TETRA == cellType)
 			{
-				vtkSmartPointer<vtkIdList> tet = vtkSmartPointer<vtkIdList>::New();	
-				tet->SetNumberOfIds(4);
-				tet->SetId(0, ids->GetId(0));
-				tet->SetId(1, ids->GetId(1));
-				tet->SetId(2, ids->GetId(2));
-				tet->SetId(3, ids->GetId(3));
-				vecCells.push_back(tet);
+				arrayCells[0]->SetNumberOfIds(4);
+				arrayCells[0]->SetId(0, ids->GetId(0));
+				arrayCells[0]->SetId(1, ids->GetId(1));
+				arrayCells[0]->SetId(2, ids->GetId(2));
+				arrayCells[0]->SetId(3, ids->GetId(3));
 			}
 			else {
 				std::cout << "[CriticalPointExtractor] Error: unknown cell type. Number of point ids " << ids->GetNumberOfIds() << std::endl;
 			}
 
 			//Compute if one of the cells contains the given singularity (normally 0 in any dimension)
-			for (auto cellFromVec : vecCells)
+			for(vtkIdType nb = 0; nb < generatedCells; nb++)
 			{
-				currentSingularity[0] = 0;
-				currentSingularity[1] = 0;
-				currentSingularity[2] = 0;
+				currentSingularity[0] = 0.000;
+				currentSingularity[1] = 0.000;
+				currentSingularity[2] = 0.000;
 
 				//If the cell contains a the singularity add them to the output and we can break
-				if (PointInCell(cellFromVec, input, currentSingularity, vecMatrixPerThread[threadIdx])) {
+				if (PointInCell(arrayCells[nb], input, currentSingularity, vecMatrixPerThread[threadIdx])) {
 #pragma omp critical
 					vecCriticalCellIDs.push_back(i);
 					break;
@@ -300,25 +288,25 @@ void CriticalPointExtractor::identify_critical_points(
 			}
 		}
 	}
-	//Prepare output data sequentially. Insert every critical cell to output
-	for (auto cellID : vecCriticalCellIDs)
-	{
-		vtkSmartPointer<vtkCell> cell = input->GetCell(cellID);
-		vtkSmartPointer<vtkIdList> ids = cell->GetPointIds();
-		vtkSmartPointer<vtkIdList> new_ids = vtkSmartPointer<vtkIdList>::New();;
-		for (int index = 0; index < ids->GetNumberOfIds(); index++)
-		{
-			double pCoords[3];
-			vtkIdType newCellID;
-			input->GetPoint(ids->GetId(index), pCoords);
-			newCellID = points->InsertNextPoint(pCoords[0], pCoords[1], pCoords[2]);
-			new_ids->InsertNextId(newCellID);
-		}
-		cells->InsertNextCell(new_ids);
-	}
-	//Add points and cells to polydata
-	outputData->SetPoints(points); 
-	outputData->SetPolys(cells);
+	////Prepare output data sequentially. Insert every critical cell to output
+	//for (auto cellID : vecCriticalCellIDs)
+	//{
+	//	vtkSmartPointer<vtkCell> cell = input->GetCell(cellID);
+	//	vtkSmartPointer<vtkIdList> ids = cell->GetPointIds();
+	//	vtkSmartPointer<vtkIdList> new_ids = vtkSmartPointer<vtkIdList>::New();;
+	//	for (int index = 0; index < ids->GetNumberOfIds(); index++)
+	//	{
+	//		double pCoords[3];
+	//		vtkIdType newCellID;
+	//		input->GetPoint(ids->GetId(index), pCoords);
+	//		newCellID = points->InsertNextPoint(pCoords[0], pCoords[1], pCoords[2]);
+	//		new_ids->InsertNextId(newCellID);
+	//	}
+	//	cells->InsertNextCell(new_ids);
+	//}
+	////Add points and cells to polydata
+	//outputData->SetPoints(points); 
+	//outputData->SetPolys(cells);
 
 	//std::cout << "Critical points found: " << outputData->GetNumberOfCells() << std::endl;
 }
@@ -429,13 +417,11 @@ double CriticalPointExtractor::Positive(
 	return det;
 }
 
-double CriticalPointExtractor::toFixed(double& val)
+double& CriticalPointExtractor::toFixed(double& val)
 {
 	//TODO: Some magic here
-	//long long ret =  val * pow(10, 14);
-	double ret = val;
-
-	return ret;
+	//val =  val * pow(10, 14);
+	return val;
 }
 
 int  CriticalPointExtractor::Sort(std::vector<vtkIdType> &ids)
