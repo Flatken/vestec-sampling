@@ -288,25 +288,25 @@ void CriticalPointExtractor::identify_critical_points(
 			}
 		}
 	}
-	////Prepare output data sequentially. Insert every critical cell to output
-	//for (auto cellID : vecCriticalCellIDs)
-	//{
-	//	vtkSmartPointer<vtkCell> cell = input->GetCell(cellID);
-	//	vtkSmartPointer<vtkIdList> ids = cell->GetPointIds();
-	//	vtkSmartPointer<vtkIdList> new_ids = vtkSmartPointer<vtkIdList>::New();;
-	//	for (int index = 0; index < ids->GetNumberOfIds(); index++)
-	//	{
-	//		double pCoords[3];
-	//		vtkIdType newCellID;
-	//		input->GetPoint(ids->GetId(index), pCoords);
-	//		newCellID = points->InsertNextPoint(pCoords[0], pCoords[1], pCoords[2]);
-	//		new_ids->InsertNextId(newCellID);
-	//	}
-	//	cells->InsertNextCell(new_ids);
-	//}
-	////Add points and cells to polydata
-	//outputData->SetPoints(points); 
-	//outputData->SetPolys(cells);
+	//Prepare output data sequentially. Insert every critical cell to output
+	for (auto cellID : vecCriticalCellIDs)
+	{
+		vtkSmartPointer<vtkCell> cell = input->GetCell(cellID);
+		vtkSmartPointer<vtkIdList> ids = cell->GetPointIds();
+		vtkSmartPointer<vtkIdList> new_ids = vtkSmartPointer<vtkIdList>::New();;
+		for (int index = 0; index < ids->GetNumberOfIds(); index++)
+		{
+			double pCoords[3];
+			vtkIdType newCellID;
+			input->GetPoint(ids->GetId(index), pCoords);
+			newCellID = points->InsertNextPoint(pCoords[0], pCoords[1], pCoords[2]);
+			new_ids->InsertNextId(newCellID);
+		}
+		cells->InsertNextCell(new_ids);
+	}
+	//Add points and cells to polydata
+	outputData->SetPoints(points); 
+	outputData->SetPolys(cells);
 
 	//std::cout << "Critical points found: " << outputData->GetNumberOfCells() << std::endl;
 }
