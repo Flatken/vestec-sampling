@@ -41,8 +41,8 @@ class CriticalPointExtractor {
     int  Sort(std::vector<vtkIdType> &ids);
     int	 Sort3(std::vector<vtkIdType> &ids);
 	  int  Sort4(std::vector<vtkIdType> &ids);
-    double Positive(vtkSmartPointer<vtkIdList> ids, vtkSmartPointer<vtkDataSet> grid, double *currentSingularity, DynamicMatrix &vecMatrix, long pertubationID = -1);
-    bool PointInCell(vtkSmartPointer<vtkIdList> ids, vtkSmartPointer<vtkDataSet> grid, double* currentSingularity, DynamicMatrix &vecMatrix);
+    double Positive(std::vector<vtkIdType> tmpIds, vtkSmartPointer<vtkDataSet> grid, double *currentSingularity, DynamicMatrix &vecMatrix, long pertubationID = -1);
+    bool PointInCell(std::vector<vtkIdType> &ids, vtkSmartPointer<vtkDataSet> grid, double* currentSingularity, DynamicMatrix &vecMatrix);
     double& toFixed(double& val);
     bool DeterminatCounterClockWise(double& det);
 	

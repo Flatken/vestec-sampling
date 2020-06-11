@@ -88,6 +88,10 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
   //singularities.push_back(p2);
   //singularities.push_back(p3);
 
+  /// TO-DO: GLOBAL PERTURBATION ON THE DATA
+  /// ----> DOUBLE TO FIXED PRECISION CONVERSION 
+  /// THIS CAN BE DISABLE
+
   CriticalPointExtractor cp_extractor;
 
   auto start = std::chrono::steady_clock::now();
@@ -103,8 +107,11 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
   std::cout << "Elapsed time in milliseconds : "
 	  << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
 	  << " ms" << std::endl;
-  /// to-do MPI implementation
+
+  /// to-DO: post-processing DUPLICATE CLEANUP
   ///  
+
+  /// TO-DO: comparison between preprocessing perturbation vs post-processing cleanup
 
   return 1;
 }
@@ -173,112 +180,93 @@ void CriticalPointExtractor::identify_critical_points(
 		int threadIdx = omp_get_thread_num();	//Thread ID
 		double currentSingularity[3];			//The current singularity value to check for
 		vtkIdType cellType;						//Current cell type
-		std::array<vtkSmartPointer<vtkIdList>, 5> arrayCells{ vtkSmartPointer<vtkIdList>::New(),
-															  vtkSmartPointer<vtkIdList>::New(),
-															  vtkSmartPointer<vtkIdList>::New(),
-															  vtkSmartPointer<vtkIdList>::New(),
-															  vtkSmartPointer<vtkIdList>::New() };
+		std::array<std::vector<vtkIdType>, 5> arrayCells{ std::vector<vtkIdType>(), std::vector<vtkIdType>(),
+															  std::vector<vtkIdType>(), std::vector<vtkIdType>(),
+															  std::vector<vtkIdType>() };
 		int generatedCells = 1;
+
+		currentSingularity[0] = 0.000;
+		currentSingularity[1] = 0.000;
+		currentSingularity[2] = 0.000;
+
 //Remove synchronization with nowait
 #pragma omp for nowait
 		for (vtkIdType i = 0; i < cells_num; i++) {
 			//get the cell i and its point ids and store per thread private for processing
 			input->GetCell(i, vecCellPerThread[threadIdx]);
+
 			vtkSmartPointer<vtkIdList> ids = vecCellPerThread[threadIdx]->GetPointIds();
 			
 			
 			//Cells to be processed per thread
 			cellType = vecCellPerThread[threadIdx]->GetCellType();
-
-			if (VTK_QUAD == cellType)
+			
+			if (VTK_PIXEL == cellType || VTK_QUAD == cellType)
 			{
 				generatedCells = 2;
 
-				arrayCells[0]->SetNumberOfIds(3);
-				arrayCells[0]->SetId(0, ids->GetId(0));
-				arrayCells[0]->SetId(1, ids->GetId(1));
-				arrayCells[0]->SetId(2, ids->GetId(3));
+				arrayCells[0].resize(3);
+				arrayCells[0][0] = ids->GetId(0);
+				arrayCells[0][1] = ids->GetId(1);
+				arrayCells[0][2] = ids->GetId(2);
 
-				arrayCells[1]->SetNumberOfIds(3);
-				arrayCells[1]->SetId(0, ids->GetId(1));
-				arrayCells[1]->SetId(1, ids->GetId(2));
-				arrayCells[1]->SetId(2, ids->GetId(3));
+				arrayCells[1].resize(3);
+				arrayCells[1][0] = ids->GetId(1);
+				arrayCells[1][1] = ids->GetId(3);
+				arrayCells[1][2] = ids->GetId(2);
 			}
-			else if (VTK_PIXEL == cellType)
-			{
-				generatedCells = 2;
-
-				arrayCells[0]->SetNumberOfIds(3);
-				arrayCells[0]->SetId(0, ids->GetId(0));
-				arrayCells[0]->SetId(1, ids->GetId(1));
-				arrayCells[0]->SetId(2, ids->GetId(2));
-
-				arrayCells[1]->SetNumberOfIds(3);
-				arrayCells[1]->SetId(0, ids->GetId(1));
-				arrayCells[1]->SetId(1, ids->GetId(3));
-				arrayCells[1]->SetId(2, ids->GetId(2));
-			}
-			else if (VTK_VOXEL == cellType)
+			else if (VTK_VOXEL == cellType || VTK_HEXAHEDRON == cellType)
 			{
 				//Create 5 tetra
 				generatedCells = 5;
 
-				arrayCells[0]->SetNumberOfIds(4);
-				arrayCells[0]->SetId(0, ids->GetId(0));
-				arrayCells[0]->SetId(1, ids->GetId(1));
-				arrayCells[0]->SetId(2, ids->GetId(3));
-				arrayCells[0]->SetId(3, ids->GetId(5));
+				arrayCells[0].resize(4);
+				arrayCells[0][0] = ids->GetId(0);
+				arrayCells[0][1] = ids->GetId(1);
+				arrayCells[0][2] = ids->GetId(3);
+				arrayCells[0][3] = ids->GetId(5);
 				
-				arrayCells[1]->SetNumberOfIds(4);
-				arrayCells[1]->SetId(0, ids->GetId(0));
-				arrayCells[1]->SetId(1, ids->GetId(3));
-				arrayCells[1]->SetId(2, ids->GetId(5));
-				arrayCells[1]->SetId(3, ids->GetId(6));
+				arrayCells[1].resize(4);
+				arrayCells[1][0] = ids->GetId(0);
+				arrayCells[1][1] = ids->GetId(3);
+				arrayCells[1][2] = ids->GetId(5);
+				arrayCells[1][3] = ids->GetId(6);
 				
-				arrayCells[2]->SetNumberOfIds(4);
-				arrayCells[2]->SetId(0, ids->GetId(0));
-				arrayCells[2]->SetId(1, ids->GetId(2));
-				arrayCells[2]->SetId(2, ids->GetId(3));
-				arrayCells[2]->SetId(3, ids->GetId(6));
+				arrayCells[2].resize(4);
+				arrayCells[2][0] = ids->GetId(0);
+				arrayCells[2][1] = ids->GetId(2);
+				arrayCells[2][2] = ids->GetId(3);
+				arrayCells[2][3] = ids->GetId(6);
 				
-				arrayCells[3]->SetNumberOfIds(4);
-				arrayCells[3]->SetId(0, ids->GetId(0));
-				arrayCells[3]->SetId(1, ids->GetId(4));
-				arrayCells[3]->SetId(2, ids->GetId(5));
-				arrayCells[3]->SetId(3, ids->GetId(6));
+				arrayCells[3].resize(4);
+				arrayCells[3][0] = ids->GetId(0);
+				arrayCells[3][1] = ids->GetId(4);
+				arrayCells[3][2] = ids->GetId(5);
+				arrayCells[3][3] = ids->GetId(6);
 				
-				arrayCells[4]->SetNumberOfIds(4);
-				arrayCells[4]->SetId(0, ids->GetId(3));
-				arrayCells[4]->SetId(1, ids->GetId(5));
-				arrayCells[4]->SetId(2, ids->GetId(6));
-				arrayCells[4]->SetId(3, ids->GetId(7));
+				arrayCells[4].resize(4);
+				arrayCells[4][0] = ids->GetId(3);
+				arrayCells[4][1] = ids->GetId(5);
+				arrayCells[4][2] = ids->GetId(6);
+				arrayCells[4][3] = ids->GetId(7);
 			}
 			else if (VTK_TRIANGLE == cellType)
 			{
-				arrayCells[0]->SetNumberOfIds(3);
-				arrayCells[0]->SetId(0, ids->GetId(0));
-				arrayCells[0]->SetId(1, ids->GetId(1));
-				arrayCells[0]->SetId(2, ids->GetId(2));
+				arrayCells[0] = {ids->GetId(0), ids->GetId(1), ids->GetId(2)};
 			}
 			else if (VTK_TETRA == cellType)
 			{
-				arrayCells[0]->SetNumberOfIds(4);
-				arrayCells[0]->SetId(0, ids->GetId(0));
-				arrayCells[0]->SetId(1, ids->GetId(1));
-				arrayCells[0]->SetId(2, ids->GetId(2));
-				arrayCells[0]->SetId(3, ids->GetId(3));
+				arrayCells[0] = {ids->GetId(0), ids->GetId(1), ids->GetId(2), ids->GetId(3)};
 			}
 			else {
 				std::cout << "[CriticalPointExtractor] Error: unknown cell type. Number of point ids " << ids->GetNumberOfIds() << std::endl;
 			}
 
+			//continue;
+
 			//Compute if one of the cells contains the given singularity (normally 0 in any dimension)
 			for(vtkIdType nb = 0; nb < generatedCells; nb++)
 			{
-				currentSingularity[0] = 0.000;
-				currentSingularity[1] = 0.000;
-				currentSingularity[2] = 0.000;
-
 				//If the cell contains a the singularity add them to the output and we can break
 				if (PointInCell(arrayCells[nb], input, currentSingularity, vecMatrixPerThread[threadIdx])) {
 #pragma omp critical
@@ -312,7 +300,7 @@ void CriticalPointExtractor::identify_critical_points(
 }
 
 
-bool CriticalPointExtractor::PointInCell(vtkSmartPointer<vtkIdList> ids, vtkSmartPointer<vtkDataSet> grid, double* currentSingularity, DynamicMatrix &vecMatrix) {
+bool CriticalPointExtractor::PointInCell(std::vector<vtkIdType> &ids, vtkSmartPointer<vtkDataSet> grid, double* currentSingularity, DynamicMatrix &vecMatrix) {
 	//std::cout << " ################### Point in Cell ###################################################### " << std::endl;
 	// 1. compute the initial sign of the determinant of the cell
 	double initialDeterminant = Positive(ids, grid, currentSingularity, vecMatrix);	
@@ -328,7 +316,7 @@ bool CriticalPointExtractor::PointInCell(vtkSmartPointer<vtkIdList> ids, vtkSmar
 	bool tmpDirection;
 	// 2. for each facet (i.e. an edge in a triangle or a triangle in a tetrahedron) do
 	// 2.1. replace each row of the matrix with the origin vector (0,0) or (0,0,0) given as i to Positive function
-	for (int i = 0; i < ids->GetNumberOfIds(); i++) {
+	for (int i = 0; i < ids.size(); i++) {
 		// 2.2. compute the determinant sign again 
 		tmpDeterminat   = Positive(ids, grid, currentSingularity, vecMatrix, i);
 		tmpDirection    = DeterminatCounterClockWise(tmpDeterminat);
@@ -345,17 +333,14 @@ bool CriticalPointExtractor::PointInCell(vtkSmartPointer<vtkIdList> ids, vtkSmar
 
 /// can we pass to Positive directly the determinant matrix instead of the cell?
 double CriticalPointExtractor::Positive(
-	vtkSmartPointer<vtkIdList> ids,
+	std::vector<vtkIdType> tmpIds,
 	vtkSmartPointer<vtkDataSet> grid,
 	double currentSingularity[3],
 	DynamicMatrix &vecMatrix,
 	long pertubationID
 ){
 	//Copy ids for local modification
-	vtkSmartPointer<vtkDataArray> vectors = grid->GetPointData()->GetVectors();
-	std::vector<vtkIdType> tmpIds(ids->GetNumberOfIds());
-	for (vtkIdType tuple = 0; tuple < ids->GetNumberOfIds(); tuple++)
-		tmpIds[tuple] = ids->GetId(tuple);
+	vtkSmartPointer<vtkDataArray> vectors = grid->GetPointData()->GetVectors();	
 
 	//Exchanges every facet with the zero vector
 	if (pertubationID != -1)
