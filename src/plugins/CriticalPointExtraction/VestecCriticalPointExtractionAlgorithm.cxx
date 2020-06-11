@@ -153,7 +153,7 @@ void CriticalPointExtractor::identify_critical_points(
 	if (zeroDim == 3) columns = 4;
 
 	//Prepare for parallel computation
-	int numThreads = 1;
+	int numThreads = 12;
 	omp_set_num_threads(numThreads);
 	//Private cell for every thread to work on
 	std::vector<vtkSmartPointer<vtkGenericCell>> vecCellPerThread; 

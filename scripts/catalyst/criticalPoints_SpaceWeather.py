@@ -64,22 +64,30 @@ def CreateCoProcessor():
       # create a producer from a simulation input
       grid_ = coprocessor.CreateProducer(datadescription, 'input')
 
-      # create a new 'Tetrahedralize'
-      # tetrahedralize1 = Tetrahedralize(Input=grid_)
-
       # create a new 'VestecCriticalPointExtractionAlgorithm'
       vestecCriticalPointExtractionAlgorithm1 = VestecCriticalPointExtractionAlgorithm(Input=grid_)
-      # vestecCriticalPointExtractionAlgorithm1 = VestecCriticalPointExtractionAlgorithm(Input=tetrahedralize1)
-      # vestecCriticalPointExtractionAlgorithm1.Array = ['POINTS', 'Vec'] # for evaluation datasets
       vestecCriticalPointExtractionAlgorithm1.Array = ['POINTS', 'B'] # for space-weather use-case
 
+	   # Generate seeds around critical points
+      vestecSeeding = VestecSeedingAlgorithm(Input=vestecCriticalPointExtractionAlgorithm1)
+      vestecSeeding.SeedingRadius = 10.0
+      vestecSeeding.NumberOfSeeds = 5
+      vestecSeeding.RandomDistributionMode = 'Uniform distribution'
+      vestecSeeding.Array = ['POINTS', 'p']
+
+      # Trace particles
+      vestecSamplingAlgorithm = VestecSamplingAlgorithm(Grid=grid_,Seeds=vestecSeeding)
+      vestecSamplingAlgorithm.Vectors = ['POINTS', 'B']
+      vestecSamplingAlgorithm.IntegrationDuration = 240
+      vestecSamplingAlgorithm.StepSize = 40
+      
       # ----------------------------------------------------------------
       # finally, restore active source
-      SetActiveSource(vestecCriticalPointExtractionAlgorithm1)
+      SetActiveSource(vestecSamplingAlgorithm)
       # ----------------------------------------------------------------
 	  
       # Now any catalyst writers
-      xMLPPolyDataWriter1 = servermanager.writers.XMLPPolyDataWriter(Input=vestecCriticalPointExtractionAlgorithm1)
+      xMLPPolyDataWriter1 = servermanager.writers.XMLPPolyDataWriter(Input=vestecSamplingAlgorithm)
       coprocessor.RegisterWriter(xMLPPolyDataWriter1, filename='results/VestecCriticalPointExtractionAlgorithm_%t.pvtp', freq=1, paddingamount=0)
     return Pipeline()
 
