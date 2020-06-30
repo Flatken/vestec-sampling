@@ -180,9 +180,9 @@ void CriticalPointExtractor::identify_critical_points(
 		int threadIdx = omp_get_thread_num();	//Thread ID
 		double currentSingularity[3];			//The current singularity value to check for
 		vtkIdType cellType;						//Current cell type
-		std::array<std::vector<vtkIdType>, 5> arrayCells{ std::vector<vtkIdType>(), std::vector<vtkIdType>(),
-														  std::vector<vtkIdType>(), std::vector<vtkIdType>(),
-														  std::vector<vtkIdType>() };
+		std::array<std::vector<vtkIdType>, 5> arrayCells{ std::vector<vtkIdType>(3), std::vector<vtkIdType>(3),
+														  std::vector<vtkIdType>(3), std::vector<vtkIdType>(3),
+														  std::vector<vtkIdType>(3) };
 		int generatedCells = 1;
 
 		currentSingularity[0] = 0.000;
@@ -201,7 +201,7 @@ void CriticalPointExtractor::identify_critical_points(
 			//Get the cell type
 			cellType = vecCellPerThread[threadIdx]->GetCellType();
 			
-			if (VTK_PIXEL == cellType)
+			if (VTK_PIXEL == cellType || VTK_QUAD == cellType)
 			{
 				generatedCells = 2;
 
@@ -214,20 +214,6 @@ void CriticalPointExtractor::identify_critical_points(
 				arrayCells[1][0] = ids->GetId(1);
 				arrayCells[1][1] = ids->GetId(3);
 				arrayCells[1][2] = ids->GetId(2);
-			}
-			else if (VTK_QUAD == cellType)
-			{
-				generatedCells = 2;
-
-				arrayCells[0].resize(3);
-				arrayCells[0][0] = ids->GetId(0);
-				arrayCells[0][1] = ids->GetId(1);
-				arrayCells[0][2] = ids->GetId(3);
-
-				arrayCells[1].resize(3);
-				arrayCells[1][0] = ids->GetId(1);
-				arrayCells[1][1] = ids->GetId(2);
-				arrayCells[1][2] = ids->GetId(3);
 			}
 			else if (VTK_VOXEL == cellType || VTK_HEXAHEDRON == cellType)
 			{
