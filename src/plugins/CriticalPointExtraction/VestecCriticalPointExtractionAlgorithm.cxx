@@ -21,6 +21,7 @@
 #include <vtkVoxel.h>
 #include <vtkPixel.h>
 #include <vtkAggregateDataSetFilter.h>
+#include <vtkCleanPolyData.h>
 
 #include <sstream>
 #include <chrono>
@@ -97,19 +98,40 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
   auto start = std::chrono::steady_clock::now();
   cp_extractor.identify_critical_points(input, output, singularities);
   auto end = std::chrono::steady_clock::now();
+  std::cout << "[identify_critical_points] Critical points found: " << output->GetNumberOfCells() << std::endl;
+  std::cout << "[identify_critical_points] Elapsed time in milliseconds : "
+	  << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
+	  << " ms" << std::endl;
+
+  // STARTED BY EVERY MPI WORKER
+  start = std::chrono::steady_clock::now();
+  cp_extractor.duplicate_cleanup(output);
+  end = std::chrono::steady_clock::now();
+  std::cout << "[duplicate_cleanup] Critical points after cleanup: " << output->GetNumberOfCells() << std::endl;
+  std::cout << "[duplicate_cleanup] Elapsed time in milliseconds : "
+	  << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
+	  << " ms" << std::endl;
 
   //Collect all critical cells per MPI rank
   vtkSmartPointer < vtkAggregateDataSetFilter > reducedData = vtkSmartPointer < vtkAggregateDataSetFilter >::New();
+  start = std::chrono::steady_clock::now();
   reducedData->SetInputData(output);
   reducedData->Update();
   output->ShallowCopy(reducedData->GetPolyDataOutput());
-  std::cout << "Critical points found: " << output->GetNumberOfCells() << std::endl;
-  std::cout << "Elapsed time in milliseconds : "
+  end = std::chrono::steady_clock::now();  
+  std::cout << "[MPI merging] Elapsed time in milliseconds : "
 	  << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
 	  << " ms" << std::endl;
 
   /// to-DO: post-processing DUPLICATE CLEANUP
-  ///  
+  ///  STARTED BY A SINGLE MPI WORKER
+  start = std::chrono::steady_clock::now();
+  cp_extractor.duplicate_cleanup(output);
+  end = std::chrono::steady_clock::now();
+  std::cout << "[duplicate_cleanup] Critical points after cleanup: " << output->GetNumberOfCells() << std::endl;
+  std::cout << "[duplicate_cleanup] Elapsed time in milliseconds : "
+	  << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
+	  << " ms" << std::endl;
 
   /// TO-DO: comparison between preprocessing perturbation vs post-processing cleanup
 
@@ -295,10 +317,34 @@ void CriticalPointExtractor::identify_critical_points(
 	//Add points and cells to polydata
 	outputData->SetPoints(points); 
 	outputData->SetPolys(cells);
-
+	vtkSmartPointer<vtkCleanPolyData> cleaner = vtkSmartPointer<vtkCleanPolyData>::New();
+	cleaner->SetInputData(outputData);
+	cleaner->Update();
+	outputData->ShallowCopy(cleaner->GetOutput());	
 	//std::cout << "Critical points found: " << outputData->GetNumberOfCells() << std::endl;
 }
 
+void CriticalPointExtractor::duplicate_cleanup(vtkSmartPointer<vtkPolyData> output) {
+
+	vtkSmartPointer<vtkIdList> ids = vtkSmartPointer<vtkIdList>::New();
+
+	for (vtkIdType i = 0; i < output->GetNumberOfPoints(); i++) {
+		output->GetPointCells(i,ids);
+		if(ids->GetNumberOfIds() > 1){
+			for (vtkIdType id=1; id < ids->GetNumberOfIds(); id++) {			
+				output->DeleteCell(ids->GetId(id));
+			}
+		}		
+}
+	output->RemoveDeletedCells();	
+
+	vtkSmartPointer<vtkCleanPolyData> cleaner = vtkSmartPointer<vtkCleanPolyData>::New();
+	cleaner->PointMergingOff();
+	cleaner->SetInputData(output);
+	cleaner->Update();
+	output->ShallowCopy(cleaner->GetOutput());		
+	std::cout << "[CriticalPointExtractor::duplicate_cleanup] Points number " << output->GetNumberOfPoints() << std::endl;
+}
 
 bool CriticalPointExtractor::PointInCell(std::vector<vtkIdType> &ids, vtkSmartPointer<vtkDataSet> grid, double* currentSingularity, DynamicMatrix &vecMatrix) {
 	//std::cout << " ################### Point in Cell ###################################################### " << std::endl;
