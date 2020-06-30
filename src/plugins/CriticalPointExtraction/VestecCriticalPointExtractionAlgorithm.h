@@ -47,7 +47,7 @@ class CriticalPointExtractor {
     bool DeterminatCounterClockWise(double& det);
 	
   vtkIdType ZERO_ID;
-  int zeroDim;
+  int iExchangeIndex;
   double tmp = 1;
 };
 

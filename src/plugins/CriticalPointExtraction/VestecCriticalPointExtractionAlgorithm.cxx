@@ -128,7 +128,7 @@ void CriticalPointExtractor::identify_critical_points(
 	vtkSmartPointer<vtkCellArray> cells = vtkSmartPointer<vtkCellArray>::New();
   
 	vtkIdType cells_num = input->GetNumberOfCells();
-	///std::cout << "Checking " << cells_num << " cells for critical points " << std::endl;
+	std::cout << "[CriticalPointExtractor::identify_critical_points] Checking " << cells_num << " cells for critical points " << std::endl;
 
 	//Set zero id to end 
 	ZERO_ID = input->GetNumberOfPoints();
@@ -139,23 +139,22 @@ void CriticalPointExtractor::identify_critical_points(
 	double xDim = fabs(bounds[1] - bounds[0]);
 	double yDim = fabs(bounds[3] - bounds[2]);
 	double zDim = fabs(bounds[5] - bounds[4]);	
-	zeroDim = 3; //3D dataset 
-	if (xDim == 0.0) zeroDim = 0; //2D dataset with yz
-	if (yDim == 0.0) zeroDim = 1; //2D dataset with xz
-	if (zDim == 0.0) zeroDim = 2; //2D dataset with xy
 
-	// std::cout << bounds[0] << " " << bounds[1] << " " << bounds[2] << " " << bounds[3] << " " << bounds[4] << " " << bounds[5] << std::endl;
-	// std::cout << xDim << " " << yDim << " " << zDim << std::endl;
-	// std::cout << input->GetCell(0)->GetCellDimension() <<std::endl;
+	iExchangeIndex = 3; //3D dataset 
+
+	if (xDim == 0.0) iExchangeIndex = 0; //2D dataset with yz
+	if (yDim == 0.0) iExchangeIndex = 1; //2D dataset with xz
+	if (zDim == 0.0) iExchangeIndex = 2; //2D dataset with xy
 
 	//create an eigen matrix
-	int columns = 3;
-	if (zeroDim == 3) columns = 4;
+	int iMatrixColumns = 3;
+	if (iExchangeIndex == 3) iMatrixColumns = 4;
 
 	//Prepare for parallel computation
 	int numThreads = 12;
 	omp_set_num_threads(numThreads);
-	//Private cell for every thread to work on
+
+	//Create a thread private cell for concurrent computation
 	std::vector<vtkSmartPointer<vtkGenericCell>> vecCellPerThread; 
 	std::vector<DynamicMatrix> vecMatrixPerThread; 
 
@@ -163,45 +162,46 @@ void CriticalPointExtractor::identify_critical_points(
 	std::vector<vtkIdType> vecCriticalCellIDs;
 
 	int rows = 3;
-	if(zeroDim == 3)
+	if(iExchangeIndex == 3)
 		rows = 4;
 
-	DynamicMatrix tmpMatrix = DynamicMatrix(rows, columns);
-
+	std::cout << "[CriticalPointExtractor::identify_critical_points] Matrix size(" << rows << "," << iMatrixColumns << ")"<< std::endl;
+	std::cout << "[CriticalPointExtractor::identify_critical_points] Exchange index: " << iExchangeIndex << std::endl;
 	for(int x=0; x < numThreads; x++) {
 		vecCellPerThread.push_back(vtkSmartPointer<vtkGenericCell>::New());
-		vecMatrixPerThread.push_back(tmpMatrix);
+		vecMatrixPerThread.push_back(DynamicMatrix(rows, iMatrixColumns));
 	}
 
-		//Check for every cell if a critical point (passed singularity as argument) exists
+	std::cout << "[CriticalPointExtractor::identify_critical_points] Identifing critical cells "<< std::endl;
+	//Check for every cell if a critical point (passed singularity as argument) exists
 #pragma omp parallel 
 	{
-		//Variables per thread
+		//Local variables per thread
 		int threadIdx = omp_get_thread_num();	//Thread ID
 		double currentSingularity[3];			//The current singularity value to check for
 		vtkIdType cellType;						//Current cell type
 		std::array<std::vector<vtkIdType>, 5> arrayCells{ std::vector<vtkIdType>(), std::vector<vtkIdType>(),
-															  std::vector<vtkIdType>(), std::vector<vtkIdType>(),
-															  std::vector<vtkIdType>() };
+														  std::vector<vtkIdType>(), std::vector<vtkIdType>(),
+														  std::vector<vtkIdType>() };
 		int generatedCells = 1;
 
 		currentSingularity[0] = 0.000;
 		currentSingularity[1] = 0.000;
 		currentSingularity[2] = 0.000;
 
-//Remove synchronization with nowait
-#pragma omp for nowait
+		//Remove synchronization with nowait
+		#pragma omp for nowait
 		for (vtkIdType i = 0; i < cells_num; i++) {
-			//get the cell i and its point ids and store per thread private for processing
+			//get the cell
 			input->GetCell(i, vecCellPerThread[threadIdx]);
 
+			//Get the associated point ids for the cell 
 			vtkSmartPointer<vtkIdList> ids = vecCellPerThread[threadIdx]->GetPointIds();
 			
-			
-			//Cells to be processed per thread
+			//Get the cell type
 			cellType = vecCellPerThread[threadIdx]->GetCellType();
 			
-			if (VTK_PIXEL == cellType || VTK_QUAD == cellType)
+			if (VTK_PIXEL == cellType)
 			{
 				generatedCells = 2;
 
@@ -214,6 +214,20 @@ void CriticalPointExtractor::identify_critical_points(
 				arrayCells[1][0] = ids->GetId(1);
 				arrayCells[1][1] = ids->GetId(3);
 				arrayCells[1][2] = ids->GetId(2);
+			}
+			else if (VTK_QUAD == cellType)
+			{
+				generatedCells = 2;
+
+				arrayCells[0].resize(3);
+				arrayCells[0][0] = ids->GetId(0);
+				arrayCells[0][1] = ids->GetId(1);
+				arrayCells[0][2] = ids->GetId(3);
+
+				arrayCells[1].resize(3);
+				arrayCells[1][0] = ids->GetId(1);
+				arrayCells[1][1] = ids->GetId(2);
+				arrayCells[1][2] = ids->GetId(3);
 			}
 			else if (VTK_VOXEL == cellType || VTK_HEXAHEDRON == cellType)
 			{
@@ -262,8 +276,6 @@ void CriticalPointExtractor::identify_critical_points(
 				std::cout << "[CriticalPointExtractor] Error: unknown cell type. Number of point ids " << ids->GetNumberOfIds() << std::endl;
 			}
 
-			//continue;
-
 			//Compute if one of the cells contains the given singularity (normally 0 in any dimension)
 			for(vtkIdType nb = 0; nb < generatedCells; nb++)
 			{
@@ -276,6 +288,8 @@ void CriticalPointExtractor::identify_critical_points(
 			}
 		}
 	}
+	std::cout << "[CriticalPointExtractor::identify_critical_points] Identifing critical cells done "<< std::endl;
+	std::cout << "[CriticalPointExtractor::identify_critical_points] Now preparing output data " << std::endl;
 	//Prepare output data sequentially. Insert every critical cell to output
 	for (auto cellID : vecCriticalCellIDs)
 	{
@@ -370,7 +384,7 @@ double CriticalPointExtractor::Positive(
 			//TODO: long long to fixed precision
 			vecMatrix(tuple, i) = toFixed(vecValues[i]);
 		}
-		vecMatrix(tuple, zeroDim) = toFixed(tmp);
+		vecMatrix(tuple, iExchangeIndex) = toFixed(tmp);
 	}
 
 	/*std::cout << " \t ######################################################################### " << std::endl;
