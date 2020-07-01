@@ -34,6 +34,11 @@ class CriticalPointExtractor {
     void identify_critical_points(	vtkSmartPointer<vtkDataSet> input,
                       vtkSmartPointer<vtkDataSet> output, double* singlarity);
     void duplicate_cleanup(vtkSmartPointer<vtkPolyData> output);
+    void perturbate(vtkSmartPointer<vtkDataSet> ds);
+    /**
+     * 
+     */
+    void toFixed(double* values, vtkIdType id);
 
     enum CriticalPointType { REGULAR=0, SADDLE=-1, SINGULARITY=1 };
     struct CriticalPoint {
@@ -45,7 +50,7 @@ class CriticalPointExtractor {
         type = t;
       }
     };
-    
+    double ONE[3] = {1,1,1};    
 
   private:
     /**
@@ -86,9 +91,11 @@ class CriticalPointExtractor {
      * Check if direction of the determinat is positive (counter-clockwise) 
      */
     bool DeterminatCounterClockWise(double& det);
-	
+
+    
+public:
     vtkIdType ZERO_ID;  //!< Vertex ID of the singularity: always number of vertices + 1 
-    int iExchangeIndex; //!< The row id of the matrix to exchange with the singularity
+    int iExchangeIndex; //!< The row id of the matrix to exchange with the singularity    
 };
 
 

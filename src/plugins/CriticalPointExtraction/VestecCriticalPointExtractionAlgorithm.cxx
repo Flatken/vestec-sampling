@@ -79,18 +79,31 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
   vtkDataArray *inScalars = this->GetInputArrayToProcess(0, inputVector);
   input->GetPointData()->SetActiveVectors(inScalars->GetName());
 
+  CriticalPointExtractor cp_extractor;
+
+  //Set zero id to end 
+  cp_extractor.ZERO_ID = input->GetNumberOfPoints() + 1;
+
   //Compute critical points
-  double singularity[3] = {0.00, 0.00, 0.00};
+  double singularity[3] = {0.00, 0.00, 0.00};  
+
+  auto start = std::chrono::steady_clock::now();
+  cp_extractor.toFixed(singularity,cp_extractor.ZERO_ID);
+
+  //cp_extractor.toFixed(cp_extractor.ONE,cp_extractor.ZERO_ID+1);
 
   /// TO-DO: GLOBAL PERTURBATION ON THE DATA
   /// ----> DOUBLE TO FIXED PRECISION CONVERSION 
   /// THIS CAN BE DISABLE
+  cp_extractor.perturbate(input);
+  auto end = std::chrono::steady_clock::now();  
+  std::cout << "[perturbate] Elapsed time in milliseconds : "
+	  << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
+	  << " ms" << std::endl;
 
-  CriticalPointExtractor cp_extractor;
-
-  auto start = std::chrono::steady_clock::now();
+  start = std::chrono::steady_clock::now();
   cp_extractor.identify_critical_points(input, output, singularity);
-  auto end = std::chrono::steady_clock::now();
+  end = std::chrono::steady_clock::now();
   std::cout << "[identify_critical_points] Unstable critical points: " << output->GetNumberOfCells() << std::endl;
   std::cout << "[identify_critical_points] Elapsed time in milliseconds : "
 	  << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
@@ -121,6 +134,58 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
 }
 
 //----------------------------------------------------------------------------
+void CriticalPointExtractor::perturbate(vtkSmartPointer<vtkDataSet> grid) {
+		//Copy ids for local modification
+	vtkSmartPointer<vtkDataArray> vectors = grid->GetPointData()->GetVectors();	
+	for(vtkIdType i=0; i<vectors->GetNumberOfTuples(); i++) {
+		double values[3];		
+		vectors->GetTuple(i,values);	
+		toFixed(values,i);
+		vectors->SetTuple(i,values);
+	}
+}
+
+void CriticalPointExtractor::toFixed(double *values, vtkIdType id) {
+	// longi := int (value * 10^a).
+	/*char str[50];
+		
+	long long w = 15;
+	long long a = 14;
+
+	sprintf(str,"%0.*f",a,values[0]);
+	values[0] = atof(str) * (double) std::pow(10,a);
+	sprintf(str, "%0.1f", floor (values[0]));
+	values[0] = (long long) atof(str);
+	
+	sprintf(str,"%0.*f",a,values[1]);
+	values[1] = atof(str) * (double) std::pow(10,a);
+	sprintf(str, "%0.1f", floor (values[1]));
+	values[1] = (long long) atof(str);
+	
+	sprintf(str,"%0.*f",a,values[2]);
+	values[2] = atof(str) * (double) std::pow(10,a);
+	sprintf(str, "%0.1f", floor (values[2]));
+	values[2] = (long long) atof(str);*/	
+
+	// perturbation function f(e,i,j) = e
+	// e ?? --> constant?
+	// i = id
+	// j = to the component of values --> 0,1,2
+
+	double perturbation = std::pow(0.5,std::pow(2,id*ZERO_ID-0));
+	auto tofixed = cnl::fixed_point<long long, -14>(values[0]+perturbation);
+	values[0] = to_rep(tofixed);
+
+	perturbation = std::pow(0.5,std::pow(2,id*ZERO_ID-1));
+	tofixed = cnl::fixed_point<long long, -14>(values[1]+perturbation);
+	values[1] = to_rep(tofixed);
+
+	perturbation = std::pow(0.5,std::pow(2,id*ZERO_ID-2));
+	tofixed = cnl::fixed_point<long long, -14>(values[2]+perturbation);
+	values[2] = to_rep(tofixed);
+}
+
+//----------------------------------------------------------------------------
 void CriticalPointExtractor::identify_critical_points(	
 	vtkSmartPointer<vtkDataSet> input,
 	vtkSmartPointer<vtkDataSet> output,
@@ -132,8 +197,7 @@ void CriticalPointExtractor::identify_critical_points(
 	vtkIdType cells_num = input->GetNumberOfCells();
 	std::cout << "[CriticalPointExtractor::identify_critical_points] Checking " << cells_num << " cells for critical points " << std::endl;
 
-	//Set zero id to end 
-	ZERO_ID = input->GetNumberOfPoints() + 1;
+	
 
 	//Check for dataset dimension and configure zero vector exchange index
 	double bounds[6];
@@ -423,7 +487,7 @@ double CriticalPointExtractor::ComputeDeterminant(
 			//TODO: long long to fixed precision
 			vecMatrix(tuple, i) = vecValues[i];
 		}
-		vecMatrix(tuple, iExchangeIndex) = 1;
+		vecMatrix(tuple, iExchangeIndex) = ONE[0];
 	}
 
 	/*std::cout << " \t ######################################################################### " << std::endl;
