@@ -15,10 +15,10 @@
 #include <cnl/all.h>
 
 
-//typedef Eigen::Matrix<double, 3, 3> Matrix33;
+//Matrix to compute the determinat
 typedef Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic> DynamicMatrix;
-//typedef Eigen::Matrix<double, 4, 4> DynamicMatrix;
 
+//Forward declaration of vtkDataSet
 class vtkDataSet;
 
 /// This class implements the algorithm described in:
@@ -36,20 +36,46 @@ class CriticalPointExtractor {
     void duplicate_cleanup(vtkSmartPointer<vtkPolyData> output);
 
   private:
-	// int  Sort(vtkSmartPointer<vtkIdList> ids);
-  //   int	 Sort3(vtkSmartPointer<vtkIdList> ids);
-	// int  Sort4(vtkSmartPointer<vtkIdList> ids);
+    /**
+     * Sort the vector integers but returns the needed swap operations
+     */
     int  Sort(std::vector<vtkIdType> &ids);
+
+    /**
+     * Sort the vector with 3 integers but returns the needed swap operations
+     */
     int	 Sort3(std::vector<vtkIdType> &ids);
+
+    /**
+     * Sort the vector with 4 integers but returns the needed swap operations
+     */
 	  int  Sort4(std::vector<vtkIdType> &ids);
-    double Positive(std::vector<vtkIdType> tmpIds, vtkSmartPointer<vtkDataSet> grid, double *currentSingularity, DynamicMatrix &vecMatrix, long pertubationID = -1);
+    
+    /**
+     * Compute the determinant
+     * tmpIds: Contains the vertex indices needed to fill the matrix. Is a copy since they will be sorted
+     * grid: Gives access to vector field
+     * currentSingularity: The singularity e.g. zero vector (0,0,0)
+     * vecMatrix: The matrix used to compute the determinant
+     */
+    double ComputeDeterminant(std::vector<vtkIdType> tmpIds, vtkSmartPointer<vtkDataSet> grid, double *currentSingularity, DynamicMatrix &vecMatrix, long pertubationID = -1);
+   
+    /**
+     * Check if the sigularity is in cell
+     * ids: The vertex ids spanning the cell
+     * grid: access to underlaying vector field
+     * currentSingularity: The singularity e.g. zero vector (0,0,0)
+     * vecMatrix: The matrix used to compute the determinant
+     */ 
     bool PointInCell(std::vector<vtkIdType> &ids, vtkSmartPointer<vtkDataSet> grid, double* currentSingularity, DynamicMatrix &vecMatrix);
-    double& toFixed(double& val);
+
+    /**
+     * Check if direction of the determinat is positive (counter-clockwise) 
+     */
     bool DeterminatCounterClockWise(double& det);
 	
-  vtkIdType ZERO_ID;
-  int iExchangeIndex;
-  double tmp = 1;
+    vtkIdType ZERO_ID;  //!< Vertex ID of the singularity: always number of vertices + 1 
+    int iExchangeIndex; //!< The row id of the matrix to exchange with the singularity
 };
 
 

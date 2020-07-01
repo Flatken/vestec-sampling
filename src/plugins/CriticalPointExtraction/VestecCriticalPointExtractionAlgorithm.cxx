@@ -98,40 +98,29 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
   auto start = std::chrono::steady_clock::now();
   cp_extractor.identify_critical_points(input, output, singularities);
   auto end = std::chrono::steady_clock::now();
-  std::cout << "[identify_critical_points] Critical points found: " << output->GetNumberOfCells() << std::endl;
+  std::cout << "[identify_critical_points] Unstable critical points: " << output->GetNumberOfCells() << std::endl;
   std::cout << "[identify_critical_points] Elapsed time in milliseconds : "
 	  << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
 	  << " ms" << std::endl;
 
-  // STARTED BY EVERY MPI WORKER
+  // Local cleanup done by every worker
   start = std::chrono::steady_clock::now();
   cp_extractor.duplicate_cleanup(output);
-  end = std::chrono::steady_clock::now();
-  std::cout << "[duplicate_cleanup] Critical points after cleanup: " << output->GetNumberOfCells() << std::endl;
-  std::cout << "[duplicate_cleanup] Elapsed time in milliseconds : "
-	  << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
-	  << " ms" << std::endl;
-
+  
   //Collect all critical cells per MPI rank
   vtkSmartPointer < vtkAggregateDataSetFilter > reducedData = vtkSmartPointer < vtkAggregateDataSetFilter >::New();
-  start = std::chrono::steady_clock::now();
   reducedData->SetInputData(output);
   reducedData->Update();
   output->ShallowCopy(reducedData->GetPolyDataOutput());
-  end = std::chrono::steady_clock::now();  
-  std::cout << "[MPI merging] Elapsed time in milliseconds : "
-	  << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
-	  << " ms" << std::endl;
 
   /// to-DO: post-processing DUPLICATE CLEANUP
-  ///  STARTED BY A SINGLE MPI WORKER
-  start = std::chrono::steady_clock::now();
+  ///  Global cleanup. Only the master has results to polish
   cp_extractor.duplicate_cleanup(output);
   end = std::chrono::steady_clock::now();
-  std::cout << "[duplicate_cleanup] Critical points after cleanup: " << output->GetNumberOfCells() << std::endl;
   std::cout << "[duplicate_cleanup] Elapsed time in milliseconds : "
 	  << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
 	  << " ms" << std::endl;
+  std::cout << "[duplicate_cleanup] Stable critical points: " << output->GetNumberOfCells() << std::endl;
 
   /// TO-DO: comparison between preprocessing perturbation vs post-processing cleanup
 
@@ -153,7 +142,7 @@ void CriticalPointExtractor::identify_critical_points(
 	std::cout << "[CriticalPointExtractor::identify_critical_points] Checking " << cells_num << " cells for critical points " << std::endl;
 
 	//Set zero id to end 
-	ZERO_ID = input->GetNumberOfPoints();
+	ZERO_ID = input->GetNumberOfPoints() + 1;
 
 	//Check for dataset dimension and configure zero vector exchange index
 	double bounds[6];
@@ -177,7 +166,7 @@ void CriticalPointExtractor::identify_critical_points(
 	omp_set_num_threads(numThreads);
 
 	//Create a thread private cell for concurrent computation
-	std::vector<vtkSmartPointer<vtkGenericCell>> vecCellPerThread; 
+	std::vector<vtkGenericCell*> vecCellPerThread; 
 	std::vector<DynamicMatrix> vecMatrixPerThread; 
 
 	//Vector of critical cell ids
@@ -190,9 +179,12 @@ void CriticalPointExtractor::identify_critical_points(
 	std::cout << "[CriticalPointExtractor::identify_critical_points] Matrix size(" << rows << "," << iMatrixColumns << ")"<< std::endl;
 	std::cout << "[CriticalPointExtractor::identify_critical_points] Exchange index: " << iExchangeIndex << std::endl;
 	for(int x=0; x < numThreads; x++) {
-		vecCellPerThread.push_back(vtkSmartPointer<vtkGenericCell>::New());
+		vecCellPerThread.push_back(vtkGenericCell::New());
 		vecMatrixPerThread.push_back(DynamicMatrix(rows, iMatrixColumns));
 	}
+
+	//Need to initialize for parallel processing: so call from main thread one time
+	input->GetCell(0, vecCellPerThread[0]);
 
 	std::cout << "[CriticalPointExtractor::identify_critical_points] Identifing critical cells "<< std::endl;
 	//Check for every cell if a critical point (passed singularity as argument) exists
@@ -201,7 +193,7 @@ void CriticalPointExtractor::identify_critical_points(
 		//Local variables per thread
 		int threadIdx = omp_get_thread_num();	//Thread ID
 		double currentSingularity[3];			//The current singularity value to check for
-		vtkIdType cellType;						//Current cell type
+		vtkIdType cellType = -1;				//Current cell type
 		std::array<std::vector<vtkIdType>, 5> arrayCells{ std::vector<vtkIdType>(3), std::vector<vtkIdType>(3),
 														  std::vector<vtkIdType>(3), std::vector<vtkIdType>(3),
 														  std::vector<vtkIdType>(3) };
@@ -214,28 +206,20 @@ void CriticalPointExtractor::identify_critical_points(
 		//Remove synchronization with nowait
 		#pragma omp for nowait
 		for (vtkIdType i = 0; i < cells_num; i++) {
-			//get the cell
+			//get the current cell
 			input->GetCell(i, vecCellPerThread[threadIdx]);
-
+			
 			//Get the associated point ids for the cell 
 			vtkSmartPointer<vtkIdList> ids = vecCellPerThread[threadIdx]->GetPointIds();
-			
+		
 			//Get the cell type
 			cellType = vecCellPerThread[threadIdx]->GetCellType();
 			
 			if (VTK_PIXEL == cellType || VTK_QUAD == cellType)
 			{
 				generatedCells = 2;
-
-				arrayCells[0].resize(3);
-				arrayCells[0][0] = ids->GetId(0);
-				arrayCells[0][1] = ids->GetId(1);
-				arrayCells[0][2] = ids->GetId(2);
-
-				arrayCells[1].resize(3);
-				arrayCells[1][0] = ids->GetId(1);
-				arrayCells[1][1] = ids->GetId(3);
-				arrayCells[1][2] = ids->GetId(2);
+				arrayCells[0] = {ids->GetId(0) , ids->GetId(1), ids->GetId(2)};
+				arrayCells[1] = {ids->GetId(1) , ids->GetId(3), ids->GetId(2)};
 			}
 			else if (VTK_VOXEL == cellType || VTK_HEXAHEDRON == cellType)
 			{
@@ -274,14 +258,17 @@ void CriticalPointExtractor::identify_critical_points(
 			}
 			else if (VTK_TRIANGLE == cellType)
 			{
+				generatedCells = 1;
 				arrayCells[0] = {ids->GetId(0), ids->GetId(1), ids->GetId(2)};
 			}
 			else if (VTK_TETRA == cellType)
 			{
+				generatedCells = 1;
 				arrayCells[0] = {ids->GetId(0), ids->GetId(1), ids->GetId(2), ids->GetId(3)};
 			}
 			else {
-				std::cout << "[CriticalPointExtractor] Error: unknown cell type. Number of point ids " << ids->GetNumberOfIds() << std::endl;
+				std::cout << "[CriticalPointExtractor] Error: unknown cell type " << std::endl;
+				continue;
 			}
 
 			//Compute if one of the cells contains the given singularity (normally 0 in any dimension)
@@ -343,13 +330,12 @@ void CriticalPointExtractor::duplicate_cleanup(vtkSmartPointer<vtkPolyData> outp
 	cleaner->SetInputData(output);
 	cleaner->Update();
 	output->ShallowCopy(cleaner->GetOutput());		
-	std::cout << "[CriticalPointExtractor::duplicate_cleanup] Points number " << output->GetNumberOfPoints() << std::endl;
 }
 
 bool CriticalPointExtractor::PointInCell(std::vector<vtkIdType> &ids, vtkSmartPointer<vtkDataSet> grid, double* currentSingularity, DynamicMatrix &vecMatrix) {
 	//std::cout << " ################### Point in Cell ###################################################### " << std::endl;
 	// 1. compute the initial sign of the determinant of the cell
-	double initialDeterminant = Positive(ids, grid, currentSingularity, vecMatrix);	
+	double initialDeterminant = ComputeDeterminant(ids, grid, currentSingularity, vecMatrix);	
 	bool initialDirection     = DeterminatCounterClockWise(initialDeterminant);	
 
 	//Check for non data values (vector is zero and determinant also) 
@@ -364,7 +350,7 @@ bool CriticalPointExtractor::PointInCell(std::vector<vtkIdType> &ids, vtkSmartPo
 	// 2.1. replace each row of the matrix with the origin vector (0,0) or (0,0,0) given as i to Positive function
 	for (int i = 0; i < ids.size(); i++) {
 		// 2.2. compute the determinant sign again 
-		tmpDeterminat   = Positive(ids, grid, currentSingularity, vecMatrix, i);
+		tmpDeterminat   = ComputeDeterminant(ids, grid, currentSingularity, vecMatrix, i);
 		tmpDirection    = DeterminatCounterClockWise(tmpDeterminat);
 		
 		// 2.3. check if it changes --> if so return false
@@ -377,8 +363,7 @@ bool CriticalPointExtractor::PointInCell(std::vector<vtkIdType> &ids, vtkSmartPo
 	return true; // the cell is critical, since the sign never change
 }
 
-/// can we pass to Positive directly the determinant matrix instead of the cell?
-double CriticalPointExtractor::Positive(
+double CriticalPointExtractor::ComputeDeterminant(
 	std::vector<vtkIdType> tmpIds,
 	vtkSmartPointer<vtkDataSet> grid,
 	double currentSingularity[3],
@@ -414,9 +399,9 @@ double CriticalPointExtractor::Positive(
 
 		for (vtkIdType i = 0; i < vecMatrix.cols(); i++) {
 			//TODO: long long to fixed precision
-			vecMatrix(tuple, i) = toFixed(vecValues[i]);
+			vecMatrix(tuple, i) = vecValues[i];
 		}
-		vecMatrix(tuple, iExchangeIndex) = toFixed(tmp);
+		vecMatrix(tuple, iExchangeIndex) = 1;
 	}
 
 	/*std::cout << " \t ######################################################################### " << std::endl;
@@ -448,14 +433,7 @@ double CriticalPointExtractor::Positive(
 	return det;
 }
 
-double& CriticalPointExtractor::toFixed(double& val)
-{
-	//TODO: Some magic here
-	//val =  val * pow(10, 14);
-	return val;
-}
-
-int  CriticalPointExtractor::Sort(std::vector<vtkIdType> &ids)
+int CriticalPointExtractor::Sort(std::vector<vtkIdType> &ids)
 {
 	if (ids.size() == 3) //Triangle
 	{
@@ -472,7 +450,7 @@ int  CriticalPointExtractor::Sort(std::vector<vtkIdType> &ids)
 	}
 }
 
-int  CriticalPointExtractor::Sort3(std::vector<vtkIdType> &ids)
+int CriticalPointExtractor::Sort3(std::vector<vtkIdType> &ids)
 {
 	unsigned int swaps = 0;
 	if (ids[0] > ids[1])
@@ -495,7 +473,7 @@ int  CriticalPointExtractor::Sort3(std::vector<vtkIdType> &ids)
 	return swaps;
 }
 
-int  CriticalPointExtractor::Sort4(std::vector<vtkIdType> &ids)
+int CriticalPointExtractor::Sort4(std::vector<vtkIdType> &ids)
 {
 	unsigned int swaps = 0;
 
