@@ -32,7 +32,7 @@ class CriticalPointExtractor {
   public:
     CriticalPointExtractor() {}
     void identify_critical_points(	vtkSmartPointer<vtkDataSet> input,
-                      vtkSmartPointer<vtkDataSet> output, std::vector<double*> singlarities);
+                      vtkSmartPointer<vtkDataSet> output, double* singlarity);
     void duplicate_cleanup(vtkSmartPointer<vtkPolyData> output);
 
   private:

@@ -80,14 +80,7 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
   input->GetPointData()->SetActiveVectors(inScalars->GetName());
 
   //Compute critical points
-  std::vector<double*> singularities;
-  double p1[3] = {0.00, 0.00, 0};
-  double p2[3] = {0.0, 0.001, 0};
-  double p3[3] = {0.001, 0.0, 0};
-
-  singularities.push_back(p1);
-  //singularities.push_back(p2);
-  //singularities.push_back(p3);
+  double singularity[3] = {0.00, 0.00, 0.00};
 
   /// TO-DO: GLOBAL PERTURBATION ON THE DATA
   /// ----> DOUBLE TO FIXED PRECISION CONVERSION 
@@ -96,7 +89,7 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
   CriticalPointExtractor cp_extractor;
 
   auto start = std::chrono::steady_clock::now();
-  cp_extractor.identify_critical_points(input, output, singularities);
+  cp_extractor.identify_critical_points(input, output, singularity);
   auto end = std::chrono::steady_clock::now();
   std::cout << "[identify_critical_points] Unstable critical points: " << output->GetNumberOfCells() << std::endl;
   std::cout << "[identify_critical_points] Elapsed time in milliseconds : "
@@ -131,13 +124,11 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
 void CriticalPointExtractor::identify_critical_points(	
 	vtkSmartPointer<vtkDataSet> input,
 	vtkSmartPointer<vtkDataSet> output,
-	std::vector<double*> singlarities
+	double* singlarity
 ) {
 
 	vtkSmartPointer<vtkPolyData> outputData = vtkPolyData::SafeDownCast(output);
-	vtkSmartPointer<vtkPoints> points = vtkSmartPointer<vtkPoints>::New();
-	vtkSmartPointer<vtkCellArray> cells = vtkSmartPointer<vtkCellArray>::New();
-  
+	  
 	vtkIdType cells_num = input->GetNumberOfCells();
 	std::cout << "[CriticalPointExtractor::identify_critical_points] Checking " << cells_num << " cells for critical points " << std::endl;
 
@@ -199,9 +190,9 @@ void CriticalPointExtractor::identify_critical_points(
 														  std::vector<vtkIdType>(3) };
 		int generatedCells = 1;
 
-		currentSingularity[0] = 0.000;
-		currentSingularity[1] = 0.000;
-		currentSingularity[2] = 0.000;
+		currentSingularity[0] = singlarity[0];
+		currentSingularity[1] = singlarity[1];
+		currentSingularity[2] = singlarity[2];
 
 		//Remove synchronization with nowait
 		#pragma omp for nowait
@@ -285,25 +276,31 @@ void CriticalPointExtractor::identify_critical_points(
 	}
 	std::cout << "[CriticalPointExtractor::identify_critical_points] Identifing critical cells done "<< std::endl;
 	std::cout << "[CriticalPointExtractor::identify_critical_points] Now preparing output data " << std::endl;
+
+	vtkSmartPointer<vtkPoints> pointArray = vtkSmartPointer<vtkPoints>::New();
+	vtkSmartPointer<vtkCellArray> cellArray = vtkSmartPointer<vtkCellArray>::New();
+
 	//Prepare output data sequentially. Insert every critical cell to output
 	for (auto cellID : vecCriticalCellIDs)
 	{
-		vtkSmartPointer<vtkCell> cell = input->GetCell(cellID);
-		vtkSmartPointer<vtkIdList> ids = cell->GetPointIds();
-		vtkSmartPointer<vtkIdList> new_ids = vtkSmartPointer<vtkIdList>::New();;
-		for (int index = 0; index < ids->GetNumberOfIds(); index++)
+		vtkSmartPointer<vtkCell> cell  = input->GetCell(cellID);
+		vtkSmartPointer<vtkIdList> oldPointIDs = cell->GetPointIds();
+		vtkSmartPointer<vtkIdList> newPointIDs = vtkSmartPointer<vtkIdList>::New();;
+		for (int index = 0; index < oldPointIDs->GetNumberOfIds(); index++)
 		{
 			double pCoords[3];
-			vtkIdType newCellID;
-			input->GetPoint(ids->GetId(index), pCoords);
-			newCellID = points->InsertNextPoint(pCoords[0], pCoords[1], pCoords[2]);
-			new_ids->InsertNextId(newCellID);
+			vtkIdType pointID;
+			input->GetPoint(oldPointIDs->GetId(index), pCoords);
+			pointID = pointArray->InsertNextPoint(pCoords[0], pCoords[1], pCoords[2]);
+			newPointIDs->InsertNextId(pointID);
 		}
-		cells->InsertNextCell(new_ids);
+		cellArray->InsertNextCell(newPointIDs);
+		//outputData->InsertNextCell(newPointIDs);
 	}
 	//Add points and cells to polydata
-	outputData->SetPoints(points); 
-	outputData->SetPolys(cells);
+	outputData->SetPoints(pointArray); 
+	outputData->SetPolys(cellArray);
+
 	vtkSmartPointer<vtkCleanPolyData> cleaner = vtkSmartPointer<vtkCleanPolyData>::New();
 	cleaner->SetInputData(outputData);
 	cleaner->Update();
