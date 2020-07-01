@@ -35,6 +35,18 @@ class CriticalPointExtractor {
                       vtkSmartPointer<vtkDataSet> output, double* singlarity);
     void duplicate_cleanup(vtkSmartPointer<vtkPolyData> output);
 
+    enum CriticalPointType { REGULAR=0, SADDLE=-1, SINGULARITY=1 };
+    struct CriticalPoint {
+      vtkIdType id;
+      CriticalPointType type;
+
+      CriticalPoint(vtkIdType i, CriticalPointType t) { 
+        id = i; 
+        type = t;
+      }
+    };
+    
+
   private:
     /**
      * Sort the vector integers but returns the needed swap operations
@@ -58,7 +70,8 @@ class CriticalPointExtractor {
      * currentSingularity: The singularity e.g. zero vector (0,0,0)
      * vecMatrix: The matrix used to compute the determinant
      */
-    double ComputeDeterminant(std::vector<vtkIdType> tmpIds, vtkSmartPointer<vtkDataSet> grid, double *currentSingularity, DynamicMatrix &vecMatrix, long pertubationID = -1);
+    double ComputeDeterminant(std::vector<vtkIdType> tmpIds, vtkSmartPointer<vtkDataSet> grid, double *currentSingularity, 
+    DynamicMatrix &vecMatrix, bool usePoints, long pertubationID = -1);
    
     /**
      * Check if the sigularity is in cell
@@ -67,7 +80,7 @@ class CriticalPointExtractor {
      * currentSingularity: The singularity e.g. zero vector (0,0,0)
      * vecMatrix: The matrix used to compute the determinant
      */ 
-    bool PointInCell(std::vector<vtkIdType> &ids, vtkSmartPointer<vtkDataSet> grid, double* currentSingularity, DynamicMatrix &vecMatrix);
+    CriticalPointType PointInCell(std::vector<vtkIdType> &ids, vtkSmartPointer<vtkDataSet> grid, double* currentSingularity, DynamicMatrix &vecMatrix);
 
     /**
      * Check if direction of the determinat is positive (counter-clockwise) 

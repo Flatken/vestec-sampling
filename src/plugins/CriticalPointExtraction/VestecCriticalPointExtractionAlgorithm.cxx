@@ -161,7 +161,7 @@ void CriticalPointExtractor::identify_critical_points(
 	std::vector<DynamicMatrix> vecMatrixPerThread; 
 
 	//Vector of critical cell ids
-	std::vector<vtkIdType> vecCriticalCellIDs;
+	std::vector<CriticalPoint> vecCriticalCellIDs;
 
 	int rows = 3;
 	if(iExchangeIndex == 3)
@@ -266,9 +266,11 @@ void CriticalPointExtractor::identify_critical_points(
 			for(vtkIdType nb = 0; nb < generatedCells; nb++)
 			{
 				//If the cell contains a the singularity add them to the output and we can break
-				if (PointInCell(arrayCells[nb], input, currentSingularity, vecMatrixPerThread[threadIdx])) {
+				CriticalPointType ret = PointInCell(arrayCells[nb], input, currentSingularity, vecMatrixPerThread[threadIdx]);
+				if (ret != REGULAR) {
+					CriticalPoint tmp(i,ret);
 #pragma omp critical
-					vecCriticalCellIDs.push_back(i);
+					vecCriticalCellIDs.push_back(tmp);
 					break;
 				}
 			}
@@ -279,15 +281,19 @@ void CriticalPointExtractor::identify_critical_points(
 
 	vtkSmartPointer<vtkPoints> pointArray = vtkSmartPointer<vtkPoints>::New();
 	vtkSmartPointer<vtkCellArray> cellArray = vtkSmartPointer<vtkCellArray>::New();
+	vtkSmartPointer<vtkIntArray> singularityType = vtkSmartPointer<vtkIntArray>::New();
+	singularityType->SetName("singularityType");
 
 	//Prepare output data sequentially. Insert every critical cell to output
 	for (auto cellID : vecCriticalCellIDs)
 	{
-		vtkSmartPointer<vtkCell> cell  = input->GetCell(cellID);
+		vtkSmartPointer<vtkCell> cell  = input->GetCell(cellID.id);
 		vtkSmartPointer<vtkIdList> oldPointIDs = cell->GetPointIds();
-		vtkSmartPointer<vtkIdList> newPointIDs = vtkSmartPointer<vtkIdList>::New();;
+		vtkSmartPointer<vtkIdList> newPointIDs = vtkSmartPointer<vtkIdList>::New();	
+
 		for (int index = 0; index < oldPointIDs->GetNumberOfIds(); index++)
 		{
+			singularityType->InsertNextTuple1(cellID.type);
 			double pCoords[3];
 			vtkIdType pointID;
 			input->GetPoint(oldPointIDs->GetId(index), pCoords);
@@ -300,6 +306,7 @@ void CriticalPointExtractor::identify_critical_points(
 	//Add points and cells to polydata
 	outputData->SetPoints(pointArray); 
 	outputData->SetPolys(cellArray);
+	outputData->GetPointData()->AddArray(singularityType);
 
 	vtkSmartPointer<vtkCleanPolyData> cleaner = vtkSmartPointer<vtkCleanPolyData>::New();
 	cleaner->SetInputData(outputData);
@@ -329,35 +336,49 @@ void CriticalPointExtractor::duplicate_cleanup(vtkSmartPointer<vtkPolyData> outp
 	output->ShallowCopy(cleaner->GetOutput());		
 }
 
-bool CriticalPointExtractor::PointInCell(std::vector<vtkIdType> &ids, vtkSmartPointer<vtkDataSet> grid, double* currentSingularity, DynamicMatrix &vecMatrix) {
+CriticalPointExtractor::CriticalPointType CriticalPointExtractor::PointInCell(std::vector<vtkIdType> &ids, vtkSmartPointer<vtkDataSet> grid, double* currentSingularity, DynamicMatrix &vecMatrix) {
 	//std::cout << " ################### Point in Cell ###################################################### " << std::endl;
 	// 1. compute the initial sign of the determinant of the cell
-	double initialDeterminant = ComputeDeterminant(ids, grid, currentSingularity, vecMatrix);	
-	bool initialDirection     = DeterminatCounterClockWise(initialDeterminant);	
-
+	double targetDeterminant = ComputeDeterminant(ids, grid, currentSingularity, vecMatrix, false, 0);
+	bool targetDirection = DeterminatCounterClockWise(targetDeterminant);
 	//Check for non data values (vector is zero and determinant also) 
-	if (initialDeterminant == 0)
+	if (targetDeterminant == 0)
 	{
-		return false;
+		return REGULAR;
 	}
 
 	double tmpDeterminat;
 	bool tmpDirection;
 	// 2. for each facet (i.e. an edge in a triangle or a triangle in a tetrahedron) do
 	// 2.1. replace each row of the matrix with the origin vector (0,0) or (0,0,0) given as i to Positive function
-	for (int i = 0; i < ids.size(); i++) {
+	for (int i = 1; i < ids.size(); i++) {
 		// 2.2. compute the determinant sign again 
-		tmpDeterminat   = ComputeDeterminant(ids, grid, currentSingularity, vecMatrix, i);
+		tmpDeterminat   = ComputeDeterminant(ids, grid, currentSingularity, vecMatrix, false, i);
 		tmpDirection    = DeterminatCounterClockWise(tmpDeterminat);
 		
 		// 2.3. check if it changes --> if so return false
-		if (initialDirection != tmpDirection)
+		if (targetDirection != tmpDirection)
 		{
-			return false;
+			return REGULAR; // regular cell
 		}
 	}
+
+	double initialDeterminant = ComputeDeterminant(ids, grid, currentSingularity, vecMatrix, true);	
+	bool initialDirection     = DeterminatCounterClockWise(initialDeterminant);	
+	// //Check for non data values (vector is zero and determinant also) 
+	// if (initialDeterminant == 0)
+	// {
+	// 	return REGULAR;
+	// }
+	
+	//
+	if (initialDirection != targetDirection)
+	{
+		return SADDLE; // we found a saddle
+	}
+
 	//std::cout << " \t\t Cell is critical "  << std::endl;
-	return true; // the cell is critical, since the sign never change
+	return SINGULARITY; // the cell is critical, since the sign never change
 }
 
 double CriticalPointExtractor::ComputeDeterminant(
@@ -365,10 +386,11 @@ double CriticalPointExtractor::ComputeDeterminant(
 	vtkSmartPointer<vtkDataSet> grid,
 	double currentSingularity[3],
 	DynamicMatrix &vecMatrix,
+	bool usePoints,
 	long pertubationID
 ){
 	//Copy ids for local modification
-	vtkSmartPointer<vtkDataArray> vectors = grid->GetPointData()->GetVectors();	
+	vtkSmartPointer<vtkDataArray> vectors = grid->GetPointData()->GetVectors();		
 
 	//Exchanges every facet with the zero vector
 	if (pertubationID != -1)
@@ -385,7 +407,10 @@ double CriticalPointExtractor::ComputeDeterminant(
 	{
 		if (tmpIds[tuple] != ZERO_ID)
 		{
-			vectors->GetTuple(tmpIds[tuple], vecValues);
+			if(!usePoints)
+				vectors->GetTuple(tmpIds[tuple], vecValues);
+			else
+				grid->GetPoint(tmpIds[tuple], vecValues);
 		}
 		else
 		{
