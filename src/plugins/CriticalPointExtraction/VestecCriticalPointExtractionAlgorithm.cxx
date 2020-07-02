@@ -88,18 +88,18 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
   double singularity[3] = {0.00, 0.00, 0.00};  
 
   auto start = std::chrono::steady_clock::now();
-  cp_extractor.toFixed(singularity,cp_extractor.ZERO_ID);
+//   cp_extractor.toFixed(singularity,cp_extractor.ZERO_ID);
 
   //cp_extractor.toFixed(cp_extractor.ONE,cp_extractor.ZERO_ID+1);
 
   /// TO-DO: GLOBAL PERTURBATION ON THE DATA
   /// ----> DOUBLE TO FIXED PRECISION CONVERSION 
   /// THIS CAN BE DISABLE
-  cp_extractor.perturbate(input);
+//   cp_extractor.perturbate(input);
   auto end = std::chrono::steady_clock::now();  
-  std::cout << "[perturbate] Elapsed time in milliseconds : "
-	  << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
-	  << " ms" << std::endl;
+//   std::cout << "[perturbate] Elapsed time in milliseconds : "
+// 	  << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
+// 	  << " ms" << std::endl;
 
   start = std::chrono::steady_clock::now();
   cp_extractor.identify_critical_points(input, output, singularity);
@@ -169,20 +169,33 @@ void CriticalPointExtractor::toFixed(double *values, vtkIdType id) {
 
 	// perturbation function f(e,i,j) = e
 	// e ?? --> constant?
-	// i = id
-	// j = to the component of values --> 0,1,2
+	// i = id (in their implementation is id+1)
+	// j = to the component of values --> 0,1,2 (in their implementation is the component +1)
 
-	double perturbation = std::pow(0.5,std::pow(2,id*ZERO_ID-0));
-	auto tofixed = cnl::fixed_point<long long, -14>(values[0]+perturbation);
-	values[0] = to_rep(tofixed);
+	double eps = 0.05;
+	int delta = 5;
 
-	perturbation = std::pow(0.5,std::pow(2,id*ZERO_ID-1));
-	tofixed = cnl::fixed_point<long long, -14>(values[1]+perturbation);
-	values[1] = to_rep(tofixed);
+	int i = id+1;
+	int j = 0 + 1;
+	double perturbation = /*(id*5+0)*eps;*/std::pow(eps,std::pow(2,i*delta-j));
+	// values[0] *= std::pow(10,14);
+	// auto tofixed = cnl::fixed_point<long long, -14>(values[0]+perturbation);
+	// values[0] = to_rep(tofixed);	
+	values[0] += perturbation;
 
-	perturbation = std::pow(0.5,std::pow(2,id*ZERO_ID-2));
-	tofixed = cnl::fixed_point<long long, -14>(values[2]+perturbation);
-	values[2] = to_rep(tofixed);
+	j = 0 + 2;
+	perturbation = /*(id*5+1)*eps;*/std::pow(eps,std::pow(2,i*delta-j));
+	// values[1] *= std::pow(10,14);
+	// tofixed = cnl::fixed_point<long long, -14>(values[1]+perturbation);
+	// values[1] = to_rep(tofixed);
+	values[1] += perturbation;
+
+	j = 0 + 3;
+	perturbation = /*(id*5+2)*eps;*/std::pow(eps,std::pow(2,i*delta-j));
+	// values[2] *= std::pow(10,14);
+	// tofixed = cnl::fixed_point<long long, -14>(values[2]+perturbation);
+	// values[2] = to_rep(tofixed);
+	values[2] += perturbation;
 }
 
 //----------------------------------------------------------------------------
