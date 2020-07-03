@@ -16,7 +16,7 @@
 
 
 //Matrix to compute the determinat
-typedef Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic> DynamicMatrix;
+typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> DynamicMatrix;
 
 //Forward declaration of vtkDataSet
 class vtkDataSet;
@@ -30,15 +30,17 @@ class vtkDataSet;
 /// (survey) "From numerics to combinatorics: a survey of topological methods for vector field visualization" by Wang et al.
 class CriticalPointExtractor {
   public:
-    CriticalPointExtractor() {}
-    void identify_critical_points(	vtkSmartPointer<vtkDataSet> input,
-                      vtkSmartPointer<vtkDataSet> output, double* singlarity);
-    void duplicate_cleanup(vtkSmartPointer<vtkPolyData> output);
-    void perturbate(vtkSmartPointer<vtkDataSet> ds);
     /**
-     * 
+     * Store vector and points in internal datat structure 
      */
-    void toFixed(double* values, vtkIdType id);
+    CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input, bool pertubate, double* currentSingularity);
+
+    /**
+     * Identify the critical cells 
+     */
+    void ComputeCriticalCells(vtkSmartPointer<vtkDataSet> output);
+
+    void CleanDuplicates(vtkSmartPointer<vtkPolyData> output);
 
     enum CriticalPointType { REGULAR=0, SADDLE=-1, SINGULARITY=1 };
     struct CriticalPoint {
@@ -50,8 +52,7 @@ class CriticalPointExtractor {
         type = t;
       }
     };
-    double ONE[3] = {1,1,1};    
-
+    
   private:
     /**
      * Sort the vector integers but returns the needed swap operations
@@ -75,27 +76,35 @@ class CriticalPointExtractor {
      * currentSingularity: The singularity e.g. zero vector (0,0,0)
      * vecMatrix: The matrix used to compute the determinant
      */
-    double ComputeDeterminant(std::vector<vtkIdType> tmpIds, vtkSmartPointer<vtkDataSet> grid, double *currentSingularity, 
-    DynamicMatrix &vecMatrix, bool usePoints, long pertubationID = -1);
+    double ComputeDeterminant(std::vector<vtkIdType> tmpIds, DynamicMatrix &vecMatrix, bool usePoints, long pertubationID = -1);
    
     /**
      * Check if the sigularity is in cell
      * ids: The vertex ids spanning the cell
-     * grid: access to underlaying vector field
-     * currentSingularity: The singularity e.g. zero vector (0,0,0)
      * vecMatrix: The matrix used to compute the determinant
      */ 
-    CriticalPointType PointInCell(std::vector<vtkIdType> &ids, vtkSmartPointer<vtkDataSet> grid, double* currentSingularity, DynamicMatrix &vecMatrix);
+    CriticalPointType PointInCell(std::vector<vtkIdType> &ids, DynamicMatrix &vecMatrix);
 
     /**
      * Check if direction of the determinat is positive (counter-clockwise) 
      */
     bool DeterminatCounterClockWise(double& det);
 
+    long IntegerDeterminant(DynamicMatrix& matrix, int n);
+
+    /**
+     * Double to fixed precision and pertubation based on id
+     */
+    void Pertubate(double* values, vtkIdType id);
+
     
-public:
+private:
     vtkIdType ZERO_ID;  //!< Vertex ID of the singularity: always number of vertices + 1 
     int iExchangeIndex; //!< The row id of the matrix to exchange with the singularity    
+    std::vector<double*> vecPointCoordinates;
+    std::vector<double*> vecVectors;
+    std::vector<std::vector<vtkIdType>> vecCellIds;
+    double singularity[3];
 };
 
 
