@@ -126,6 +126,9 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 											   bool pertubate,
 											   double *currentSingularity)
 {
+	//Configure openmp
+	omp_set_num_threads(numThreads);
+
 	//Store singularity
 	singularity[0] = currentSingularity[0];
 	singularity[1] = currentSingularity[1];
@@ -140,10 +143,6 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 	
 	//Store vectors and point coordinates for internal usage
 	vtkSmartPointer<vtkDataArray> vectors = input->GetPointData()->GetVectors();	
-
-	//Configure openmp
-	int numThreads = 12;
-	omp_set_num_threads(numThreads);
 
 	#pragma omp parallel for
 	for(vtkIdType i=0; i < numPoints; i++) 
@@ -262,30 +261,6 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 
 }
 
-long CriticalPointExtractor::IntegerDeterminant(DynamicMatrix& matrix, int n){
-   long det = 0;
-   DynamicMatrix submatrix(n,n);
-   if (n == 2)
-   return ((matrix(0,0) * matrix(1,1)) - (matrix(1,0) * matrix(0,1)));
-   else {
-      for (int x = 0; x < n; x++) {
-         int subi = 0;
-         for (int i = 1; i < n; i++) {
-            int subj = 0;
-            for (int j = 0; j < n; j++) {
-               if (j == x)
-               continue;
-               submatrix(subi,subj) = matrix(i,j);
-               subj++;
-            }
-            subi++;
-         }
-         det = det + (std::pow(-1, x) * matrix(0,x) * IntegerDeterminant( submatrix, n - 1 ));
-      }
-   }
-   return det;
-}
-
 void CriticalPointExtractor::Pertubate(double *values, vtkIdType id) {
 	// perturbation function f(e,i,j) = e
 	// e ?? --> constant?
@@ -323,10 +298,6 @@ void CriticalPointExtractor::ComputeCriticalCells(vtkSmartPointer<vtkDataSet> ou
 
 	vtkIdType cells_num = vecCellIds.size();
 	
-	//Prepare for parallel computation
-	int numThreads = 12;
-	omp_set_num_threads(numThreads);
-
 	//Vector of critical cell ids
 	std::vector<CriticalPoint> vecCriticalCellIDs;
 

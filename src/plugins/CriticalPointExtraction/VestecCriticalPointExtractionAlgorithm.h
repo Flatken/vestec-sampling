@@ -90,8 +90,6 @@ class CriticalPointExtractor {
      */
     bool DeterminatCounterClockWise(double& det);
 
-    long IntegerDeterminant(DynamicMatrix& matrix, int n);
-
     /**
      * Double to fixed precision and pertubation based on id
      */
@@ -101,10 +99,11 @@ class CriticalPointExtractor {
 private:
     vtkIdType ZERO_ID;  //!< Vertex ID of the singularity: always number of vertices + 1 
     int iExchangeIndex; //!< The row id of the matrix to exchange with the singularity    
-    std::vector<double*> vecPointCoordinates;
-    std::vector<double*> vecVectors;
-    std::vector<std::vector<vtkIdType>> vecCellIds;
-    double singularity[3];
+    std::vector<double*> vecPointCoordinates; //!< Store point coordinates
+    std::vector<double*> vecVectors; //!< Store vector field
+    std::vector<std::vector<vtkIdType>> vecCellIds;  //!< The point ids for each cell
+    double singularity[3]; //!< The singularity to identify
+    int numThreads = 12; //!< Number of OpenMP threads
 };
 
 
