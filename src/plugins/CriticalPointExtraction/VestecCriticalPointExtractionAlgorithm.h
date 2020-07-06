@@ -16,8 +16,8 @@
 
 
 //Matrix to compute the determinat
-//typedef Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, 1, 4, 4> DynamicMatrix;
-typedef Eigen::Matrix<float, 4, 4> DynamicMatrix;
+typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 1, 4, 4> DynamicMatrix;
+// typedef Eigen::Matrix<float, 4, 4> DynamicMatrix;
 //Forward declaration of vtkDataSet
 class vtkDataSet;
 
@@ -33,7 +33,7 @@ class CriticalPointExtractor {
     /**
      * Store vector and points in internal datat structure 
      */
-    CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input, bool pertubate, double* currentSingularity);
+    CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input, double* currentSingularity);
 
     /**
      * Identify the critical cells 
@@ -93,7 +93,7 @@ class CriticalPointExtractor {
     /**
      * Double to fixed precision and pertubation based on id
      */
-    void Pertubate(double* values, vtkIdType id);
+    void Perturbate();
 
     
 private:
@@ -104,6 +104,7 @@ private:
     std::vector<std::vector<vtkIdType>> vecCellIds;  //!< The point ids for each cell
     double singularity[3]; //!< The singularity to identify
     int numThreads = 12; //!< Number of OpenMP threads
+    Eigen::Matrix4d perturbationMatrix;
 };
 
 

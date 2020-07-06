@@ -83,7 +83,7 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
   double singularity[3] = {0.00, 0.00, 0.00};  
 
   auto start = std::chrono::steady_clock::now();
-  CriticalPointExtractor cp_extractor(input, false, singularity);
+  CriticalPointExtractor cp_extractor(input, singularity);
 
   auto end = std::chrono::steady_clock::now();  
    std::cout << "[CriticalPointExtractor::Constructor] Elapsed time in milliseconds : "
@@ -123,7 +123,6 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
 }
 
 CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input,
-											   bool pertubate,
 											   double *currentSingularity)
 {
 	//Configure openmp
@@ -142,7 +141,14 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 	vecVectors.resize(numPoints);
 	
 	//Store vectors and point coordinates for internal usage
-	vtkSmartPointer<vtkDataArray> vectors = input->GetPointData()->GetVectors();	
+	vtkSmartPointer<vtkDataArray> vectors = input->GetPointData()->GetVectors();
+
+	// if(pertubate)
+	// 	{
+	// 		Pertubate(vector, i);
+	// 		Pertubate(singularity, ZERO_ID);
+	// 	}	
+	Perturbate();
 
 	#pragma omp parallel for
 	for(vtkIdType i=0; i < numPoints; i++) 
@@ -151,13 +157,7 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 		double* vector = new double[3];
 
 		vectors->GetTuple(i,vector);
-		input->GetPoint(i, position);
-
-		if(pertubate)
-		{
-			Pertubate(vector, i);
-			Pertubate(singularity, ZERO_ID);
-		}
+		input->GetPoint(i, position);		
 		
 		vecVectors[i] = vector;
 		vecPointCoordinates[i] = position;
@@ -261,34 +261,45 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 
 }
 
-void CriticalPointExtractor::Pertubate(double *values, vtkIdType id) {
+void CriticalPointExtractor::Perturbate() {
 	// perturbation function f(e,i,j) = e
 	// e ?? --> constant?
 	// i = id (in their implementation is id+1)
 	// j = to the component of values --> 0,1,2 (in their implementation is the component +1)
 
-	double eps = 1;
-	int delta = 4;
+	double eps = 0.99;
+	int delta = 5;
 
-	int i = id+1; //TODO: should be point id of the simplex
-	int j = 0 + 1;
-	double perturbation = /*(id*5+0)*eps;*/std::pow(eps,std::pow(2,i*delta-j));
-	std::cout << "Pertubation " << std::pow(2,i*delta-j) << std::endl;
-	//auto tofixed = cnl::fixed_point<long, -14>(values[0]+perturbation);
-	//values[0] = to_rep(tofixed);	
-	values[0] += perturbation;
+	for (int i=1; i<5; i++) {
+		for (int j=1; j<4; j++) {			
+			// std::cout << std::pow(2,i*delta-j) << std::endl;
+			perturbationMatrix(i-1,j-1) = std::pow(eps,std::pow(2,i*delta-j));
+			std::cout << i-1 << " " << j-1 << " - " << perturbationMatrix(i-1,j-1) << " - " << std::pow(2,i*delta-j) << std::endl;
+		}
+		perturbationMatrix(i-1,3) = 1;
+	}
+	
+	std::cout << perturbationMatrix << std::endl;
 
-	j = 0 + 2;
-	perturbation = /*(id*5+1)*eps;*/std::pow(eps,std::pow(2,i*delta-j));
-	//tofixed = cnl::fixed_point<long, -14>(values[1]+perturbation);
-	//values[1] = to_rep(tofixed);
-	values[1] += perturbation;
+	// int i = id+1; //TODO: should be point id of the simplex
+	// int j = 0 + 1;
+	// double perturbation = /*(id*5+0)*eps;*/std::pow(eps,std::pow(2,i*delta-j));
+	// std::cout << "Pertubation " << std::pow(2,i*delta-j) << std::endl;
+	// //auto tofixed = cnl::fixed_point<long, -14>(values[0]+perturbation);
+	// //values[0] = to_rep(tofixed);	
+	// values[0] += perturbation;
 
-	j = 0 + 3;
-	perturbation = /*(id*5+2)*eps;*/std::pow(eps,std::pow(2,i*delta-j));
-	//tofixed = cnl::fixed_point<long, -14>(values[2]+perturbation);
-	//values[2] = to_rep(tofixed);
-	values[2] += perturbation;
+	// j = 0 + 2;
+	// perturbation = /*(id*5+1)*eps;*/std::pow(eps,std::pow(2,i*delta-j));
+	// //tofixed = cnl::fixed_point<long, -14>(values[1]+perturbation);
+	// //values[1] = to_rep(tofixed);
+	// values[1] += perturbation;
+
+	// j = 0 + 3;
+	// perturbation = /*(id*5+2)*eps;*/std::pow(eps,std::pow(2,i*delta-j));
+	// //tofixed = cnl::fixed_point<long, -14>(values[2]+perturbation);
+	// //values[2] = to_rep(tofixed);
+	// values[2] += perturbation;
 }
 
 //----------------------------------------------------------------------------
@@ -306,14 +317,13 @@ void CriticalPointExtractor::ComputeCriticalCells(vtkSmartPointer<vtkDataSet> ou
 		matrixSize = 4;
 
     std::vector<DynamicMatrix> vecMatrices;
-	std::vector<Eigen::PlainObjectBase<Eigen::Matrix>> test;
 	
 	for(int x=0; x < numThreads;++x)
 	{
 		if(matrixSize == 4)
-			vecMatrices.push_back(Eigen::Matrix4f());
-		//if(matrixSize == 3)
-		//	vecMatrices.push_back(Eigen::Matrix3f());
+			vecMatrices.push_back(Eigen::Matrix4d());
+		if(matrixSize == 3)
+			vecMatrices.push_back(Eigen::Matrix3d());
 	}
 	//std::cout << "[CriticalPointExtractor::identify_critical_points] Matrix size(" << matrixSize << "," << matrixSize << ")"<< std::endl;
 	//std::cout << "[CriticalPointExtractor::identify_critical_points] Exchange index: " << iExchangeIndex << std::endl;
@@ -485,7 +495,7 @@ double CriticalPointExtractor::ComputeDeterminant(
 		}
 
 		for (vtkIdType i = 0; i < vecMatrix.cols(); i++) {
-			vecMatrix(tuple, i) = vecValues[i];
+			vecMatrix(tuple, i) = vecValues[i] + perturbationMatrix(tuple,i);
 		}
 		vecMatrix(tuple, iExchangeIndex) = 1;
 	}
@@ -511,11 +521,10 @@ double CriticalPointExtractor::ComputeDeterminant(
 
 	// 2. compute determinant sign
 	double det = 0;
-	//if(numIds == 4)
-		det = vecMatrix.determinant();
-	//else
-	//	det = vecMatrix.block(0,0,3,3).determinant();
-	
+	if(numIds == 4)
+		det = static_cast<Eigen::Matrix4d>(vecMatrix).determinant();
+	else
+		det = static_cast<Eigen::Matrix3d>(vecMatrix).determinant();	
 
 	// 3. check the number of swap operation while sorting
 	if (swapOperations % 2 != 0) //Odd
