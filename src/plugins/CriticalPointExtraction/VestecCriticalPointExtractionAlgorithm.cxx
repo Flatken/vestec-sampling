@@ -306,9 +306,15 @@ void CriticalPointExtractor::ComputeCriticalCells(vtkSmartPointer<vtkDataSet> ou
 		matrixSize = 4;
 
     std::vector<DynamicMatrix> vecMatrices;
+	std::vector<Eigen::PlainObjectBase<Eigen::Matrix>> test;
+	
 	for(int x=0; x < numThreads;++x)
-		vecMatrices.push_back(DynamicMatrix(matrixSize,matrixSize));
-
+	{
+		if(matrixSize == 4)
+			vecMatrices.push_back(Eigen::Matrix4f());
+		//if(matrixSize == 3)
+		//	vecMatrices.push_back(Eigen::Matrix3f());
+	}
 	//std::cout << "[CriticalPointExtractor::identify_critical_points] Matrix size(" << matrixSize << "," << matrixSize << ")"<< std::endl;
 	//std::cout << "[CriticalPointExtractor::identify_critical_points] Exchange index: " << iExchangeIndex << std::endl;
 	//std::cout << "[CriticalPointExtractor::identify_critical_points] Identifing critical cells "<< std::endl;
@@ -331,7 +337,8 @@ void CriticalPointExtractor::ComputeCriticalCells(vtkSmartPointer<vtkDataSet> ou
 			}
 		}
 	}
-	
+	std::cout << "[CriticalPointExtractor::identify_critical_points] Identifing critical cells done "<< std::endl;
+
 	vtkSmartPointer<vtkPoints> pointArray = vtkSmartPointer<vtkPoints>::New();
 	vtkSmartPointer<vtkCellArray> cellArray = vtkSmartPointer<vtkCellArray>::New();
 	vtkSmartPointer<vtkIntArray> singularityType = vtkSmartPointer<vtkIntArray>::New();
@@ -390,7 +397,7 @@ void CriticalPointExtractor::CleanDuplicates(vtkSmartPointer<vtkPolyData> output
 	output->ShallowCopy(cleaner->GetOutput());		
 }
 
-CriticalPointExtractor::CriticalPointType CriticalPointExtractor::PointInCell(std::vector<vtkIdType> &ids, DynamicMatrix &vecMatrix) {
+CriticalPointExtractor::CriticalPointType CriticalPointExtractor::PointInCell(const std::vector<vtkIdType> &ids, DynamicMatrix &vecMatrix) {
 	// 1. compute the initial sign of the determinant of the cell
 	double targetDeterminant = ComputeDeterminant(ids, vecMatrix, false, 0);
 	bool targetDirection = DeterminatCounterClockWise(targetDeterminant);
@@ -399,7 +406,7 @@ CriticalPointExtractor::CriticalPointType CriticalPointExtractor::PointInCell(st
 	{
 		return REGULAR;
 	}
-
+	
 	double tmpDeterminat;
 	bool tmpDirection;
 	// 2. for each facet (i.e. an edge in a triangle or a triangle in a tetrahedron) do
@@ -428,11 +435,19 @@ CriticalPointExtractor::CriticalPointType CriticalPointExtractor::PointInCell(st
 }
 
 double CriticalPointExtractor::ComputeDeterminant(
-	std::vector<vtkIdType> tmpIds,
+	const std::vector<vtkIdType> &ids,
 	DynamicMatrix &vecMatrix,
 	bool usePoints,
 	long pertubationID
 ){
+	
+	std::array<vtkIdType, 4> tmpIds;
+	int numIds = ids.size();
+	if(numIds == 3)
+		tmpIds = {ids[0],ids[1],ids[2]};
+	else
+		tmpIds = {ids[0],ids[1],ids[2],ids[3]};
+
 	//Exchanges every facet with the zero vector
 	if (pertubationID != -1)
 	{
@@ -441,10 +456,10 @@ double CriticalPointExtractor::ComputeDeterminant(
 
 	// 1. Sort and check swap operations (check)
     // TODO: More generic version required. How to handle per pertubation
-	int swapOperations =  Sort(tmpIds);
-	
+	int swapOperations = Sort(&tmpIds[0], numIds);
+
 	double vecValues[3];
-	for (std::size_t tuple = 0; tuple < tmpIds.size(); tuple++) 
+	for (std::size_t tuple = 0; tuple < numIds; tuple++) 
 	{
 		vtkIdType pointID = tmpIds[tuple];
 		if (pointID != ZERO_ID)
@@ -476,27 +491,31 @@ double CriticalPointExtractor::ComputeDeterminant(
 	}
 
 	/*
-	std::cout << " \t ######################################################################### " << std::endl;
-	std::cout << " \t\tVertex IDs ";
-	for (int x = 0; x < tmpIds.size(); x++)
-		std::cout << tmpIds[x] << " ";
-	std::cout << std::endl;
-	std::cout << " \t\tMatrix: " << std::endl;
-	std::cout << " \t\t ";
-	for (int x = 0; x < vecMatrix.rows(); x++)
-	{
-		for (int y = 0; y < vecMatrix.cols(); y++)
-			std::cout << vecMatrix(x, y) << " ";
-		std::cout << std::endl;
-		std::cout << " \t\t ";
-	}
-	std::cout << std::endl;
-	std::cout << " \t ######################################################################### " << std::endl;
-	*/
+	//std::cout << " \t ######################################################################### " << std::endl;
+	//std::cout << " \t\tVertex IDs ";
+	//for (int x = 0; x < tmpIds.size(); x++)
+	//	std::cout << tmpIds[x] << " ";
+	//std::cout << std::endl;
+	//std::cout << " \t\tMatrix: " << std::endl;
+	//std::cout << " \t\t ";
+	//for (int x = 0; x < vecMatrix.rows(); x++)
+	//{
+	//	for (int y = 0; y < vecMatrix.cols(); y++)
+	//		std::cout << vecMatrix(x, y) << " ";
+	//	std::cout << std::endl;
+	//	std::cout << " \t\t ";
+	//}
+	//std::cout << std::endl;
+	//std::cout << " \t ######################################################################### " << std::endl;
+	//*/
 
 	// 2. compute determinant sign
-	double det = vecMatrix.determinant();
-	//long det = IntegerDeterminant(vecMatrix, vecMatrix.rows());
+	double det = 0;
+	//if(numIds == 4)
+		det = vecMatrix.determinant();
+	//else
+	//	det = vecMatrix.block(0,0,3,3).determinant();
+	
 
 	// 3. check the number of swap operation while sorting
 	if (swapOperations % 2 != 0) //Odd
@@ -506,13 +525,13 @@ double CriticalPointExtractor::ComputeDeterminant(
 	return det;
 }
 
-int CriticalPointExtractor::Sort(std::vector<vtkIdType> &ids)
+int CriticalPointExtractor::Sort(vtkIdType* ids, int n)
 {
-	if (ids.size() == 3) //Triangle
+	if (n == 3) //Triangle
 	{
 		return Sort3(ids);
 	}
-	else if (ids.size() == 4) //TETRA 
+	else if (n == 4) //TETRA 
 	{
 		return Sort4(ids);
 	}
@@ -523,7 +542,7 @@ int CriticalPointExtractor::Sort(std::vector<vtkIdType> &ids)
 	}
 }
 
-int CriticalPointExtractor::Sort3(std::vector<vtkIdType> &ids)
+int CriticalPointExtractor::Sort3(vtkIdType* ids)
 {
 	unsigned int swaps = 0;
 	if (ids[0] > ids[1])
@@ -546,7 +565,7 @@ int CriticalPointExtractor::Sort3(std::vector<vtkIdType> &ids)
 	return swaps;
 }
 
-int CriticalPointExtractor::Sort4(std::vector<vtkIdType> &ids)
+int CriticalPointExtractor::Sort4(vtkIdType* ids)
 {
 	unsigned int swaps = 0;
 

@@ -16,8 +16,8 @@
 
 
 //Matrix to compute the determinat
-typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> DynamicMatrix;
-
+//typedef Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, 1, 4, 4> DynamicMatrix;
+typedef Eigen::Matrix<float, 4, 4> DynamicMatrix;
 //Forward declaration of vtkDataSet
 class vtkDataSet;
 
@@ -57,17 +57,17 @@ class CriticalPointExtractor {
     /**
      * Sort the vector integers but returns the needed swap operations
      */
-    int  Sort(std::vector<vtkIdType> &ids);
+    int  Sort(vtkIdType* ids, int n);
 
     /**
      * Sort the vector with 3 integers but returns the needed swap operations
      */
-    int	 Sort3(std::vector<vtkIdType> &ids);
+    int	 Sort3(vtkIdType* ids);
 
     /**
      * Sort the vector with 4 integers but returns the needed swap operations
      */
-	  int  Sort4(std::vector<vtkIdType> &ids);
+	  int  Sort4(vtkIdType* ids);
     
     /**
      * Compute the determinant
@@ -76,14 +76,14 @@ class CriticalPointExtractor {
      * currentSingularity: The singularity e.g. zero vector (0,0,0)
      * vecMatrix: The matrix used to compute the determinant
      */
-    double ComputeDeterminant(std::vector<vtkIdType> tmpIds, DynamicMatrix &vecMatrix, bool usePoints, long pertubationID = -1);
+    double ComputeDeterminant(const std::vector<vtkIdType>& ids, DynamicMatrix &vecMatrix, bool usePoints, long pertubationID = -1);
    
     /**
      * Check if the sigularity is in cell
      * ids: The vertex ids spanning the cell
      * vecMatrix: The matrix used to compute the determinant
      */ 
-    CriticalPointType PointInCell(std::vector<vtkIdType> &ids, DynamicMatrix &vecMatrix);
+    CriticalPointType PointInCell(const std::vector<vtkIdType> &ids, DynamicMatrix &vecMatrix);
 
     /**
      * Check if direction of the determinat is positive (counter-clockwise) 
