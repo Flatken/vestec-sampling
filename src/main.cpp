@@ -128,7 +128,7 @@ int main(int argc, char** argv) {
 	MPI_Barrier(MPI_COMM_WORLD);
 	for (timeStep = 0; timeStep < numberOfTimeSteps; timeStep++)
 	{
-		std::cout << "Execute pipeline for t: "<< time <<" and step: " << timeStep << std::endl;
+		//std::cout << "Execute pipeline for t: "<< time <<" and step: " << timeStep << std::endl;
 #ifdef USE_CATALYST
 		int lastTimeStep = 0;
 		if (timeStep == numberOfTimeSteps - 1)

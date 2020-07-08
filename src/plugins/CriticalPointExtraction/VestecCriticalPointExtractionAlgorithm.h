@@ -104,9 +104,7 @@ private:
     std::vector<double*> vecVectors; //!< Store vector field
     std::vector<std::vector<vtkIdType>> vecCellIds;  //!< The point ids for each cell
     double singularity[3]; //!< The singularity to identify
-    // int numThreads = 12; //!< Number of OpenMP threads
     int numThreads; //!< Number of OpenMP threads
-    // Eigen::Matrix4d perturbationMatrix;
     double eps = 1 / std::pow(10,14);
 	  double delta = 5; // >=n
 };

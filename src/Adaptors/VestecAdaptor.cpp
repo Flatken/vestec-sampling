@@ -192,7 +192,6 @@ void CatalystCoProcess( double time, unsigned int timeStep, int lastTimeStep)
 			else {
 				std::cout << "Unsupported vtk data format! " << std::endl;
 			}
-			std::cout << "Partitioning dataset done ! " << std::endl;
 		}else{
 			//Copy dataset from reader
 			VTKGrid = pReader->GetOutput()->NewInstance();
