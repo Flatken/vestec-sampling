@@ -22,10 +22,11 @@ typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 1, 4, 4> DynamicMa
 class vtkDataSet;
 
 /// This class implements the algorithm described in:
-/// "Robust Detection of Singularities in Vector Fields" by Bhatia et al.
-/// -----
-/// add other references here:
+/// "Robust Detection of Singularities in Vector Fields" by Bhatia et al./// 
 /// (extending this method) "Detection and classification of critical points in piecewise linear vector fields" by Wang et al.
+/// -----
+/// other references here:
+/// (possible extension using a different index for classification) "Morse set classification and hierarchical refinement using conley index" by Chen G et al.
 /// (survey) "A survey of topology‐based methods in visualization" by Heine et al.
 /// (survey) "From numerics to combinatorics: a survey of topological methods for vector field visualization" by Wang et al.
 class CriticalPointExtractor {
@@ -103,8 +104,11 @@ private:
     std::vector<double*> vecVectors; //!< Store vector field
     std::vector<std::vector<vtkIdType>> vecCellIds;  //!< The point ids for each cell
     double singularity[3]; //!< The singularity to identify
-    int numThreads = 12; //!< Number of OpenMP threads
-    Eigen::Matrix4d perturbationMatrix;
+    // int numThreads = 12; //!< Number of OpenMP threads
+    int numThreads; //!< Number of OpenMP threads
+    // Eigen::Matrix4d perturbationMatrix;
+    double eps = 1 / std::pow(10,14);
+	  double delta = 5; // >=n
 };
 
 

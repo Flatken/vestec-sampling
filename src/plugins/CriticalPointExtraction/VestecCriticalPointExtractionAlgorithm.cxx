@@ -26,7 +26,7 @@
 #include <sstream>
 #include <chrono>
 #include <cmath>
-
+#include <thread>
 
 #include <omp.h>
 #include <random>
@@ -126,7 +126,9 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 											   double *currentSingularity)
 {
 	//Configure openmp
+	numThreads = std::thread::hardware_concurrency(); //!< Number of OpenMP threads
 	omp_set_num_threads(numThreads);
+	std::cout<<"number of threads: "<<numThreads<<std::endl;
 
 	//Store singularity
 	singularity[0] = currentSingularity[0];
@@ -143,7 +145,7 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 	//Store vectors and point coordinates for internal usage
 	vtkSmartPointer<vtkDataArray> vectors = input->GetPointData()->GetVectors();
 
-	
+	Perturbate(singularity, ZERO_ID);
 
 	#pragma omp parallel for
 	for(vtkIdType i=0; i < numPoints; i++) 
@@ -155,7 +157,6 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 		input->GetPoint(i, position);		
 		
 		Perturbate(vector, i);
-		Perturbate(singularity, ZERO_ID);
 		//Perturbate(position, i);
 
 		vecVectors[i] = vector;
@@ -265,22 +266,26 @@ void CriticalPointExtractor::Perturbate(double* values, vtkIdType id) {
 	// i = id (in their implementation is id+1)
 	// j = to the component of values --> 0,1,2 (in their implementation is the component +1)
 
-	double eps = 1 / std::pow(10,14);
-	double delta = 5; // >=n
-
+	//eps and delta are constant.. so I compute them one time at the beginning
 	vtkIdType i = id + 1;
-	
-	double j = 1;
-	double perturbation = /*(id*5+0)*eps;*/std::pow(eps,std::pow(2,1 + ((double)i/(double)vecVectors.size())*delta-j));	
-	values[0] += perturbation;
-	
-	j = 2;
-	perturbation = /*(id*5+0)*eps;*/std::pow(eps,std::pow(2,1 + ((double)i/(double)vecVectors.size())*delta-j));	
-	values[1] += perturbation;
+	double i_norm = static_cast<double>(i)/static_cast<double>(vecVectors.size());
+	double exp_coeff = 1+i_norm*delta;
 
-	j = 3;
-	perturbation = /*(id*5+0)*eps;*/std::pow(eps,std::pow(2,1 + ((double)i/(double)vecVectors.size())*delta-j));	
-	values[2] += perturbation;
+	for(int j=0; j<3; j++) {
+		values[j] += std::pow(eps,std::pow(2,exp_coeff-static_cast<double>(j+1)));
+	}
+	
+	// double j = 1;
+	// double perturbation = std::pow(eps,std::pow(2,exp_coeff-j));	
+	// values[0] += perturbation;
+	
+	// j = 2;
+	// perturbation = std::pow(eps,std::pow(2,exp_coeff-j));	
+	// values[1] += perturbation;
+
+	// j = 3;
+	// perturbation = std::pow(eps,std::pow(2,exp_coeff-j));	
+	// values[2] += perturbation;
 }
 
 //----------------------------------------------------------------------------
@@ -297,15 +302,22 @@ void CriticalPointExtractor::ComputeCriticalCells(vtkSmartPointer<vtkDataSet> ou
 	if(iExchangeIndex == 3)
 		matrixSize = 4;
 
-    std::vector<DynamicMatrix> vecMatrices;
+    //std::vector<DynamicMatrix> vecMatrices;
+	std::vector<DynamicMatrix> vecMatrices;
+	if(matrixSize == 4)
+		vecMatrices.assign(numThreads,Eigen::Matrix4d());
+	if(matrixSize == 3)
+		vecMatrices.assign(numThreads,Eigen::Matrix3d());	
 	
-	for(int x=0; x < numThreads;++x)
-	{
-		if(matrixSize == 4)
-			vecMatrices.push_back(Eigen::Matrix4d());
-		if(matrixSize == 3)
-			vecMatrices.push_back(Eigen::Matrix3d());
-	}
+	// for(int x=0; x < numThreads;++x)
+	// {
+	// 	if(matrixSize == 4)
+	// 		// vecMatrices.push_back(Eigen::Matrix4d());
+	// 		vecMatrices[x] = Eigen::Matrix4d();
+	// 	if(matrixSize == 3)
+	// 		// vecMatrices.push_back(Eigen::Matrix3d());
+	// 		vecMatrices[x] = Eigen::Matrix3d();
+	// }
 	//std::cout << "[CriticalPointExtractor::identify_critical_points] Matrix size(" << matrixSize << "," << matrixSize << ")"<< std::endl;
 	//std::cout << "[CriticalPointExtractor::identify_critical_points] Exchange index: " << iExchangeIndex << std::endl;
 	//std::cout << "[CriticalPointExtractor::identify_critical_points] Identifing critical cells "<< std::endl;
