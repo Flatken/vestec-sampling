@@ -93,7 +93,7 @@ class CriticalPointExtractor {
     /**
      * Double to fixed precision and pertubation based on id
      */
-    void Perturbate();
+    void Perturbate(double* values, vtkIdType id);
 
     
 private:

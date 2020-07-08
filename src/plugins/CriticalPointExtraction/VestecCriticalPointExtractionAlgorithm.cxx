@@ -143,12 +143,7 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 	//Store vectors and point coordinates for internal usage
 	vtkSmartPointer<vtkDataArray> vectors = input->GetPointData()->GetVectors();
 
-	// if(pertubate)
-	// 	{
-	// 		Pertubate(vector, i);
-	// 		Pertubate(singularity, ZERO_ID);
-	// 	}	
-	Perturbate();
+	
 
 	#pragma omp parallel for
 	for(vtkIdType i=0; i < numPoints; i++) 
@@ -159,6 +154,10 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 		vectors->GetTuple(i,vector);
 		input->GetPoint(i, position);		
 		
+		Perturbate(vector, i);
+		Perturbate(singularity, ZERO_ID);
+		//Perturbate(position, i);
+
 		vecVectors[i] = vector;
 		vecPointCoordinates[i] = position;
 	}
@@ -258,48 +257,30 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 		
 	}
 	std::cout << "[CriticalPointExtractor::identify_critical_points] Checking " << vecCellIds.size() << " simplices for critical points " << std::endl;
-
 }
 
-void CriticalPointExtractor::Perturbate() {
-	// perturbation function f(e,i,j) = e
-	// e ?? --> constant?
+void CriticalPointExtractor::Perturbate(double* values, vtkIdType id) {
+	// perturbation function f(e,i,j) = eps^2^i*delta-j
+	// eps ?? --> constant?
 	// i = id (in their implementation is id+1)
 	// j = to the component of values --> 0,1,2 (in their implementation is the component +1)
 
-	double eps = 0.99;
-	int delta = 5;
+	double eps = 1 / std::pow(10,14);
+	double delta = 5; // >=n
 
-	for (int i=1; i<5; i++) {
-		for (int j=1; j<4; j++) {			
-			// std::cout << std::pow(2,i*delta-j) << std::endl;
-			perturbationMatrix(i-1,j-1) = std::pow(eps,std::pow(2,i*delta-j));
-			std::cout << i-1 << " " << j-1 << " - " << perturbationMatrix(i-1,j-1) << " - " << std::pow(2,i*delta-j) << std::endl;
-		}
-		perturbationMatrix(i-1,3) = 1;
-	}
+	vtkIdType i = id + 1;
 	
-	std::cout << perturbationMatrix << std::endl;
+	double j = 1;
+	double perturbation = /*(id*5+0)*eps;*/std::pow(eps,std::pow(2,1 + ((double)i/(double)vecVectors.size())*delta-j));	
+	values[0] += perturbation;
+	
+	j = 2;
+	perturbation = /*(id*5+0)*eps;*/std::pow(eps,std::pow(2,1 + ((double)i/(double)vecVectors.size())*delta-j));	
+	values[1] += perturbation;
 
-	// int i = id+1; //TODO: should be point id of the simplex
-	// int j = 0 + 1;
-	// double perturbation = /*(id*5+0)*eps;*/std::pow(eps,std::pow(2,i*delta-j));
-	// std::cout << "Pertubation " << std::pow(2,i*delta-j) << std::endl;
-	// //auto tofixed = cnl::fixed_point<long, -14>(values[0]+perturbation);
-	// //values[0] = to_rep(tofixed);	
-	// values[0] += perturbation;
-
-	// j = 0 + 2;
-	// perturbation = /*(id*5+1)*eps;*/std::pow(eps,std::pow(2,i*delta-j));
-	// //tofixed = cnl::fixed_point<long, -14>(values[1]+perturbation);
-	// //values[1] = to_rep(tofixed);
-	// values[1] += perturbation;
-
-	// j = 0 + 3;
-	// perturbation = /*(id*5+2)*eps;*/std::pow(eps,std::pow(2,i*delta-j));
-	// //tofixed = cnl::fixed_point<long, -14>(values[2]+perturbation);
-	// //values[2] = to_rep(tofixed);
-	// values[2] += perturbation;
+	j = 3;
+	perturbation = /*(id*5+0)*eps;*/std::pow(eps,std::pow(2,1 + ((double)i/(double)vecVectors.size())*delta-j));	
+	values[2] += perturbation;
 }
 
 //----------------------------------------------------------------------------
@@ -388,16 +369,42 @@ void CriticalPointExtractor::ComputeCriticalCells(vtkSmartPointer<vtkDataSet> ou
 
 void CriticalPointExtractor::CleanDuplicates(vtkSmartPointer<vtkPolyData> output) {
 
-	vtkSmartPointer<vtkIdList> ids = vtkSmartPointer<vtkIdList>::New();
+	vtkSmartPointer<vtkIdList> sharedCells = vtkSmartPointer<vtkIdList>::New();
 
 	for (vtkIdType i = 0; i < output->GetNumberOfPoints(); i++) {
-		output->GetPointCells(i,ids);
-		if(ids->GetNumberOfIds() > 1){
-			for (vtkIdType id=1; id < ids->GetNumberOfIds(); id++) {			
-				output->DeleteCell(ids->GetId(id));
-			}
-		}		
-}
+		output->GetPointCells(i,sharedCells);
+
+		if(sharedCells->GetNumberOfIds() == 1)
+			break;
+		
+		//Ok we have mutiple cells for that vertex! Do they share a facet
+		if(sharedCells->GetNumberOfIds() == 2){
+			output->DeleteCell(sharedCells->GetId(1));
+		}
+		else if(sharedCells->GetNumberOfIds() == 3)
+		{
+			output->DeleteCell(sharedCells->GetId(1));
+			output->DeleteCell(sharedCells->GetId(2));
+		}
+		else if(sharedCells->GetNumberOfIds() == 4)
+		{
+			output->DeleteCell(sharedCells->GetId(1));
+			output->DeleteCell(sharedCells->GetId(2));
+			output->DeleteCell(sharedCells->GetId(3));
+		}
+		else if(sharedCells->GetNumberOfIds() == 5)
+		{
+			output->DeleteCell(sharedCells->GetId(1));
+			output->DeleteCell(sharedCells->GetId(2));
+			output->DeleteCell(sharedCells->GetId(3));
+			output->DeleteCell(sharedCells->GetId(4));
+		}
+		else
+		{
+			std::cout << "Sharing vertex between more than five cells" << sharedCells->GetNumberOfIds() << std::endl;
+		}
+				
+	}
 	output->RemoveDeletedCells();	
 
 	vtkSmartPointer<vtkCleanPolyData> cleaner = vtkSmartPointer<vtkCleanPolyData>::New();
@@ -469,9 +476,9 @@ double CriticalPointExtractor::ComputeDeterminant(
 	int swapOperations = Sort(&tmpIds[0], numIds);
 
 	double vecValues[3];
-	for (std::size_t tuple = 0; tuple < numIds; tuple++) 
+	for (std::size_t i = 0; i < numIds; i++) 
 	{
-		vtkIdType pointID = tmpIds[tuple];
+		vtkIdType pointID = tmpIds[i];
 		if (pointID != ZERO_ID)
 		{
 			if(!usePoints)
@@ -494,10 +501,10 @@ double CriticalPointExtractor::ComputeDeterminant(
 			vecValues[2] = singularity[2];
 		}
 
-		for (vtkIdType i = 0; i < vecMatrix.cols(); i++) {
-			vecMatrix(tuple, i) = vecValues[i] + perturbationMatrix(tuple,i);
+		for (vtkIdType j = 0; j < vecMatrix.cols(); j++) {
+			vecMatrix(i,j) = vecValues[j];// + perturbationMatrix(i,j);
 		}
-		vecMatrix(tuple, iExchangeIndex) = 1;
+		vecMatrix(i, iExchangeIndex) = 1;
 	}
 
 	/*
