@@ -127,8 +127,8 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 {
 	
 	//Configure openmp
-	// numThreads = std::thread::hardware_concurrency() * 4; //!< Number of OpenMP threads
-	numThreads = 1; //!< Number of OpenMP threads
+	numThreads = std::thread::hardware_concurrency() * 4; //!< Number of OpenMP threads
+	// numThreads = 1; //!< Number of OpenMP threads
 	omp_set_num_threads(numThreads);
 	std::cout<<"number of threads: "<<numThreads<<std::endl;
 
@@ -208,19 +208,19 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 	//Allocate size for cells which depends on input cell type
 	if(VTK_PIXEL == cellType || VTK_QUAD == cellType) {
 		vecCellIds.resize(numCells * 2);
-		dim=3;
+		numCellIds=3;
 	}
 	else if (VTK_VOXEL == cellType || VTK_HEXAHEDRON == cellType) {
 		vecCellIds.resize(numCells * 5);
-		dim=4;
+		numCellIds=4;
 	}
 	else if (VTK_TRIANGLE == cellType) {
 		vecCellIds.resize(numCells);
-		dim=3;
+		numCellIds=3;
 	}
 	else if (VTK_TETRA == cellType) {
 		vecCellIds.resize(numCells);
-		dim=4;
+		numCellIds=4;
 	}
 
 	#pragma omp parallel for
@@ -284,18 +284,6 @@ void CriticalPointExtractor::Perturbate(double* values, vtkIdType id) {
 	for(int j=0; j<3; j++) {
 		values[j] += std::pow(eps,std::pow(2,exp_coeff-static_cast<double>(j+1)));
 	}
-	
-	// double j = 1;
-	// double perturbation = std::pow(eps,std::pow(2,exp_coeff-j));	
-	// values[0] += perturbation;
-	
-	// j = 2;
-	// perturbation = std::pow(eps,std::pow(2,exp_coeff-j));	
-	// values[1] += perturbation;
-
-	// j = 3;
-	// perturbation = std::pow(eps,std::pow(2,exp_coeff-j));	
-	// values[2] += perturbation;
 }
 
 //----------------------------------------------------------------------------
@@ -318,16 +306,7 @@ void CriticalPointExtractor::ComputeCriticalCells(vtkSmartPointer<vtkDataSet> ou
 		vecMatrices.assign(numThreads,Eigen::Matrix4d());
 	if(matrixSize == 3)
 		vecMatrices.assign(numThreads,Eigen::Matrix3d());	
-	
-	// for(int x=0; x < numThreads;++x)
-	// {
-	// 	if(matrixSize == 4)
-	// 		// vecMatrices.push_back(Eigen::Matrix4d());
-	// 		vecMatrices[x] = Eigen::Matrix4d();
-	// 	if(matrixSize == 3)
-	// 		// vecMatrices.push_back(Eigen::Matrix3d());
-	// 		vecMatrices[x] = Eigen::Matrix3d();
-	// }
+
 	//std::cout << "[CriticalPointExtractor::identify_critical_points] Matrix size(" << matrixSize << "," << matrixSize << ")"<< std::endl;
 	//std::cout << "[CriticalPointExtractor::identify_critical_points] Exchange index: " << iExchangeIndex << std::endl;
 	//std::cout << "[CriticalPointExtractor::identify_critical_points] Identifing critical cells "<< std::endl;
@@ -360,10 +339,10 @@ void CriticalPointExtractor::ComputeCriticalCells(vtkSmartPointer<vtkDataSet> ou
 	//Prepare output data sequentially. Insert every critical cell to output
 	for (auto cellID : vecCriticalCellIDs)
 	{
-		/*std::vector<vtkIdType>*/ const vtkIdType* vecVertexIds = vecCellIds[cellID.id];
+		const vtkIdType* vecVertexIds = vecCellIds[cellID.id];
 		vtkSmartPointer<vtkIdList> newPointIDs = vtkSmartPointer<vtkIdList>::New();	
 
-		for (int index = 0; index < /*vecVertexIds.size()*/dim; index++)
+		for (int index = 0; index < numCellIds; index++)
 		{
 			singularityType->InsertNextTuple1(cellID.type);
 			double pCoords[3];
@@ -439,21 +418,21 @@ void CriticalPointExtractor::CleanDuplicates(vtkSmartPointer<vtkPolyData> output
 CriticalPointExtractor::CriticalPointType CriticalPointExtractor::PointInCell(/*const std::vector<vtkIdType> &ids*/ const vtkIdType* ids, DynamicMatrix &vecMatrix) {
 	// 1. compute the initial sign of the determinant of the cell
 	double targetDeterminant = ComputeDeterminant(ids, vecMatrix, false, 0);
-	bool targetDirection = DeterminatCounterClockWise(targetDeterminant);
+	bool targetDirection = DeterminantCounterClockWise(targetDeterminant);
 	//Check for non data values (vector is zero and determinant also) 
 	if (targetDeterminant == 0)
 	{
 		return REGULAR;
 	}
 	
-	double tmpDeterminat;
+	double tmpDeterminant;
 	bool tmpDirection;
 	// 2. for each facet (i.e. an edge in a triangle or a triangle in a tetrahedron) do
 	// 2.1. replace each row of the matrix with the origin vector (0,0) or (0,0,0) given as i to Positive function
-	for (int i = 1; i < /*ids.size()*/dim; i++) {
+	for (int i = 1; i < numCellIds; i++) {
 		// 2.2. compute the determinant sign again 
-		tmpDeterminat   = ComputeDeterminant(ids, vecMatrix, false, i);
-		tmpDirection    = DeterminatCounterClockWise(tmpDeterminat);
+		tmpDeterminant   = ComputeDeterminant(ids, vecMatrix, false, i);
+		tmpDirection    = DeterminantCounterClockWise(tmpDeterminant);
 		
 		// 2.3. check if it changes --> if so return false
 		if (targetDirection != tmpDirection)
@@ -463,7 +442,7 @@ CriticalPointExtractor::CriticalPointType CriticalPointExtractor::PointInCell(/*
 	}
 
 	double initialDeterminant = ComputeDeterminant(ids, vecMatrix, true);	
-	bool initialDirection     = DeterminatCounterClockWise(initialDeterminant);	
+	bool initialDirection     = DeterminantCounterClockWise(initialDeterminant);	
 	
 	if (initialDirection != targetDirection)
 	{
@@ -482,7 +461,7 @@ double CriticalPointExtractor::ComputeDeterminant(
 ){
 	
 	std::array<vtkIdType, 4> tmpIds;
-	int numIds = dim;
+	int numIds = numCellIds;
 	if(numIds == 3)
 		tmpIds = {ids[0],ids[1],ids[2]};
 	else
@@ -655,7 +634,7 @@ int CriticalPointExtractor::Sort4(vtkIdType* ids)
 	return swaps;
 }
 
-bool CriticalPointExtractor::DeterminatCounterClockWise(double& det)
+bool CriticalPointExtractor::DeterminantCounterClockWise(double& det)
 {
 	if (det > 0)
 		return true;

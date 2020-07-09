@@ -15,9 +15,8 @@
 #include <cnl/all.h>
 
 
-//Matrix to compute the determinat
+//Matrix to compute the determinant
 typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 1, 4, 4> DynamicMatrix;
-// typedef Eigen::Matrix<float, 4, 4> DynamicMatrix;
 //Forward declaration of vtkDataSet
 class vtkDataSet;
 
@@ -32,7 +31,7 @@ class vtkDataSet;
 class CriticalPointExtractor {
   public:
     /**
-     * Store vector and points in internal datat structure 
+     * Store vector and points in internal data structure 
      */
     CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input, double* currentSingularity);
 
@@ -77,19 +76,19 @@ class CriticalPointExtractor {
      * currentSingularity: The singularity e.g. zero vector (0,0,0)
      * vecMatrix: The matrix used to compute the determinant
      */
-    double ComputeDeterminant(/*const std::vector<vtkIdType> &ids*/ const vtkIdType* ids, DynamicMatrix &vecMatrix, bool usePoints, long perturbationID = -1);
+    double ComputeDeterminant(const vtkIdType* ids, DynamicMatrix &vecMatrix, bool usePoints, long perturbationID = -1);
    
     /**
-     * Check if the sigularity is in cell
+     * Check if the singularity is in cell
      * ids: The vertex ids spanning the cell
      * vecMatrix: The matrix used to compute the determinant
      */ 
-    CriticalPointType PointInCell(/*const std::vector<vtkIdType> &ids*/ const vtkIdType* ids, DynamicMatrix &vecMatrix);
+    CriticalPointType PointInCell(const vtkIdType* ids, DynamicMatrix &vecMatrix);
 
     /**
      * Check if direction of the determinat is positive (counter-clockwise) 
      */
-    bool DeterminatCounterClockWise(double& det);
+    bool DeterminantCounterClockWise(double& det);
 
     /**
      * Double to fixed precision and pertubation based on id
@@ -102,9 +101,8 @@ private:
     int iExchangeIndex; //!< The row id of the matrix to exchange with the singularity    
     std::vector<double*> vecPointCoordinates; //!< Store point coordinates
     std::vector<double*> vecVectors; //!< Store vector field
-    // std::vector<std::vector<vtkIdType>> vecCellIds;  //!< The point ids for each cell
     std::vector<vtkIdType*> vecCellIds;  //!< The point ids for each cell
-    int dim;
+    int numCellIds;
     double singularity[3]; //!< The singularity to identify
     int numThreads; //!< Number of OpenMP threads
     double eps = 1 / std::pow(10,14);
