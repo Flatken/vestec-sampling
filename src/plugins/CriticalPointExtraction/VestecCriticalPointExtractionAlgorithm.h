@@ -77,14 +77,14 @@ class CriticalPointExtractor {
      * currentSingularity: The singularity e.g. zero vector (0,0,0)
      * vecMatrix: The matrix used to compute the determinant
      */
-    double ComputeDeterminant(const std::vector<vtkIdType>& ids, DynamicMatrix &vecMatrix, bool usePoints, long pertubationID = -1);
+    double ComputeDeterminant(/*const std::vector<vtkIdType> &ids*/ const vtkIdType* ids, DynamicMatrix &vecMatrix, bool usePoints, long perturbationID = -1);
    
     /**
      * Check if the sigularity is in cell
      * ids: The vertex ids spanning the cell
      * vecMatrix: The matrix used to compute the determinant
      */ 
-    CriticalPointType PointInCell(const std::vector<vtkIdType> &ids, DynamicMatrix &vecMatrix);
+    CriticalPointType PointInCell(/*const std::vector<vtkIdType> &ids*/ const vtkIdType* ids, DynamicMatrix &vecMatrix);
 
     /**
      * Check if direction of the determinat is positive (counter-clockwise) 
@@ -102,7 +102,9 @@ private:
     int iExchangeIndex; //!< The row id of the matrix to exchange with the singularity    
     std::vector<double*> vecPointCoordinates; //!< Store point coordinates
     std::vector<double*> vecVectors; //!< Store vector field
-    std::vector<std::vector<vtkIdType>> vecCellIds;  //!< The point ids for each cell
+    // std::vector<std::vector<vtkIdType>> vecCellIds;  //!< The point ids for each cell
+    std::vector<vtkIdType*> vecCellIds;  //!< The point ids for each cell
+    int dim;
     double singularity[3]; //!< The singularity to identify
     int numThreads; //!< Number of OpenMP threads
     double eps = 1 / std::pow(10,14);

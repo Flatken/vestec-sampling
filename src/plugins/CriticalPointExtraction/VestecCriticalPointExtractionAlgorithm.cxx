@@ -127,7 +127,8 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 {
 	
 	//Configure openmp
-	numThreads = std::thread::hardware_concurrency() * 4; //!< Number of OpenMP threads
+	// numThreads = std::thread::hardware_concurrency() * 4; //!< Number of OpenMP threads
+	numThreads = 1; //!< Number of OpenMP threads
 	omp_set_num_threads(numThreads);
 	std::cout<<"number of threads: "<<numThreads<<std::endl;
 
@@ -146,8 +147,10 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 	//Store vectors and point coordinates for internal usage
 	vtkSmartPointer<vtkDataArray> vectors = input->GetPointData()->GetVectors();
 
+	auto start = std::chrono::steady_clock::now();
+
 	Perturbate(singularity, ZERO_ID);
-	
+
 	double* position = new double[numPoints*3];
 	double* vector = new double[numPoints*3];
 
@@ -162,7 +165,11 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 		vecVectors[i] = &vector[i * 3];
 		vecPointCoordinates[i] = &position[i * 3];
 	}
-	Perturbate(singularity, ZERO_ID);
+
+	auto end = std::chrono::steady_clock::now();  
+   	std::cout << "[CriticalPointExtractor::Constructor->PERTURBATE] Elapsed time in milliseconds : "
+ 	  << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
+ 	  << " ms" << std::endl;
 
 	//Check for dataset dimension and configure the index in the matrix which will be set to 1
 	double bounds[6];
@@ -196,11 +203,25 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 		vecCellPerThread.push_back(vtkSmartPointer<vtkGenericCell>::New());
 	}
 
+	start = std::chrono::steady_clock::now();	  
+
 	//Allocate size for cells which depends on input cell type
-	if(VTK_PIXEL == cellType || VTK_QUAD == cellType) vecCellIds.resize(numCells * 2);
-	else if (VTK_VOXEL == cellType || VTK_HEXAHEDRON == cellType) vecCellIds.resize(numCells * 5);
-	else if (VTK_TRIANGLE == cellType) vecCellIds.resize(numCells);
-	else if (VTK_TETRA == cellType) vecCellIds.resize(numCells);
+	if(VTK_PIXEL == cellType || VTK_QUAD == cellType) {
+		vecCellIds.resize(numCells * 2);
+		dim=3;
+	}
+	else if (VTK_VOXEL == cellType || VTK_HEXAHEDRON == cellType) {
+		vecCellIds.resize(numCells * 5);
+		dim=4;
+	}
+	else if (VTK_TRIANGLE == cellType) {
+		vecCellIds.resize(numCells);
+		dim=3;
+	}
+	else if (VTK_TETRA == cellType) {
+		vecCellIds.resize(numCells);
+		dim=4;
+	}
 
 	#pragma omp parallel for
 	for (vtkIdType i = 0; i < numCells; i++) {
@@ -214,25 +235,25 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 		vtkSmartPointer<vtkIdList> ids = vecCellPerThread[threadIdx]->GetPointIds();
 	
 		if (VTK_PIXEL == cellType || VTK_QUAD == cellType)
-		{
-			vecCellIds[i * 2]     = { ids->GetId(0) , ids->GetId(1), ids->GetId(2)};
-			vecCellIds[i * 2 + 1] = { ids->GetId(1) , ids->GetId(3), ids->GetId(2)};
+		{			
+			vecCellIds[i * 2]     = new vtkIdType[3]{ ids->GetId(0) , ids->GetId(1), ids->GetId(2)};
+			vecCellIds[i * 2 + 1] = new vtkIdType[3]{ ids->GetId(1) , ids->GetId(3), ids->GetId(2)};
 		}
 		else if (VTK_VOXEL == cellType || VTK_HEXAHEDRON == cellType)
 		{
-			vecCellIds[i * 5]     = { ids->GetId(0) , ids->GetId(1), ids->GetId(3), ids->GetId(5)};
-			vecCellIds[i * 5 + 1] = { ids->GetId(0) , ids->GetId(3), ids->GetId(5), ids->GetId(6)};
-			vecCellIds[i * 5 + 2] = { ids->GetId(0) , ids->GetId(2), ids->GetId(3), ids->GetId(6)};
-			vecCellIds[i * 5 + 3] = { ids->GetId(0) , ids->GetId(4), ids->GetId(5), ids->GetId(6)};
-			vecCellIds[i * 5 + 4] = { ids->GetId(3) , ids->GetId(5), ids->GetId(6), ids->GetId(7)};
+			vecCellIds[i * 5]     = new vtkIdType[4]{ ids->GetId(0) , ids->GetId(1), ids->GetId(3), ids->GetId(5)};
+			vecCellIds[i * 5 + 1] = new vtkIdType[4]{ ids->GetId(0) , ids->GetId(3), ids->GetId(5), ids->GetId(6)};
+			vecCellIds[i * 5 + 2] = new vtkIdType[4]{ ids->GetId(0) , ids->GetId(2), ids->GetId(3), ids->GetId(6)};
+			vecCellIds[i * 5 + 3] = new vtkIdType[4]{ ids->GetId(0) , ids->GetId(4), ids->GetId(5), ids->GetId(6)};
+			vecCellIds[i * 5 + 4] = new vtkIdType[4]{ ids->GetId(3) , ids->GetId(5), ids->GetId(6), ids->GetId(7)};
 		}
 		else if (VTK_TRIANGLE == cellType)
 		{
-			vecCellIds[i] = { ids->GetId(0) , ids->GetId(1), ids->GetId(2)};
+			vecCellIds[i] = new vtkIdType[3]{ ids->GetId(0) , ids->GetId(1), ids->GetId(2)};
 		}
 		else if (VTK_TETRA == cellType)
 		{
-			vecCellIds[i] = { ids->GetId(0) , ids->GetId(1), ids->GetId(2), ids->GetId(3)};
+			vecCellIds[i] = new vtkIdType[4]{ ids->GetId(0) , ids->GetId(1), ids->GetId(2), ids->GetId(3)};
 		}
 		else {
 			std::cout << "[CriticalPointExtractor] Error: unknown cell type " << std::endl;
@@ -240,6 +261,12 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 		}	
 		
 	}
+
+	end = std::chrono::steady_clock::now();  
+   	std::cout << "[CriticalPointExtractor::Constructor->SIMPLICIAL CELLS EXTRACTION] Elapsed time in milliseconds : "
+ 	  << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
+ 	  << " ms" << std::endl;
+
 	std::cout << "[CriticalPointExtractor::identify_critical_points] Checking " << vecCellIds.size() << " simplices for critical points " << std::endl;
 }
 
@@ -333,10 +360,10 @@ void CriticalPointExtractor::ComputeCriticalCells(vtkSmartPointer<vtkDataSet> ou
 	//Prepare output data sequentially. Insert every critical cell to output
 	for (auto cellID : vecCriticalCellIDs)
 	{
-		std::vector<vtkIdType> vecVertexIds = vecCellIds[cellID.id];
+		/*std::vector<vtkIdType>*/ const vtkIdType* vecVertexIds = vecCellIds[cellID.id];
 		vtkSmartPointer<vtkIdList> newPointIDs = vtkSmartPointer<vtkIdList>::New();	
 
-		for (int index = 0; index < vecVertexIds.size(); index++)
+		for (int index = 0; index < /*vecVertexIds.size()*/dim; index++)
 		{
 			singularityType->InsertNextTuple1(cellID.type);
 			double pCoords[3];
@@ -409,7 +436,7 @@ void CriticalPointExtractor::CleanDuplicates(vtkSmartPointer<vtkPolyData> output
 	output->ShallowCopy(cleaner->GetOutput());		
 }
 
-CriticalPointExtractor::CriticalPointType CriticalPointExtractor::PointInCell(const std::vector<vtkIdType> &ids, DynamicMatrix &vecMatrix) {
+CriticalPointExtractor::CriticalPointType CriticalPointExtractor::PointInCell(/*const std::vector<vtkIdType> &ids*/ const vtkIdType* ids, DynamicMatrix &vecMatrix) {
 	// 1. compute the initial sign of the determinant of the cell
 	double targetDeterminant = ComputeDeterminant(ids, vecMatrix, false, 0);
 	bool targetDirection = DeterminatCounterClockWise(targetDeterminant);
@@ -423,7 +450,7 @@ CriticalPointExtractor::CriticalPointType CriticalPointExtractor::PointInCell(co
 	bool tmpDirection;
 	// 2. for each facet (i.e. an edge in a triangle or a triangle in a tetrahedron) do
 	// 2.1. replace each row of the matrix with the origin vector (0,0) or (0,0,0) given as i to Positive function
-	for (int i = 1; i < ids.size(); i++) {
+	for (int i = 1; i < /*ids.size()*/dim; i++) {
 		// 2.2. compute the determinant sign again 
 		tmpDeterminat   = ComputeDeterminant(ids, vecMatrix, false, i);
 		tmpDirection    = DeterminatCounterClockWise(tmpDeterminat);
@@ -447,27 +474,27 @@ CriticalPointExtractor::CriticalPointType CriticalPointExtractor::PointInCell(co
 }
 
 double CriticalPointExtractor::ComputeDeterminant(
-	const std::vector<vtkIdType> &ids,
+	//const std::vector<vtkIdType> &ids,
+	const vtkIdType* ids,
 	DynamicMatrix &vecMatrix,
 	bool usePoints,
-	long pertubationID
+	long perturbationID
 ){
 	
 	std::array<vtkIdType, 4> tmpIds;
-	int numIds = ids.size();
+	int numIds = dim;
 	if(numIds == 3)
 		tmpIds = {ids[0],ids[1],ids[2]};
 	else
 		tmpIds = {ids[0],ids[1],ids[2],ids[3]};
 
 	//Exchanges every facet with the zero vector
-	if (pertubationID != -1)
+	if (perturbationID != -1)
 	{
-		tmpIds[pertubationID] = ZERO_ID;
+		tmpIds[perturbationID] = ZERO_ID;
 	}
 
 	// 1. Sort and check swap operations (check)
-    // TODO: More generic version required. How to handle per pertubation
 	int swapOperations = Sort(&tmpIds[0], numIds);
 
 	double vecValues[3];
