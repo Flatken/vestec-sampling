@@ -79,6 +79,10 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
   vtkDataArray *inScalars = this->GetInputArrayToProcess(0, inputVector);
   input->GetPointData()->SetActiveVectors(inScalars->GetName());
 
+  //Get number of points from each MPI process
+  //calculate local start index
+  //calculate total number of vertices
+
   //Compute critical points
   double singularity[3] = {0.00, 0.00, 0.00};  
 
@@ -127,7 +131,7 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 {
 	
 	//Configure openmp
-	numThreads = std::thread::hardware_concurrency() * 4; //!< Number of OpenMP threads
+	numThreads = std::thread::hardware_concurrency() * 3; //!< Number of OpenMP threads
 	// numThreads = 1; //!< Number of OpenMP threads
 	omp_set_num_threads(numThreads);
 	std::cout<<"number of threads: "<<numThreads<<std::endl;
@@ -138,7 +142,7 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 	singularity[2] = currentSingularity[2];
 
 	vtkIdType numPoints = input->GetNumberOfPoints();
-	ZERO_ID = numPoints + 1;
+	ZERO_ID = 1000000000 + 1;
 
 	//Allocate memory
 	vecPointCoordinates.resize(numPoints);
@@ -160,7 +164,10 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 		vectors->GetTuple(i,&vector[i * 3]);
 		input->GetPoint(i, &position[i * 3]);		
 		
-		Perturbate(&vector[i * 3], i);
+		vtkIdType globalID = GlobalUniqueID(&position[i * 3]);
+		//mapGlobalMapping[i] = globalID;
+		//mapLocalMapping[globalID] = i;
+		Perturbate(&vector[i * 3], globalID);
 
 		vecVectors[i] = &vector[i * 3];
 		vecPointCoordinates[i] = &position[i * 3];
@@ -270,6 +277,12 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 	std::cout << "[CriticalPointExtractor::identify_critical_points] Checking " << vecCellIds.size() << " simplices for critical points " << std::endl;
 }
 
+vtkIdType CriticalPointExtractor::GlobalUniqueID(double* pos)
+{
+	//Function to calculate global unique id
+	return (1000000*pos[0] + 10000000*pos[1] + 100000000*pos[3]);
+}
+
 void CriticalPointExtractor::Perturbate(double* values, vtkIdType id) {
 	// perturbation function f(e,i,j) = eps^2^i*delta-j
 	// eps ?? --> constant?
@@ -289,6 +302,7 @@ void CriticalPointExtractor::Perturbate(double* values, vtkIdType id) {
 //----------------------------------------------------------------------------
 void CriticalPointExtractor::ComputeCriticalCells(vtkSmartPointer<vtkDataSet> output) 
 {
+
 	vtkSmartPointer<vtkPolyData> outputData = vtkPolyData::SafeDownCast(output);
 
 	vtkIdType cells_num = vecCellIds.size();
@@ -372,47 +386,30 @@ void CriticalPointExtractor::CleanDuplicates(vtkSmartPointer<vtkPolyData> output
 
 	vtkSmartPointer<vtkIdList> sharedCells = vtkSmartPointer<vtkIdList>::New();
 
+	vtkSmartPointer<vtkCleanPolyData> cleanerPre = vtkSmartPointer<vtkCleanPolyData>::New();
+	cleanerPre->PointMergingOn();
+	cleanerPre->SetInputData(output);
+	cleanerPre->Update();
+	output->ShallowCopy(cleanerPre->GetOutput());		
+
 	for (vtkIdType i = 0; i < output->GetNumberOfPoints(); i++) {
 		output->GetPointCells(i,sharedCells);
 
 		if(sharedCells->GetNumberOfIds() == 1)
 			break;
 		
-		//Ok we have mutiple cells for that vertex! Do they share a facet
-		if(sharedCells->GetNumberOfIds() == 2){
-			output->DeleteCell(sharedCells->GetId(1));
-		}
-		else if(sharedCells->GetNumberOfIds() == 3)
-		{
-			output->DeleteCell(sharedCells->GetId(1));
-			output->DeleteCell(sharedCells->GetId(2));
-		}
-		else if(sharedCells->GetNumberOfIds() == 4)
-		{
-			output->DeleteCell(sharedCells->GetId(1));
-			output->DeleteCell(sharedCells->GetId(2));
-			output->DeleteCell(sharedCells->GetId(3));
-		}
-		else if(sharedCells->GetNumberOfIds() == 5)
-		{
-			output->DeleteCell(sharedCells->GetId(1));
-			output->DeleteCell(sharedCells->GetId(2));
-			output->DeleteCell(sharedCells->GetId(3));
-			output->DeleteCell(sharedCells->GetId(4));
-		}
-		else
-		{
-			std::cout << "Sharing vertex between more than five cells" << sharedCells->GetNumberOfIds() << std::endl;
-		}
-				
+		for (vtkIdType i = 1; i < sharedCells->GetNumberOfIds(); i++) 
+			output->DeleteCell(sharedCells->GetId(i));		
 	}
 	output->RemoveDeletedCells();	
 
-	vtkSmartPointer<vtkCleanPolyData> cleaner = vtkSmartPointer<vtkCleanPolyData>::New();
-	cleaner->PointMergingOff();
-	cleaner->SetInputData(output);
-	cleaner->Update();
-	output->ShallowCopy(cleaner->GetOutput());		
+	vtkSmartPointer<vtkCleanPolyData> cleanerPost = vtkSmartPointer<vtkCleanPolyData>::New();
+	cleanerPost->PointMergingOff();
+	cleanerPost->SetInputData(output);
+	cleanerPost->Update();
+	output->ShallowCopy(cleanerPost->GetOutput());		
+
+	
 }
 
 CriticalPointExtractor::CriticalPointType CriticalPointExtractor::PointInCell(/*const std::vector<vtkIdType> &ids*/ const vtkIdType* ids, DynamicMatrix &vecMatrix) {
