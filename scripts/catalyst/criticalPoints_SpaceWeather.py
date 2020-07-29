@@ -70,15 +70,15 @@ def CreateCoProcessor():
 
 	   # Generate seeds around critical points
       vestecSeeding = VestecSeedingAlgorithm(Input=vestecCriticalPointExtractionAlgorithm1)
-      vestecSeeding.SeedingRadius = 10.0
-      vestecSeeding.NumberOfSeeds = 5
+      vestecSeeding.SeedingRadius = 7.0
+      vestecSeeding.NumberOfSeeds = 15
       vestecSeeding.RandomDistributionMode = 'Uniform distribution'
       vestecSeeding.Array = ['POINTS', 'p']
 
       # Trace particles
       vestecSamplingAlgorithm = VestecSamplingAlgorithm(Grid=grid_,Seeds=vestecSeeding)
       vestecSamplingAlgorithm.Vectors = ['POINTS', 'B']
-      vestecSamplingAlgorithm.IntegrationDuration = 240
+      vestecSamplingAlgorithm.IntegrationDuration = 320
       vestecSamplingAlgorithm.StepSize = 40
       
       # ----------------------------------------------------------------
@@ -87,8 +87,8 @@ def CreateCoProcessor():
       # ----------------------------------------------------------------
 	  
       # Now any catalyst writers
-      xMLPPolyDataWriter1 = servermanager.writers.XMLPPolyDataWriter(Input=vestecSamplingAlgorithm)
-      coprocessor.RegisterWriter(xMLPPolyDataWriter1, filename='results/VestecCriticalPointExtractionAlgorithm_%t.pvtp', freq=1, paddingamount=0)
+      writer = servermanager.writers.XMLPUnstructuredGridWriter(Input=vestecCriticalPointExtractionAlgorithm1)
+      coprocessor.RegisterWriter(writer, filename='spaceWeather/VestecCriticalPointExtractionAlgorithm_%t.pvtu', freq=1, paddingamount=0)
     return Pipeline()
 
   class CoProcessor(coprocessing.CoProcessor):

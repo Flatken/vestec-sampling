@@ -33,14 +33,12 @@ class CriticalPointExtractor {
     /**
      * Store vector and points in internal data structure 
      */
-    CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input, double* currentSingularity);
+    CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input, double* currentSingularity, bool pertubate = true);
 
     /**
      * Identify the critical cells 
      */
     void ComputeCriticalCells(vtkSmartPointer<vtkDataSet> output);
-
-    void CleanDuplicates(vtkSmartPointer<vtkPolyData> output);
 
     enum CriticalPointType { REGULAR=0, SADDLE=-1, SINGULARITY=1 };
     struct CriticalPoint {
@@ -104,6 +102,7 @@ private:
     int iExchangeIndex; //!< The row id of the matrix to exchange with the singularity    
     std::vector<double*> vecPointCoordinates; //!< Store point coordinates
     std::vector<double*> vecVectors; //!< Store vector field
+    std::vector<double*> vecPerturbation; //!< Store vector field perturbation
     std::vector<vtkIdType*> vecCellIds;  //!< The point ids for each cell
     std::map<vtkIdType, vtkIdType> mapGlobalMapping;
     std::map<vtkIdType, vtkIdType> mapLocalMapping;
@@ -111,7 +110,7 @@ private:
     double singularity[3]; //!< The singularity to identify
     int numThreads; //!< Number of OpenMP threads
     double eps = 1 / std::pow(10,14);
-	  double delta = 5; // >=n
+	  double delta = 4; // >=n
 };
 
 

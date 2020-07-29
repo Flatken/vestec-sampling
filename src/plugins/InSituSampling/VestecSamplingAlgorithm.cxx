@@ -17,6 +17,7 @@
 #include <vtkFloatArray.h>
 #include <vtkThresholdPoints.h>
 #include <vtkAlgorithmOutput.h>
+#include <vtkProbeFilter.h>
 #include <sstream>
 
 

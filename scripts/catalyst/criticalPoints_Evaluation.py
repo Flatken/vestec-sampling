@@ -68,7 +68,7 @@ def CreateCoProcessor():
       vestecCriticalPointExtractionAlgorithm1 = VestecCriticalPointExtractionAlgorithm(Input=grid_)
       vestecCriticalPointExtractionAlgorithm1.Array = ['POINTS', 'Vec'] # for evaluation datasets
 
-	  # Generate seeds around critical points
+	    # Generate seeds around critical points
       vestecSeeding = VestecSeedingAlgorithm(Input=vestecCriticalPointExtractionAlgorithm1)
       vestecSeeding.SeedingRadius = 10.0
       vestecSeeding.NumberOfSeeds = 5
@@ -89,8 +89,8 @@ def CreateCoProcessor():
       # ----------------------------------------------------------------
 	  
       # Now any catalyst writers
-      xMLPPolyDataWriter1 = servermanager.writers.XMLPPolyDataWriter(Input=vestecSamplingAlgorithm)
-      coprocessor.RegisterWriter(xMLPPolyDataWriter1, filename='results/VestecCriticalPointExtractionAlgorithm_%t.pvtp', freq=1, paddingamount=0)
+      writer = servermanager.writers.XMLPUnstructuredGridWriter(Input=vestecCriticalPointExtractionAlgorithm1)
+      coprocessor.RegisterWriter(writer, filename='results/VestecCriticalPointExtractionAlgorithm_%t.pvtu', freq=1, paddingamount=0)
     return Pipeline()
 
   class CoProcessor(coprocessing.CoProcessor):

@@ -79,8 +79,8 @@ def CreateCoProcessor():
       # ----------------------------------------------------------------
 	  
       # Now any catalyst writers
-      xMLPPolyDataWriter1 = servermanager.writers.XMLPPolyDataWriter(Input=vestecCriticalPointExtractionAlgorithm1)
-      coprocessor.RegisterWriter(xMLPPolyDataWriter1, filename='results/VestecCriticalPointExtractionAlgorithm_%t.pvtp', freq=1, paddingamount=0)
+      writer = servermanager.writers.XMLPUnstructuredGridWriter(Input=vestecCriticalPointExtractionAlgorithm1)
+      coprocessor.RegisterWriter(writer, filename='Lorenz/VestecCriticalPointExtractionAlgorithm_%t.pvtu', freq=1, paddingamount=0)
     return Pipeline()
 
   class CoProcessor(coprocessing.CoProcessor):
