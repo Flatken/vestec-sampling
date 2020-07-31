@@ -53,14 +53,12 @@ fi
 # configure, compile & install ---------------------------------------------------------------------
 export Paraview_DIR=$EXTERNALS_INSTALL_DIR/lib/cmake/paraview-5.6
 export Eigen_DIR=$EXTERNALS_INSTALL_DIR
-export CNL_DIR=$EXTERNALS_INSTALL_DIR
 
 cd "$BUILD_DIR"
 cmake "${CMAKE_FLAGS[@]}" -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" \
       -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DCOSMOSCOUT_EXTERNALS_DIR="$EXTERNALS_INSTALL_DIR" \
       -DParaView_DIR=$Paraview_DIR \
       -DEigen3_DIR=$Eigen_DIR \
-	    -DCnl_DIR=$CNL_DIR \
       -DUSE_CATALYST=ON \
       -DCMAKE_EXPORT_COMPILE_COMMANDS=On "$CMAKE_DIR"
 
