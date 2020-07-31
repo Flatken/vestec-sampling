@@ -50,6 +50,14 @@ class CriticalPointExtractor {
         type = t;
       }
     };
+
+    ~CriticalPointExtractor() {      
+      delete position;
+	    delete vector;
+	    delete perturbation;
+      for(auto c : vecCellIds) 
+        delete c;
+    }
     
   private:
     /**
@@ -93,19 +101,22 @@ class CriticalPointExtractor {
      */
     void Perturbate(double* values, vtkIdType id);
 
-    /**
-     * Calculate global unique id 
-     */
-    vtkIdType GlobalUniqueID(double* pos);
+    // /**
+    //  * Calculate global unique id 
+    //  */
+    // vtkIdType GlobalUniqueID(double* pos);
 private:
     vtkIdType ZERO_ID;  //!< Vertex ID of the singularity: always number of vertices + 1 
     int iExchangeIndex; //!< The row id of the matrix to exchange with the singularity    
     std::vector<double*> vecPointCoordinates; //!< Store point coordinates
     std::vector<double*> vecVectors; //!< Store vector field
     std::vector<double*> vecPerturbation; //!< Store vector field perturbation
+    double* position;
+	  double* vector;
+	  double* perturbation;
     std::vector<vtkIdType*> vecCellIds;  //!< The point ids for each cell
-    std::map<vtkIdType, vtkIdType> mapGlobalMapping;
-    std::map<vtkIdType, vtkIdType> mapLocalMapping;
+    // std::map<vtkIdType, vtkIdType> mapGlobalMapping;
+    // std::map<vtkIdType, vtkIdType> mapLocalMapping;
     int numCellIds;
     double singularity[3]; //!< The singularity to identify
     int numThreads; //!< Number of OpenMP threads

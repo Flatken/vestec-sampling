@@ -87,7 +87,7 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
   double singularity[3] = {0.000, 0.000, 0.000};  
 
   auto start = std::chrono::steady_clock::now();
-  CriticalPointExtractor cp_extractor(input, singularity, true);
+  CriticalPointExtractor cp_extractor(input, singularity); //perturbation is ON by default
 
   auto end = std::chrono::steady_clock::now();  
    std::cout << "[CriticalPointExtractor::Constructor] Elapsed time in milliseconds : "
@@ -133,7 +133,7 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
   if(output->GetNumberOfCells() > 0)
   {
 	double singularitySecond[3] = {0.000, 0.000, 0.000};  
-  	CriticalPointExtractor cp_cleanup(output, singularitySecond, true);
+  	CriticalPointExtractor cp_cleanup(output, singularitySecond); //perturbation is ON by default
   	cp_cleanup.ComputeCriticalCells(output);
   }
   end = std::chrono::steady_clock::now();
@@ -146,21 +146,21 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
   test->SetFileName("cleaned.vtk");
   test->Update();
 
-  if(output->GetNumberOfCells() > 0)
-  {
-	double singularitySecond[3] = {0.000, 0.000, 0.000};  
-  	CriticalPointExtractor cp_cleanup(output, singularitySecond, true);
-  	cp_cleanup.ComputeCriticalCells(output);
-  }
-  end = std::chrono::steady_clock::now();
-  std::cout << "[cleanup] Elapsed time in milliseconds : "
-  << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
-  << " ms" << std::endl;
-  std::cout << "[cleanup] Stable critical cells: " << output->GetNumberOfCells() << std::endl;
+//   if(output->GetNumberOfCells() > 0)
+//   {
+// 	double singularitySecond[3] = {0.000, 0.000, 0.000};  
+//   	CriticalPointExtractor cp_cleanup(output, singularitySecond, true);
+//   	cp_cleanup.ComputeCriticalCells(output);
+//   }
+//   end = std::chrono::steady_clock::now();
+//   std::cout << "[cleanup] Elapsed time in milliseconds : "
+//   << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
+//   << " ms" << std::endl;
+//   std::cout << "[cleanup] Stable critical cells: " << output->GetNumberOfCells() << std::endl;
 
-  test->SetInputData(output);
-  test->SetFileName("cleaned2.vtk");
-  test->Update();
+//   test->SetInputData(output);
+//   test->SetFileName("cleaned2.vtk");
+//   test->Update();
   return 1;
 }
 
@@ -178,7 +178,8 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 	singularity[2] = currentSingularity[2];
 
 	vtkIdType numPoints = input->GetNumberOfPoints();
-	ZERO_ID = 1000000000 + 1;
+	// ZERO_ID = 1000000000 + 1;
+	ZERO_ID = numPoints + 1;
 
 	//Allocate memory
 	vecPointCoordinates.resize(numPoints);
@@ -191,9 +192,9 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 	if(pertubate)
 		Perturbate(singularity, ZERO_ID);
 
-	double* position = new double[numPoints*3];
-	double* vector = new double[numPoints*3];
-	double* perturbation = new double[numPoints*3];
+	position = new double[numPoints*3];
+	vector = new double[numPoints*3];
+	perturbation = new double[numPoints*3];
 
 	#pragma omp parallel for
 	for(vtkIdType i=0; i < numPoints; i++) 
@@ -222,7 +223,7 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 	if (yDim == 0.0) iExchangeIndex = 1; 	//2D dataset with xz
 	if (zDim == 0.0) iExchangeIndex = 2; 	//2D dataset with xy
 
-	//std::cout << "[CriticalPointExtractor::identify_critical_points] Checking " << input->GetNumberOfCells() << " cells for critical points " << std::endl;
+	std::cout << "[CriticalPointExtractor::identify_critical_points] Checking " << input->GetNumberOfCells() << " cells for critical points " << std::endl;
 
 	//Vector of critical cell ids
 	std::vector<CriticalPoint> vecCriticalCellIDs;
@@ -298,14 +299,23 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 		}	
 		
 	}
+
+	std::cout << "[CriticalPointExtractor::identify_critical_points] Extracted " << vecCellIds.size() << " cells" << std::endl;
 }
 
-vtkIdType CriticalPointExtractor::GlobalUniqueID(double* pos)
-{
-	//Function to calculate global unique id
-	std::hash<double> double_hash;
-	return (1000000*pos[0] + 10000000*pos[1] + 100000000*pos[2]);
-}
+// vtkIdType CriticalPointExtractor::GlobalUniqueID(double* pos)
+// {
+// 	//Function to calculate global unique id
+// 	// std::hash<double> double_hash;
+// 	// return (1000000*pos[0] + 10000000*pos[1] + 100000000*pos[2]);
+// 	vtkIdType xD = static_cast<vtkIdType>(pos[0]);
+// 	vtkIdType yD = static_cast<vtkIdType>(pos[1])<<8;
+// 	vtkIdType zD = static_cast<vtkIdType>(pos[2])<<16;
+// 	// std::cout<<"orig-cast: "<<xD<<" "<<yD<<" "<<zD<<std::endl;
+// 	// GlobalIdType hashed = pos[0] + pos[1]*xR + pos[2]*xR*yR;
+// 	vtkIdType hashed = xD + yD + zD + xD*yD + 2*yD*zD + 4*xD*zD + xD*yD*zD;
+// 	return hashed;
+// }
 
 void CriticalPointExtractor::Perturbate(double* values, vtkIdType id) {
 	// perturbation function f(e,i,j) = eps^2^i*delta-j
@@ -409,10 +419,10 @@ void CriticalPointExtractor::ComputeCriticalCells(vtkSmartPointer<vtkDataSet> ou
 	outputData->GetPointData()->AddArray(vectorField);
 	outputData->GetPointData()->SetVectors(vectorField);
 
-	vtkSmartPointer < vtkCleanUnstructuredGrid > clean = vtkSmartPointer < vtkCleanUnstructuredGrid >::New(); 
-    clean->SetInputData(outputData);
-    clean->Update();
-    outputData->ShallowCopy(clean->GetOutput());
+	// vtkSmartPointer < vtkCleanUnstructuredGrid > clean = vtkSmartPointer < vtkCleanUnstructuredGrid >::New(); 
+    // clean->SetInputData(outputData);
+    // clean->Update();
+    // outputData->ShallowCopy(clean->GetOutput());
 }
 
 CriticalPointExtractor::CriticalPointType CriticalPointExtractor::PointInCell(/*const std::vector<vtkIdType> &ids*/ const vtkIdType* ids, DynamicMatrix &vecMatrix) {
