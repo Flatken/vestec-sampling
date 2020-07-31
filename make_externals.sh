@@ -58,6 +58,29 @@ cmake -G "Eclipse CDT4 - Unix Makefiles" -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" \
       -DCMAKE_BUILD_TYPE=Release "$EXTERNALS_DIR/ttk"
 cmake --build . --target install --parallel 12
 
+# EIGEN -----------------------------------------------------------------------------------------
+echo ""
+echo "Building and installing Eigen ..."
+
+cmake -E make_directory "$BUILD_DIR/eigen" && cd "$BUILD_DIR/eigen"
+cmake -G "Eclipse CDT4 - Unix Makefiles" -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" \
+      -DCMAKE_BUILD_TYPE=Release "$EXTERNALS_DIR%/eigen" \
+cmake --build . --target install --parallel 12
+
+# CNL -----------------------------------------------------------------------------------------
+echo ""
+echo "Building and installing CNL ..."
+
+cmake -E make_directory "$BUILD_DIR/cnl" && cd "$BUILD_DIR/cnl"
+cmake -G "Eclipse CDT4 - Unix Makefiles" -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" \
+      -DCMAKE_BUILD_TYPE=Release "$EXTERNALS_DIR%/cnl" \
+cmake --build . --target install --parallel 12
+
+echo ""
+
+pause
+cd "$CURRENT_DIR"
+
 ## --------------------------------------------------------------------------------------------------
 echo "Finished successfully."
 #
