@@ -71,6 +71,7 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
     vtkInformationVector **inputVector,
     vtkInformationVector* outputVector )
 {
+  
   // get the input and output
   vtkDataSet* input = vtkDataSet::GetData(inputVector[0], 0);
   vtkUnstructuredGrid* output = vtkUnstructuredGrid::GetData(outputVector, 0);
@@ -85,6 +86,9 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
 
   //Compute critical points
   double singularity[3] = {0.000, 0.000, 0.000};  
+
+  vtkSmartPointer<vtkMultiProcessController> controller = vtkMultiProcessController::GetGlobalController();
+  controller->Barrier();
 
   auto start = std::chrono::steady_clock::now();
   CriticalPointExtractor cp_extractor(input, singularity); //perturbation is ON by default
@@ -110,7 +114,13 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
   reducedData->SetInputData(output);
   reducedData->Update();
   vtkIdType numPointsBefore = reducedData->GetUnstructuredGridOutput()->GetNumberOfPoints();
+
+   end = std::chrono::steady_clock::now();
+  std::cout << "[reduceDataSet] Elapsed time in milliseconds : "
+	  << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
+	  << " ms" << std::endl;
   
+  start = std::chrono::steady_clock::now();
   vtkSmartPointer < vtkCleanUnstructuredGrid > clean = vtkSmartPointer < vtkCleanUnstructuredGrid >::New(); 
   clean->SetInputData(reducedData->GetOutput());
   clean->Update();
@@ -118,33 +128,33 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
   vtkIdType numPointsAfter = clean->GetOutput()->GetNumberOfPoints();
 
   end = std::chrono::steady_clock::now();
-  std::cout << "[reduceDataSet] Elapsed time in milliseconds : "
+  std::cout << "[cleanupDataSet] Elapsed time in milliseconds : "
 	  << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
 	  << " ms" << std::endl;
-  std::cout << "[reduceDataSet] critical cells: " << output->GetNumberOfCells() << std::endl;
-  std::cout << "[reduceDataSet] points removed: " << numPointsBefore - numPointsAfter << std::endl;
+  std::cout << "[cleanupDataSet] critical cells: " << output->GetNumberOfCells() << std::endl;
+  std::cout << "[cleanupDataSet] points removed: " << numPointsBefore - numPointsAfter << std::endl;
 
-  vtkDataSetWriter * test = vtkDataSetWriter::New();
-  test->SetInputData(output);
-  test->SetFileName("aggregate.vtk");
-  test->Update();
+//   vtkDataSetWriter * test = vtkDataSetWriter::New();
+//   test->SetInputData(output);
+//   test->SetFileName("aggregate.vtk");
+//   test->Update();
 
-  start = std::chrono::steady_clock::now();
-  if(output->GetNumberOfCells() > 0)
-  {
-	double singularitySecond[3] = {0.000, 0.000, 0.000};  
-  	CriticalPointExtractor cp_cleanup(output, singularitySecond); //perturbation is ON by default
-  	cp_cleanup.ComputeCriticalCells(output);
-  }
-  end = std::chrono::steady_clock::now();
-  std::cout << "[cleanup] Elapsed time in milliseconds : "
-  << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
-  << " ms" << std::endl;
-  std::cout << "[cleanup] Stable critical cells: " << output->GetNumberOfCells() << std::endl;
+//   start = std::chrono::steady_clock::now();
+//   if(output->GetNumberOfCells() > 0)
+//   {
+// 	double singularitySecond[3] = {0.000, 0.000, 0.000};  
+//   	CriticalPointExtractor cp_cleanup(output, singularitySecond); //perturbation is ON by default
+//   	cp_cleanup.ComputeCriticalCells(output);
+//   }
+//   end = std::chrono::steady_clock::now();
+//   std::cout << "[cleanup] Elapsed time in milliseconds : "
+//   << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
+//   << " ms" << std::endl;
+//   std::cout << "[cleanup] Stable critical cells: " << output->GetNumberOfCells() << std::endl;
 
-  test->SetInputData(output);
-  test->SetFileName("cleaned.vtk");
-  test->Update();
+//   test->SetInputData(output);
+//   test->SetFileName("cleaned.vtk");
+//   test->Update();
 
 //   if(output->GetNumberOfCells() > 0)
 //   {
