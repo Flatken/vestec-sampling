@@ -179,8 +179,9 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 											   bool pertubate)
 {
 	//Configure openmp
-	numThreads = std::thread::hardware_concurrency() * 4; //!< Number of OpenMP threads
+	numThreads = omp_get_max_threads(); //!< Number of OpenMP threads
 	omp_set_num_threads(numThreads);
+	std::cout<<"NUM THREADS: "<<numThreads<<std::endl;
 	
 	//Store singularity
 	singularity[0] = currentSingularity[0];
