@@ -71,6 +71,7 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
     vtkInformationVector **inputVector,
     vtkInformationVector* outputVector )
 {
+	 std::cout << "[CriticalPointExtractor::Constructor] RequestData" << std::endl;
   // get the input and output
   vtkDataSet* input = vtkDataSet::GetData(inputVector[0], 0);
   vtkUnstructuredGrid* output = vtkUnstructuredGrid::GetData(outputVector, 0);
@@ -79,6 +80,7 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
   vtkDataArray *inScalars = this->GetInputArrayToProcess(0, inputVector);
   input->GetPointData()->SetActiveVectors(inScalars->GetName());
 
+  std::cout << "[CriticalPointExtractor::Constructor] RequestData 2" << std::endl;
   //Get number of points from each MPI process
   //calculate local start index
   //calculate total number of vertices
@@ -124,11 +126,6 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
   std::cout << "[reduceDataSet] critical cells: " << output->GetNumberOfCells() << std::endl;
   std::cout << "[reduceDataSet] points removed: " << numPointsBefore - numPointsAfter << std::endl;
 
-  vtkDataSetWriter * test = vtkDataSetWriter::New();
-  test->SetInputData(output);
-  test->SetFileName("aggregate.vtk");
-  test->Update();
-
   start = std::chrono::steady_clock::now();
   if(output->GetNumberOfCells() > 0)
   {
@@ -142,25 +139,6 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
   << " ms" << std::endl;
   std::cout << "[cleanup] Stable critical cells: " << output->GetNumberOfCells() << std::endl;
 
-  test->SetInputData(output);
-  test->SetFileName("cleaned.vtk");
-  test->Update();
-
-//   if(output->GetNumberOfCells() > 0)
-//   {
-// 	double singularitySecond[3] = {0.000, 0.000, 0.000};  
-//   	CriticalPointExtractor cp_cleanup(output, singularitySecond, true);
-//   	cp_cleanup.ComputeCriticalCells(output);
-//   }
-//   end = std::chrono::steady_clock::now();
-//   std::cout << "[cleanup] Elapsed time in milliseconds : "
-//   << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
-//   << " ms" << std::endl;
-//   std::cout << "[cleanup] Stable critical cells: " << output->GetNumberOfCells() << std::endl;
-
-//   test->SetInputData(output);
-//   test->SetFileName("cleaned2.vtk");
-//   test->Update();
   return 1;
 }
 
@@ -210,7 +188,7 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 		vecPerturbation[i] = &perturbation[i * 3];
 		vecPointCoordinates[i] = &position[i * 3];
 	}
-
+std::cout << "[CriticalPointExtractor] 2 " << std::endl;
 	//Check for dataset dimension and configure the index in the matrix which will be set to 1
 	double bounds[6];
 	input->GetBounds(bounds);
@@ -260,7 +238,7 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 		vecCellIds.resize(numCells);
 		numCellIds=4;
 	}
-
+std::cout << "[CriticalPointExtractor] 33 " << std::endl;
 	#pragma omp parallel for
 	for (vtkIdType i = 0; i < numCells; i++) {
 		//Local variables per thread
@@ -299,7 +277,6 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 		}	
 		
 	}
-
 	std::cout << "[CriticalPointExtractor::identify_critical_points] Extracted " << vecCellIds.size() << " cells" << std::endl;
 }
 
