@@ -36,7 +36,9 @@ class CriticalPointExtractor {
     /**
      * Identify the critical cells 
      */
-    void ComputeCriticalCells(vtkSmartPointer<vtkDataSet> output);
+    void ComputeCriticalCells();
+
+    void writeCriticalCells(vtkSmartPointer<vtkDataSet> output);
 
     enum CriticalPointType { REGULAR=0, SADDLE=-1, SINGULARITY=1 };
     struct CriticalPoint {
@@ -119,7 +121,8 @@ private:
     double singularity[3]; //!< The singularity to identify
     int numThreads; //!< Number of OpenMP threads
     double eps = 1 / std::pow(10,14);
-	  double delta = 4; // >=n
+	  double delta = 4; // >=n    
+	  std::vector<CriticalPoint> vecCriticalCellIDs; //!< Vector of critical cell ids
 };
 
 

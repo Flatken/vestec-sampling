@@ -101,12 +101,14 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
  	  << " ms" << std::endl;
 
   start = std::chrono::steady_clock::now();
-  cp_extractor.ComputeCriticalCells(output);
+  cp_extractor.ComputeCriticalCells();
   end = std::chrono::steady_clock::now();
   std::cout << "[identify_critical_points] Elapsed time in milliseconds : "
 	  << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
 	  << " ms" << std::endl;
   std::cout << "[identify_critical_points] Unstable critical cells: " << output->GetNumberOfCells() << std::endl;
+
+  cp_extractor.writeCriticalCells(output);
 
   // Local cleanup done by every worker
   start = std::chrono::steady_clock::now();
@@ -311,15 +313,12 @@ void CriticalPointExtractor::Perturbate(double* values, vtkIdType id) {
 }
 
 //----------------------------------------------------------------------------
-void CriticalPointExtractor::ComputeCriticalCells(vtkSmartPointer<vtkDataSet> output) 
+void CriticalPointExtractor::ComputeCriticalCells() 
 {
-
-	vtkSmartPointer<vtkUnstructuredGrid> outputData = vtkUnstructuredGrid::SafeDownCast(output);
-
 	vtkIdType cells_num = vecCellIds.size();
 	
 	//Vector of critical cell ids
-	std::vector<CriticalPoint> vecCriticalCellIDs;
+	// std::vector<CriticalPoint> vecCriticalCellIDs;
 
 	int matrixSize = 3;
 	if(iExchangeIndex == 3)
@@ -354,7 +353,12 @@ void CriticalPointExtractor::ComputeCriticalCells(vtkSmartPointer<vtkDataSet> ou
 			}
 		}
 	}
-	
+}
+
+void CriticalPointExtractor::writeCriticalCells(vtkSmartPointer<vtkDataSet> output) 
+{
+	vtkSmartPointer<vtkUnstructuredGrid> outputData = vtkUnstructuredGrid::SafeDownCast(output);
+
 	vtkSmartPointer<vtkPoints> pointArray = vtkSmartPointer<vtkPoints>::New();
 	vtkSmartPointer<vtkCellArray> cellArray = vtkSmartPointer<vtkCellArray>::New();
 	vtkSmartPointer<vtkIntArray> singularityType = vtkSmartPointer<vtkIntArray>::New();
