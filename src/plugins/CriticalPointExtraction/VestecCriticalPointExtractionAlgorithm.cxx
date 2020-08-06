@@ -32,6 +32,8 @@
 #include <random>
 #include <array>
 
+#include <Eigen/Core>
+
 #define M_PI 3.14159
 
 
@@ -71,7 +73,6 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
     vtkInformationVector **inputVector,
     vtkInformationVector* outputVector )
 {
-	 std::cout << "[CriticalPointExtractor::Constructor] RequestData" << std::endl;
   // get the input and output
   vtkDataSet* input = vtkDataSet::GetData(inputVector[0], 0);
   vtkUnstructuredGrid* output = vtkUnstructuredGrid::GetData(outputVector, 0);
@@ -87,6 +88,9 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
 
   //Compute critical points
   double singularity[3] = {0.000, 0.000, 0.000};  
+
+  vtkSmartPointer<vtkMultiProcessController> controller = vtkMultiProcessController::GetGlobalController();
+  controller->Barrier();
 
   auto start = std::chrono::steady_clock::now();
   CriticalPointExtractor cp_extractor(input, singularity); //perturbation is ON by default
@@ -112,7 +116,13 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
   reducedData->SetInputData(output);
   reducedData->Update();
   vtkIdType numPointsBefore = reducedData->GetUnstructuredGridOutput()->GetNumberOfPoints();
+
+   end = std::chrono::steady_clock::now();
+  std::cout << "[reduceDataSet] Elapsed time in milliseconds : "
+	  << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
+	  << " ms" << std::endl;
   
+  start = std::chrono::steady_clock::now();
   vtkSmartPointer < vtkCleanUnstructuredGrid > clean = vtkSmartPointer < vtkCleanUnstructuredGrid >::New(); 
   clean->SetInputData(reducedData->GetOutput());
   clean->Update();
@@ -120,25 +130,11 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
   vtkIdType numPointsAfter = clean->GetOutput()->GetNumberOfPoints();
 
   end = std::chrono::steady_clock::now();
-  std::cout << "[reduceDataSet] Elapsed time in milliseconds : "
+  std::cout << "[cleanupDataSet] Elapsed time in milliseconds : "
 	  << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
 	  << " ms" << std::endl;
-  std::cout << "[reduceDataSet] critical cells: " << output->GetNumberOfCells() << std::endl;
-  std::cout << "[reduceDataSet] points removed: " << numPointsBefore - numPointsAfter << std::endl;
-
-  start = std::chrono::steady_clock::now();
-  if(output->GetNumberOfCells() > 0)
-  {
-	double singularitySecond[3] = {0.000, 0.000, 0.000};  
-  	CriticalPointExtractor cp_cleanup(output, singularitySecond); //perturbation is ON by default
-  	cp_cleanup.ComputeCriticalCells(output);
-  }
-  end = std::chrono::steady_clock::now();
-  std::cout << "[cleanup] Elapsed time in milliseconds : "
-  << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
-  << " ms" << std::endl;
-  std::cout << "[cleanup] Stable critical cells: " << output->GetNumberOfCells() << std::endl;
-
+  std::cout << "[cleanupDataSet] critical cells: " << output->GetNumberOfCells() << std::endl;
+  std::cout << "[cleanupDataSet] points removed: " << numPointsBefore - numPointsAfter << std::endl;
   return 1;
 }
 
@@ -147,8 +143,10 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 											   bool pertubate)
 {
 	//Configure openmp
-	numThreads = std::thread::hardware_concurrency() * 4; //!< Number of OpenMP threads
+	Eigen::initParallel();
+	numThreads = omp_get_max_threads(); //!< Number of OpenMP threads
 	omp_set_num_threads(numThreads);
+	std::cout << "[CriticalPointExtractor] Number of threads: " << numThreads << std::endl;
 	
 	//Store singularity
 	singularity[0] = currentSingularity[0];
@@ -156,7 +154,6 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 	singularity[2] = currentSingularity[2];
 
 	vtkIdType numPoints = input->GetNumberOfPoints();
-	// ZERO_ID = 1000000000 + 1;
 	ZERO_ID = numPoints + 1;
 
 	//Allocate memory
@@ -174,21 +171,6 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 	vector = new double[numPoints*3];
 	perturbation = new double[numPoints*3];
 
-	#pragma omp parallel for
-	for(vtkIdType i=0; i < numPoints; i++) 
-	{
-		vectors->GetTuple(i,&vector[i * 3]);
-		input->GetPoint(i, &position[i * 3]);		
-		
-		vtkIdType globalID = i;//GlobalUniqueID(&position[i * 3]);
-		if(pertubate)
-			Perturbate(&perturbation[i * 3], globalID);
-
-		vecVectors[i] = &vector[i * 3];
-		vecPerturbation[i] = &perturbation[i * 3];
-		vecPointCoordinates[i] = &position[i * 3];
-	}
-std::cout << "[CriticalPointExtractor] 2 " << std::endl;
 	//Check for dataset dimension and configure the index in the matrix which will be set to 1
 	double bounds[6];
 	input->GetBounds(bounds);
@@ -238,44 +220,62 @@ std::cout << "[CriticalPointExtractor] 2 " << std::endl;
 		vecCellIds.resize(numCells);
 		numCellIds=4;
 	}
-std::cout << "[CriticalPointExtractor] 33 " << std::endl;
-	#pragma omp parallel for
-	for (vtkIdType i = 0; i < numCells; i++) {
-		//Local variables per thread
-		int threadIdx = omp_get_thread_num();//Thread ID
 
-		//get the current cell
-		input->GetCell(i, vecCellPerThread[threadIdx]);
+	#pragma omp parallel
+	{
+		#pragma omp for nowait
+		for(vtkIdType i=0; i < numPoints; i++) 
+		{
+			vectors->GetTuple(i,&vector[i * 3]);
+			input->GetPoint(i, &position[i * 3]);		
+			
+			vtkIdType globalID = i;//GlobalUniqueID(&position[i * 3]);
+			if(pertubate)
+				Perturbate(&perturbation[i * 3], globalID);
 
-		//Get the associated point ids for the cell 
-		vtkSmartPointer<vtkIdList> ids = vecCellPerThread[threadIdx]->GetPointIds();
-	
-		if (VTK_PIXEL == cellType || VTK_QUAD == cellType)
-		{			
-			vecCellIds[i * 2]     = new vtkIdType[3]{ ids->GetId(0) , ids->GetId(1), ids->GetId(2)};
-			vecCellIds[i * 2 + 1] = new vtkIdType[3]{ ids->GetId(1) , ids->GetId(3), ids->GetId(2)};
+			vecVectors[i] = &vector[i * 3];
+			vecPerturbation[i] = &perturbation[i * 3];
+			vecPointCoordinates[i] = &position[i * 3];
 		}
-		else if (VTK_VOXEL == cellType || VTK_HEXAHEDRON == cellType)
-		{
-			vecCellIds[i * 5]     = new vtkIdType[4]{ ids->GetId(0) , ids->GetId(6), ids->GetId(4), ids->GetId(5)};
-			vecCellIds[i * 5 + 1] = new vtkIdType[4]{ ids->GetId(3) , ids->GetId(5), ids->GetId(7), ids->GetId(6)};
-			vecCellIds[i * 5 + 2] = new vtkIdType[4]{ ids->GetId(3) , ids->GetId(1), ids->GetId(5), ids->GetId(0)};
-			vecCellIds[i * 5 + 3] = new vtkIdType[4]{ ids->GetId(0) , ids->GetId(3), ids->GetId(2), ids->GetId(6)};
-			vecCellIds[i * 5 + 4] = new vtkIdType[4]{ ids->GetId(0) , ids->GetId(6), ids->GetId(3), ids->GetId(5)};
-		}
-		else if (VTK_TRIANGLE == cellType)
-		{
-			vecCellIds[i] = new vtkIdType[3]{ ids->GetId(0) , ids->GetId(1), ids->GetId(2)};
-		}
-		else if (VTK_TETRA == cellType)
-		{
-			vecCellIds[i] = new vtkIdType[4]{ ids->GetId(0) , ids->GetId(1), ids->GetId(2), ids->GetId(3)};
-		}
-		else {
-			std::cout << "[CriticalPointExtractor] Error: unknown cell type " << std::endl;
-				continue;
-		}	
+
+		#pragma omp for
+		for (vtkIdType i = 0; i < numCells; i++) {
+			//Local variables per thread
+			int threadIdx = omp_get_thread_num();//Thread ID
+
+			//get the current cell
+			input->GetCell(i, vecCellPerThread[threadIdx]);
+
+			//Get the associated point ids for the cell 
+			vtkSmartPointer<vtkIdList> ids = vecCellPerThread[threadIdx]->GetPointIds();
 		
+			if (VTK_PIXEL == cellType || VTK_QUAD == cellType)
+			{			
+				vecCellIds[i * 2]     = new vtkIdType[3]{ ids->GetId(0) , ids->GetId(1), ids->GetId(2)};
+				vecCellIds[i * 2 + 1] = new vtkIdType[3]{ ids->GetId(1) , ids->GetId(3), ids->GetId(2)};
+			}
+			else if (VTK_VOXEL == cellType || VTK_HEXAHEDRON == cellType)
+			{
+				vecCellIds[i * 5]     = new vtkIdType[4]{ ids->GetId(0) , ids->GetId(6), ids->GetId(4), ids->GetId(5)};
+				vecCellIds[i * 5 + 1] = new vtkIdType[4]{ ids->GetId(3) , ids->GetId(5), ids->GetId(7), ids->GetId(6)};
+				vecCellIds[i * 5 + 2] = new vtkIdType[4]{ ids->GetId(3) , ids->GetId(1), ids->GetId(5), ids->GetId(0)};
+				vecCellIds[i * 5 + 3] = new vtkIdType[4]{ ids->GetId(0) , ids->GetId(3), ids->GetId(2), ids->GetId(6)};
+				vecCellIds[i * 5 + 4] = new vtkIdType[4]{ ids->GetId(0) , ids->GetId(6), ids->GetId(3), ids->GetId(5)};
+			}
+			else if (VTK_TRIANGLE == cellType)
+			{
+				vecCellIds[i] = new vtkIdType[3]{ ids->GetId(0) , ids->GetId(1), ids->GetId(2)};
+			}
+			else if (VTK_TETRA == cellType)
+			{
+				vecCellIds[i] = new vtkIdType[4]{ ids->GetId(0) , ids->GetId(1), ids->GetId(2), ids->GetId(3)};
+			}
+			else {
+				std::cout << "[CriticalPointExtractor] Error: unknown cell type " << std::endl;
+					continue;
+			}	
+			
+		}
 	}
 	std::cout << "[CriticalPointExtractor::identify_critical_points] Extracted " << vecCellIds.size() << " cells" << std::endl;
 }
@@ -395,11 +395,6 @@ void CriticalPointExtractor::ComputeCriticalCells(vtkSmartPointer<vtkDataSet> ou
 	outputData->GetPointData()->AddArray(singularityType);
 	outputData->GetPointData()->AddArray(vectorField);
 	outputData->GetPointData()->SetVectors(vectorField);
-
-	// vtkSmartPointer < vtkCleanUnstructuredGrid > clean = vtkSmartPointer < vtkCleanUnstructuredGrid >::New(); 
-    // clean->SetInputData(outputData);
-    // clean->Update();
-    // outputData->ShallowCopy(clean->GetOutput());
 }
 
 CriticalPointExtractor::CriticalPointType CriticalPointExtractor::PointInCell(/*const std::vector<vtkIdType> &ids*/ const vtkIdType* ids, DynamicMatrix &vecMatrix) {

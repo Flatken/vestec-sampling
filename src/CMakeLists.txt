@@ -4,7 +4,6 @@ find_package(ParaView REQUIRED)
 include("${PARAVIEW_USE_FILE}")
 
 find_package (Eigen3 3.3 REQUIRED NO_MODULE)
-find_package (Cnl REQUIRED)
 find_package(OpenMP)
 
 # Target for the emulator====================================================

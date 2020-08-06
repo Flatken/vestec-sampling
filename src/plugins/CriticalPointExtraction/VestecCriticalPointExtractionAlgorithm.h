@@ -12,8 +12,6 @@
 #include <random>
 
 #include <Eigen/Dense>
-#include <cnl/all.h>
-
 
 //Matrix to compute the determinant
 typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 1, 4, 4> DynamicMatrix;
