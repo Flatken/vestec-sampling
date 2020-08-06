@@ -145,7 +145,7 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 											   bool pertubate)
 {
 	//Configure openmp
-	Eigen::initParallel();
+	// Eigen::initParallel();
 	numThreads = omp_get_max_threads(); //!< Number of OpenMP threads
 	omp_set_num_threads(numThreads);
 	std::cout << "[CriticalPointExtractor] Number of threads: " << numThreads << std::endl;
