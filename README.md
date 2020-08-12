@@ -34,6 +34,10 @@ Update and initialize the git submodules recursivly.
 cd src
 git submodule update --init --recursive 
 ```
+Then, patch Paraview in order make it compatible with TTK.
+```
+./patch_paraview.sh
+```
 
 Build the external dependencies by using the folowing shell script (ParaView and TTK)
 
