@@ -188,11 +188,11 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 	std::cout << "[CriticalPointExtractor::identify_critical_points] Checking " << input->GetNumberOfCells() << " cells for critical points " << std::endl;
 
 	//Vector of critical cell ids
-	std::vector<CriticalPoint> vecCriticalCellIDs;
+	// std::vector<CriticalPoint> vecCriticalCellIDs;
 
 	//Configure for parallel independent processing
     std::vector<vtkSmartPointer<vtkGenericCell>> vecCellPerThread;  //Cell for each thread
-	std::vector<std::vector<vtkIdType>> idsForCell;					//Cell point ids for each thread
+	// std::vector<std::vector<vtkIdType>> idsForCell;					//Cell point ids for each thread
 
 	//Get the cell type once (needed for correct allocation)
 	vtkSmartPointer<vtkGenericCell> cell = vtkSmartPointer<vtkGenericCell>::New();
