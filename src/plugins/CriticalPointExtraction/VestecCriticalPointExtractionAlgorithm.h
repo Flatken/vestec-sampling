@@ -31,7 +31,7 @@ class CriticalPointExtractor {
     /**
      * Store vector and points in internal data structure 
      */
-    CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input, double* currentSingularity, bool pertubate = true);
+    CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input, double* currentSingularity, int mpiRank, bool pertubate = true);
 
     /**
      * Identify the critical cells 

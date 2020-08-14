@@ -73,82 +73,96 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
     vtkInformationVector **inputVector,
     vtkInformationVector* outputVector )
 {
-  // get the input and output
-  vtkDataSet* input = vtkDataSet::GetData(inputVector[0], 0);
-  vtkUnstructuredGrid* output = vtkUnstructuredGrid::GetData(outputVector, 0);
+	// get the input and output
+	vtkDataSet* input = vtkDataSet::GetData(inputVector[0], 0);
+	vtkUnstructuredGrid* output = vtkUnstructuredGrid::GetData(outputVector, 0);
 
-  //Set active array
-  vtkDataArray *inScalars = this->GetInputArrayToProcess(0, inputVector);
-  input->GetPointData()->SetActiveVectors(inScalars->GetName());
+	vtkSmartPointer<vtkMultiProcessController> controller = vtkMultiProcessController::GetGlobalController();
+	int mpiRank = controller->GetLocalProcessId();
+	int mpiRanks = controller->GetNumberOfProcesses();
 
-  std::cout << "[CriticalPointExtractor::Constructor] RequestData 2" << std::endl;
-  //Get number of points from each MPI process
-  //calculate local start index
-  //calculate total number of vertices
+	//Set active array
+	vtkDataArray *inScalars = this->GetInputArrayToProcess(0, inputVector);
+	input->GetPointData()->SetActiveVectors(inScalars->GetName());
 
-  //Compute critical points
-  double singularity[3] = {0.000, 0.000, 0.000};  
+	std::cout << "[MPI:" << mpiRank << "] [RequestData] START" << std::endl;
+	//Get number of points from each MPI process
+	//calculate local start index
+	//calculate total number of vertices
 
-  vtkSmartPointer<vtkMultiProcessController> controller = vtkMultiProcessController::GetGlobalController();
-  controller->Barrier();
+	//Compute critical points
+	double singularity[3] = {0.000, 0.000, 0.000}; 
+	
+	controller->Barrier();
 
-  auto start = std::chrono::steady_clock::now();
-  CriticalPointExtractor cp_extractor(input, singularity); //perturbation is ON by default
+	auto start = std::chrono::steady_clock::now();
+	CriticalPointExtractor cp_extractor(input, singularity, mpiRank); //perturbation is ON by default
+	auto end = std::chrono::steady_clock::now(); 	
+	std::cout << "[MPI:" << mpiRank << "] [CriticalPointExtractor::Constructor] Elapsed time in milliseconds : "
+		<< std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
+		<< " ms" << std::endl;
+	double constructor_time = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
-  auto end = std::chrono::steady_clock::now();  
-   std::cout << "[CriticalPointExtractor::Constructor] Elapsed time in milliseconds : "
- 	  << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
- 	  << " ms" << std::endl;
+	start = std::chrono::steady_clock::now();
+	cp_extractor.ComputeCriticalCells();
+	end = std::chrono::steady_clock::now();
+	std::cout << "[MPI:" << mpiRank << "] [CriticalPointExtractor::identify_critical_points] Elapsed time in milliseconds : "
+		<< std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
+		<< " ms" << std::endl;
+	std::cout << "[MPI:" << mpiRank << "] [CriticalPointExtractor::identify_critical_points] Unstable critical cells: " << output->GetNumberOfCells() << std::endl;
+	double critical_point_time = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
-  start = std::chrono::steady_clock::now();
-  cp_extractor.ComputeCriticalCells();
-  end = std::chrono::steady_clock::now();
-  std::cout << "[identify_critical_points] Elapsed time in milliseconds : "
-	  << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
-	  << " ms" << std::endl;
-  std::cout << "[identify_critical_points] Unstable critical cells: " << output->GetNumberOfCells() << std::endl;
+	cp_extractor.writeCriticalCells(output);
 
-  cp_extractor.writeCriticalCells(output);
+	// Local cleanup done by every worker
+	start = std::chrono::steady_clock::now();	
+	//Collect all critical cells per MPI rank
+	vtkSmartPointer < vtkAggregateDataSetFilter > reducedData = vtkSmartPointer < vtkAggregateDataSetFilter >::New();
+	reducedData->SetInputData(output);
+	reducedData->Update();
+	vtkIdType numPointsBefore = reducedData->GetUnstructuredGridOutput()->GetNumberOfPoints();
+	end = std::chrono::steady_clock::now();
+	std::cout << "[MPI:" << mpiRank << "] [RequestData::reduceDataSet] Elapsed time in milliseconds : "
+		<< std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
+		<< " ms" << std::endl;
+	
+	start = std::chrono::steady_clock::now();
+	vtkSmartPointer < vtkCleanUnstructuredGrid > clean = vtkSmartPointer < vtkCleanUnstructuredGrid >::New(); 
+	clean->SetInputData(reducedData->GetOutput());
+	clean->Update();
+	output->ShallowCopy(clean->GetOutput());
+	vtkIdType numPointsAfter = clean->GetOutput()->GetNumberOfPoints();
 
-  // Local cleanup done by every worker
-  start = std::chrono::steady_clock::now();
-  
-  //Collect all critical cells per MPI rank
-  vtkSmartPointer < vtkAggregateDataSetFilter > reducedData = vtkSmartPointer < vtkAggregateDataSetFilter >::New();
-  reducedData->SetInputData(output);
-  reducedData->Update();
-  vtkIdType numPointsBefore = reducedData->GetUnstructuredGridOutput()->GetNumberOfPoints();
+	end = std::chrono::steady_clock::now();
+	std::cout << "[MPI:" << mpiRank << "] [RequestData::cleanupDataSet] Elapsed time in milliseconds : "
+		<< std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
+		<< " ms" << std::endl;
+	std::cout << "[MPI:" << mpiRank << "] [RequestData::cleanupDataSet] critical cells: " << output->GetNumberOfCells() << std::endl;
+	std::cout << "[MPI:" << mpiRank << "] [RequestData::cleanupDataSet] points removed: " << numPointsBefore - numPointsAfter << std::endl;
 
-   end = std::chrono::steady_clock::now();
-  std::cout << "[reduceDataSet] Elapsed time in milliseconds : "
-	  << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
-	  << " ms" << std::endl;
-  
-  start = std::chrono::steady_clock::now();
-  vtkSmartPointer < vtkCleanUnstructuredGrid > clean = vtkSmartPointer < vtkCleanUnstructuredGrid >::New(); 
-  clean->SetInputData(reducedData->GetOutput());
-  clean->Update();
-  output->ShallowCopy(clean->GetOutput());
-  vtkIdType numPointsAfter = clean->GetOutput()->GetNumberOfPoints();
+	if(mpiRanks > 1) 
+	{
+		// aggregating timings
+		double tot_constructor_time=0;
+		controller->AllReduce(&constructor_time,&tot_constructor_time,1,vtkCommunicator::StandardOperations::SUM_OP);
+		std::cout<<"[MPI:" << mpiRank << "] [RequestData] [SUM] Constructor time: "<<tot_constructor_time<<std::endl;
+		double tot_cp_time=0;
+		controller->AllReduce(&critical_point_time,&tot_cp_time,1,vtkCommunicator::StandardOperations::SUM_OP);
+		std::cout<<"[MPI:" << mpiRank << "] [RequestData] [SUM] Critical Point Extraction time: "<<tot_cp_time<<std::endl;		
+	}
 
-  end = std::chrono::steady_clock::now();
-  std::cout << "[cleanupDataSet] Elapsed time in milliseconds : "
-	  << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
-	  << " ms" << std::endl;
-  std::cout << "[cleanupDataSet] critical cells: " << output->GetNumberOfCells() << std::endl;
-  std::cout << "[cleanupDataSet] points removed: " << numPointsBefore - numPointsAfter << std::endl;
-  return 1;
+	return 1;
 }
 
 CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input,
-											   double *currentSingularity,
+											   double *currentSingularity, int mpiRank,
 											   bool pertubate)
 {
 	//Configure openmp
 	// Eigen::initParallel();
 	numThreads = omp_get_max_threads(); //!< Number of OpenMP threads
 	omp_set_num_threads(numThreads);
-	std::cout << "[CriticalPointExtractor] Number of threads: " << numThreads << std::endl;
+	std::cout << "[MPI:" << mpiRank << "] [CriticalPointExtractor] Number of threads: " << numThreads << std::endl;
 	
 	//Store singularity
 	singularity[0] = currentSingularity[0];
@@ -185,7 +199,7 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 	if (yDim == 0.0) iExchangeIndex = 1; 	//2D dataset with xz
 	if (zDim == 0.0) iExchangeIndex = 2; 	//2D dataset with xy
 
-	std::cout << "[CriticalPointExtractor::identify_critical_points] Checking " << input->GetNumberOfCells() << " cells for critical points " << std::endl;
+	// std::cout << "[CriticalPointExtractor::identify_critical_points] [MPI:" << mpiRank << "] Checking " << input->GetNumberOfCells() << " cells for critical points " << std::endl;
 
 	//Vector of critical cell ids
 	// std::vector<CriticalPoint> vecCriticalCellIDs;
@@ -273,13 +287,13 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 				vecCellIds[i] = new vtkIdType[4]{ ids->GetId(0) , ids->GetId(1), ids->GetId(2), ids->GetId(3)};
 			}
 			else {
-				std::cout << "[CriticalPointExtractor] Error: unknown cell type " << std::endl;
+				std::cout << "[MPI:" << mpiRank << "] [CriticalPointExtractor::identify_critical_points] Error: unknown cell type " << std::endl;
 					continue;
 			}	
 			
 		}
 	}
-	std::cout << "[CriticalPointExtractor::identify_critical_points] Extracted " << vecCellIds.size() << " cells" << std::endl;
+	std::cout << "[MPI:" << mpiRank << "] [CriticalPointExtractor::identify_critical_points] Extracted " << vecCellIds.size() << " simplices" << std::endl;
 }
 
 // vtkIdType CriticalPointExtractor::GlobalUniqueID(double* pos)
