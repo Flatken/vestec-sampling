@@ -1,0 +1,24 @@
+#!/bin/bash --login
+#
+# Parallel script produced by bolt
+#        Resource: ARCHER (Cray XC30 (24-core per node))
+#    Batch system: PBSPro_select
+#
+# bolt is written by EPCC (http://www.epcc.ed.ac.uk)
+#
+#PBS -l select=8
+#PBS -N Vestec_SpaceWeather
+#PBS -A d170
+#PBS -l walltime=0:20:0
+
+# Switch to current working directory
+cd $PBS_O_WORKDIR
+
+export LD_LIBRARY_PATH=../lib:$LD_LIBRARY_PATH
+
+# Run the parallel program
+export OMP_NUM_THREADS=12
+aprun -n 8 -N 1 -d 12  ./VestecCatalystEmulator /work/d170/d170/felle85/datasets/space_weather/run007/ .vtk 0.02 criticalPoints_SpaceWeather.py
+
+
+
