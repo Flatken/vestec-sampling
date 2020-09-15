@@ -52,7 +52,7 @@ class CriticalPointExtractor {
     };
 
     ~CriticalPointExtractor() {      
-      delete position;
+            delete position;
 	    delete vector;
 	    delete perturbation;
       for(auto c : vecCellIds) 

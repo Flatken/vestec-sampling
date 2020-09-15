@@ -186,7 +186,7 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 	position = new double[numPoints*3];
 	vector = new double[numPoints*3];
 	perturbation = new double[numPoints*3];
-
+	
 	//Check for dataset dimension and configure the index in the matrix which will be set to 1
 	double bounds[6];
 	input->GetBounds(bounds);
@@ -205,18 +205,20 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 	// std::vector<CriticalPoint> vecCriticalCellIDs;
 
 	//Configure for parallel independent processing
-    std::vector<vtkSmartPointer<vtkGenericCell>> vecCellPerThread;  //Cell for each thread
+        std::vector<vtkSmartPointer<vtkGenericCell>> vecCellPerThread;  //Cell for each thread
 	// std::vector<std::vector<vtkIdType>> idsForCell;					//Cell point ids for each thread
 
 	//Get the cell type once (needed for correct allocation)
 	vtkSmartPointer<vtkGenericCell> cell = vtkSmartPointer<vtkGenericCell>::New();
 	vtkIdType numCells = input->GetNumberOfCells();
 	input->GetCell(0, cell);
-    vtkIdType cellType = cell->GetCellType();
-
-	for(int x=0; x < numThreads;++x)
+        vtkIdType cellType = cell->GetCellType();
+	
+	vecCellPerThread.resize(numThreads);
+	#pragma omp parallel for
+    	for(int x=0; x < numThreads;++x)
 	{
-		vecCellPerThread.push_back(vtkSmartPointer<vtkGenericCell>::New());
+		vecCellPerThread[x] = vtkSmartPointer<vtkGenericCell>::New();
 	}
 
 	//Allocate size for cells which depends on input cell type
@@ -239,32 +241,31 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 
 	#pragma omp parallel
 	{
+		//Local variables per thread
+		int threadIdx = omp_get_thread_num();//Thread ID
+
 		#pragma omp for nowait
 		for(vtkIdType i=0; i < numPoints; i++) 
 		{
 			vectors->GetTuple(i,&vector[i * 3]);
-			input->GetPoint(i, &position[i * 3]);		
+			input->GetPoint(i, &position[i * 3]);	
 			
-			vtkIdType globalID = i;//GlobalUniqueID(&position[i * 3]);
 			if(pertubate)
-				Perturbate(&perturbation[i * 3], globalID);
+				Perturbate(&perturbation[i * 3], i);
 
-			vecVectors[i] = &vector[i * 3];
-			vecPerturbation[i] = &perturbation[i * 3];
-			vecPointCoordinates[i] = &position[i * 3];
+			vecVectors[i] 		= &vector[i * 3];
+			vecPerturbation[i] 	= &perturbation[i * 3];
+			vecPointCoordinates[i] 	= &position[i * 3];
 		}
 
 		#pragma omp for
 		for (vtkIdType i = 0; i < numCells; i++) {
-			//Local variables per thread
-			int threadIdx = omp_get_thread_num();//Thread ID
-
 			//get the current cell
 			input->GetCell(i, vecCellPerThread[threadIdx]);
 
 			//Get the associated point ids for the cell 
-			vtkSmartPointer<vtkIdList> ids = vecCellPerThread[threadIdx]->GetPointIds();
-		
+			vtkIdList* ids = vecCellPerThread[threadIdx]->GetPointIds();
+			
 			if (VTK_PIXEL == cellType || VTK_QUAD == cellType)
 			{			
 				vecCellIds[i * 2]     = new vtkIdType[3]{ ids->GetId(0) , ids->GetId(1), ids->GetId(2)};
@@ -340,6 +341,7 @@ void CriticalPointExtractor::ComputeCriticalCells()
 
     //std::vector<DynamicMatrix> vecMatrices;
 	std::vector<DynamicMatrix> vecMatrices;
+//vecMatrices.resize(numThreads);
 	if(matrixSize == 4)
 		vecMatrices.assign(numThreads,Eigen::Matrix4d());
 	if(matrixSize == 3)
@@ -355,6 +357,12 @@ void CriticalPointExtractor::ComputeCriticalCells()
 		//Local variables per thread
 		int threadIdx = omp_get_thread_num();	//Thread ID
 
+		 if(matrixSize == 4)
+#pragma omp critical
+                	vecMatrices.push_back(Eigen::Matrix4d());
+        	if(matrixSize == 3)
+#pragma omp critical 
+                	vecMatrices.push_back(Eigen::Matrix3d());
 		//Remove synchronization with nowait
 		#pragma omp for 
 		for (vtkIdType i = 0; i < vecCellIds.size(); i++) {
