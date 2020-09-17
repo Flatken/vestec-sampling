@@ -106,6 +106,7 @@ void CatalystCoProcess( double time, unsigned int timeStep, int lastTimeStep)
 		//from the solver/silmulation code
 		if(mpiRanks > 1)
 		{
+			std::cout << "[CatalystCoProcess::Load and prepare data] Partitioning " << std::endl;
 			//Check the current data type
 			if (pReader->ReadOutputType() == VTK_RECTILINEAR_GRID)
 			{

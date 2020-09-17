@@ -57,7 +57,10 @@ cmake -E make_directory "%INSTALL_DIR%/include"
 rem Prepare windows build
 set Qt5_DIR="C:/Qt/Qt5.14.2/5.14.2/msvc2017_64/lib/cmake/Qt5"
 
+goto :ttk
+
 rem VTK --------------------------------------------------------------------------------------------
+:vtk
 
 echo .
 echo Building and installing VTK from ParaView 5.6.1 ...
@@ -68,8 +71,8 @@ cmake %CMAKE_FLAGS% -DCMAKE_INSTALL_PREFIX=%INSTALL_DIR%^
       -DCMAKE_BUILD_TYPE=%BUILD_TYPE% %EXTERNALS_DIR%/paraview-5.6/VTK 
 cmake --build . --config %BUILD_TYPE% --target install --parallel 12
 
-pause
 rem Paraview --------------------------------------------------------------------------------------------
+:paraview
 
 rem cd "%EXTERNALS_DIR%/ttk/paraview/patch/"
 rem patch-paraview-msvc.cmd "%EXTERNALS_DIR%/paraview-5.6"
@@ -91,8 +94,8 @@ cmake %CMAKE_FLAGS% -DCMAKE_INSTALL_PREFIX="%INSTALL_DIR%"^
       -DCMAKE_BUILD_TYPE="%BUILD_TYPE%" "%EXTERNALS_DIR%/paraview-5.6" 
 cmake --build . --config "%BUILD_TYPE%" --target install --parallel 12
 
-pause
 rem # TTK -----------------------------------------------------------------------------------------
+:ttk
 
 echo .
 echo Building and installing TTK
@@ -101,13 +104,16 @@ echo .
 cmake -E make_directory "%BUILD_DIR%/ttk" && cd "%BUILD_DIR%/ttk"
 cmake %CMAKE_FLAGS% -DCMAKE_INSTALL_PREFIX=%INSTALL_DIR%^
       -DTTK_INSTALL_PLUGIN_DIR="%INSTALL_DIR%/bin/plugins"^
+      -DTTK_ENABLE_ZLIB=Off^
       -DParaView_DIR=%BUILD_DIR%/paraview^
-	    -DQt5_DIR=C:/Qt/Qt5.14.2/5.14.2/msvc2017_64/lib/cmake/Qt5^
+	-DQt5_DIR=C:/Qt/Qt5.14.2/5.14.2/msvc2017_64/lib/cmake/Qt5^
       -DCMAKE_CXX_FLAGS="/bigobj /EHsc /UBOOST_NO_EXCEPTIONS"^
       -DCMAKE_BUILD_TYPE=%BUILD_TYPE% "%EXTERNALS_DIR%/ttk"
 cmake --build . --config %BUILD_TYPE% --target install --parallel 12
 
 rem # EIGEN -----------------------------------------------------------------------------------------
+:eigen
+
 echo .
 echo Building and installing Eigen
 
@@ -119,7 +125,6 @@ cmake --build . --config %BUILD_TYPE% --target install --parallel 12
 
 echo .
 
-pause
 cd "%CURRENT_DIR%"
 echo Finished successfully.
 

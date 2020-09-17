@@ -51,12 +51,19 @@ class CriticalPointExtractor {
       }
     };
 
-    ~CriticalPointExtractor() {      
-            delete position;
+    ~CriticalPointExtractor() {     
+      delete position;
 	    delete vector;
 	    delete perturbation;
-      for(auto c : vecCellIds) 
-        delete c;
+     
+     #pragma omp parallel for
+     for(vtkIdType x=0; x < vecCellIds.size(); ++x)
+        delete vecCellIds[x];
+
+     vecCellIds.clear();
+     vecPointCoordinates.clear();
+     vecVectors.clear();
+     vecPerturbation.clear();
     }
     
   private:

@@ -78,18 +78,15 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
 	vtkUnstructuredGrid* output = vtkUnstructuredGrid::GetData(outputVector, 0);
 
 	vtkSmartPointer<vtkMultiProcessController> controller = vtkMultiProcessController::GetGlobalController();
-	int mpiRank = controller->GetLocalProcessId();
+	int mpiRank  = controller->GetLocalProcessId();
 	int mpiRanks = controller->GetNumberOfProcesses();
 
 	//Set active array
 	vtkDataArray *inScalars = this->GetInputArrayToProcess(0, inputVector);
 	input->GetPointData()->SetActiveVectors(inScalars->GetName());
 
-	std::cout << "[MPI:" << mpiRank << "] [RequestData] START" << std::endl;
-	//Get number of points from each MPI process
-	//calculate local start index
-	//calculate total number of vertices
-
+	std::cout << "[MPI:" << mpiRank << "] [RequestData] START with " << mpiRanks << " processes " << std::endl;
+	
 	//Compute critical points
 	double singularity[3] = {0.000, 0.000, 0.000}; 
 	
@@ -144,13 +141,12 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
 	{
 		// aggregating timings
 		double tot_constructor_time=0;
-		controller->AllReduce(&constructor_time,&tot_constructor_time,1,vtkCommunicator::StandardOperations::SUM_OP);
+		controller->AllReduce(&constructor_time,&tot_constructor_time,1,vtkCommunicator::StandardOperations::MAX_OP);
 		std::cout<<"[MPI:" << mpiRank << "] [RequestData] [SUM] Constructor time: "<<tot_constructor_time<<std::endl;
 		double tot_cp_time=0;
-		controller->AllReduce(&critical_point_time,&tot_cp_time,1,vtkCommunicator::StandardOperations::SUM_OP);
+		controller->AllReduce(&critical_point_time,&tot_cp_time,1,vtkCommunicator::StandardOperations::MAX_OP);
 		std::cout<<"[MPI:" << mpiRank << "] [RequestData] [SUM] Critical Point Extraction time: "<<tot_cp_time<<std::endl;		
 	}
-
 	return 1;
 }
 
@@ -216,7 +212,7 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 	
 	vecCellPerThread.resize(numThreads);
 	#pragma omp parallel for
-    	for(int x=0; x < numThreads;++x)
+    for(int x=0; x < numThreads;++x)
 	{
 		vecCellPerThread[x] = vtkSmartPointer<vtkGenericCell>::New();
 	}
@@ -297,20 +293,6 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 	std::cout << "[MPI:" << mpiRank << "] [CriticalPointExtractor::identify_critical_points] Extracted " << vecCellIds.size() << " simplices" << std::endl;
 }
 
-// vtkIdType CriticalPointExtractor::GlobalUniqueID(double* pos)
-// {
-// 	//Function to calculate global unique id
-// 	// std::hash<double> double_hash;
-// 	// return (1000000*pos[0] + 10000000*pos[1] + 100000000*pos[2]);
-// 	vtkIdType xD = static_cast<vtkIdType>(pos[0]);
-// 	vtkIdType yD = static_cast<vtkIdType>(pos[1])<<8;
-// 	vtkIdType zD = static_cast<vtkIdType>(pos[2])<<16;
-// 	// std::cout<<"orig-cast: "<<xD<<" "<<yD<<" "<<zD<<std::endl;
-// 	// GlobalIdType hashed = pos[0] + pos[1]*xR + pos[2]*xR*yR;
-// 	vtkIdType hashed = xD + yD + zD + xD*yD + 2*yD*zD + 4*xD*zD + xD*yD*zD;
-// 	return hashed;
-// }
-
 void CriticalPointExtractor::Perturbate(double* values, vtkIdType id) {
 	// perturbation function f(e,i,j) = eps^2^i*delta-j
 	// eps ?? --> constant?
@@ -339,13 +321,12 @@ void CriticalPointExtractor::ComputeCriticalCells()
 	if(iExchangeIndex == 3)
 		matrixSize = 4;
 
-    //std::vector<DynamicMatrix> vecMatrices;
-	std::vector<DynamicMatrix> vecMatrices;
-//vecMatrices.resize(numThreads);
-	if(matrixSize == 4)
-		vecMatrices.assign(numThreads,Eigen::Matrix4d());
-	if(matrixSize == 3)
-		vecMatrices.assign(numThreads,Eigen::Matrix3d());	
+    std::vector<DynamicMatrix> vecMatrices;
+    vecMatrices.resize(numThreads);
+	//if(matrixSize == 4)
+	//	vecMatrices.assign(numThreads,Eigen::Matrix4d());
+	//if(matrixSize == 3)
+	//	vecMatrices.assign(numThreads,Eigen::Matrix3d());	
 
 	//std::cout << "[CriticalPointExtractor::identify_critical_points] Matrix size(" << matrixSize << "," << matrixSize << ")"<< std::endl;
 	//std::cout << "[CriticalPointExtractor::identify_critical_points] Exchange index: " << iExchangeIndex << std::endl;
@@ -357,12 +338,10 @@ void CriticalPointExtractor::ComputeCriticalCells()
 		//Local variables per thread
 		int threadIdx = omp_get_thread_num();	//Thread ID
 
-		 if(matrixSize == 4)
-#pragma omp critical
-                	vecMatrices.push_back(Eigen::Matrix4d());
-        	if(matrixSize == 3)
-#pragma omp critical 
-                	vecMatrices.push_back(Eigen::Matrix3d());
+		if(matrixSize == 4)
+            vecMatrices[threadIdx] = Eigen::Matrix4d();
+        if(matrixSize == 3)
+            vecMatrices[threadIdx] = Eigen::Matrix3d();
 		//Remove synchronization with nowait
 		#pragma omp for 
 		for (vtkIdType i = 0; i < vecCellIds.size(); i++) {
