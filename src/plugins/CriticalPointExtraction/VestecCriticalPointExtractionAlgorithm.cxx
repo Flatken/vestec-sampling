@@ -142,10 +142,10 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
 		// aggregating timings
 		double tot_constructor_time=0;
 		controller->AllReduce(&constructor_time,&tot_constructor_time,1,vtkCommunicator::StandardOperations::MAX_OP);
-		std::cout<<"[MPI:" << mpiRank << "] [RequestData] [SUM] Constructor time: "<<tot_constructor_time<<std::endl;
+		std::cout<<"[MPI:" << mpiRank << "] [RequestData] [MAX] Constructor time: "<<tot_constructor_time<<std::endl;
 		double tot_cp_time=0;
 		controller->AllReduce(&critical_point_time,&tot_cp_time,1,vtkCommunicator::StandardOperations::MAX_OP);
-		std::cout<<"[MPI:" << mpiRank << "] [RequestData] [SUM] Critical Point Extraction time: "<<tot_cp_time<<std::endl;		
+		std::cout<<"[MPI:" << mpiRank << "] [RequestData] [MAX] Critical Point Extraction time: "<<tot_cp_time<<std::endl;		
 	}
 	return 1;
 }
