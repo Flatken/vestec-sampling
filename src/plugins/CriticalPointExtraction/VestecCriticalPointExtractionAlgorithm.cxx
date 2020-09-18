@@ -157,7 +157,7 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 	//Configure openmp
 	// Eigen::initParallel();
 	numThreads = omp_get_max_threads(); //!< Number of OpenMP threads
-	omp_set_num_threads(numThreads);
+	//omp_set_num_threads(numThreads);
 	std::cout << "[MPI:" << mpiRank << "] [CriticalPointExtractor] Number of threads: " << numThreads << std::endl;
 	
 	//Store singularity
@@ -197,24 +197,20 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 
 	// std::cout << "[CriticalPointExtractor::identify_critical_points] [MPI:" << mpiRank << "] Checking " << input->GetNumberOfCells() << " cells for critical points " << std::endl;
 
-	//Vector of critical cell ids
-	// std::vector<CriticalPoint> vecCriticalCellIDs;
-
 	//Configure for parallel independent processing
-        std::vector<vtkSmartPointer<vtkGenericCell>> vecCellPerThread;  //Cell for each thread
-	// std::vector<std::vector<vtkIdType>> idsForCell;					//Cell point ids for each thread
+    std::vector<vtkGenericCell*> vecCellPerThread;      //Cell for each thread
 
 	//Get the cell type once (needed for correct allocation)
 	vtkSmartPointer<vtkGenericCell> cell = vtkSmartPointer<vtkGenericCell>::New();
 	vtkIdType numCells = input->GetNumberOfCells();
 	input->GetCell(0, cell);
-        vtkIdType cellType = cell->GetCellType();
+    vtkIdType cellType = cell->GetCellType();
 	
 	vecCellPerThread.resize(numThreads);
 	#pragma omp parallel for
     for(int x=0; x < numThreads;++x)
 	{
-		vecCellPerThread[x] = vtkSmartPointer<vtkGenericCell>::New();
+		vecCellPerThread[x] = vtkGenericCell::New();
 	}
 
 	//Allocate size for cells which depends on input cell type
@@ -235,7 +231,7 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 		numCellIds=4;
 	}
 
-	#pragma omp parallel
+	#pragma omp parallel firstprivate(vecCellPerThread)
 	{
 		//Local variables per thread
 		int threadIdx = omp_get_thread_num();//Thread ID
@@ -290,6 +286,13 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 			
 		}
 	}
+
+	#pragma omp parallel for
+    for(int x=0; x < numThreads;++x)
+	{
+		vecCellPerThread[x]->Delete();
+	}
+	vecCellPerThread.clear();
 	std::cout << "[MPI:" << mpiRank << "] [CriticalPointExtractor::identify_critical_points] Extracted " << vecCellIds.size() << " simplices" << std::endl;
 }
 
@@ -314,36 +317,29 @@ void CriticalPointExtractor::ComputeCriticalCells()
 {
 	vtkIdType cells_num = vecCellIds.size();
 	
-	//Vector of critical cell ids
-	// std::vector<CriticalPoint> vecCriticalCellIDs;
-
 	int matrixSize = 3;
 	if(iExchangeIndex == 3)
 		matrixSize = 4;
 
     std::vector<DynamicMatrix> vecMatrices;
     vecMatrices.resize(numThreads);
-	//if(matrixSize == 4)
-	//	vecMatrices.assign(numThreads,Eigen::Matrix4d());
-	//if(matrixSize == 3)
-	//	vecMatrices.assign(numThreads,Eigen::Matrix3d());	
+	if(matrixSize == 4)
+		vecMatrices.assign(numThreads,Eigen::Matrix4d());
+	if(matrixSize == 3)
+		vecMatrices.assign(numThreads,Eigen::Matrix3d());	
 
 	//std::cout << "[CriticalPointExtractor::identify_critical_points] Matrix size(" << matrixSize << "," << matrixSize << ")"<< std::endl;
 	//std::cout << "[CriticalPointExtractor::identify_critical_points] Exchange index: " << iExchangeIndex << std::endl;
 	//std::cout << "[CriticalPointExtractor::identify_critical_points] Identifing critical cells "<< std::endl;
 
 	//Check for every cell if a critical point (passed singularity as argument) exists
-#pragma omp parallel 
+#pragma omp parallel firstprivate(vecMatrices)
 	{
 		//Local variables per thread
 		int threadIdx = omp_get_thread_num();	//Thread ID
 
-		if(matrixSize == 4)
-            vecMatrices[threadIdx] = Eigen::Matrix4d();
-        if(matrixSize == 3)
-            vecMatrices[threadIdx] = Eigen::Matrix3d();
 		//Remove synchronization with nowait
-		#pragma omp for 
+		#pragma omp for
 		for (vtkIdType i = 0; i < vecCellIds.size(); i++) {
 			//If the cell contains a the singularity add them to the output and we can break
 			CriticalPointType ret = PointInCell(vecCellIds[i], vecMatrices[threadIdx]);
