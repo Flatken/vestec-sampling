@@ -106,11 +106,12 @@ void CatalystCoProcess( double time, unsigned int timeStep, int lastTimeStep)
 		//from the solver/silmulation code
 		if(mpiRanks > 1)
 		{
+			if(mpiRank == 0)
 			std::cout << "[CatalystCoProcess::Load and prepare data] Partitioning " << std::endl;
 			//Check the current data type
 			if (pReader->ReadOutputType() == VTK_RECTILINEAR_GRID)
 			{
-				// if(mpiRank == 0) std::cout << "Spliting VTK_RECTILINEAR_GRID " << std::endl;
+				if(mpiRank == 0) std::cout << "Spliting VTK_RECTILINEAR_GRID " << std::endl;
 				//Split the domain and pass only a portion (block) to the catalyst pipeline
 				vtkRectilinearGridPartitioner* pPartitioner = vtkRectilinearGridPartitioner::New();
 				pPartitioner->SetInputData(pReader->GetOutput());
@@ -138,7 +139,7 @@ void CatalystCoProcess( double time, unsigned int timeStep, int lastTimeStep)
 			}
 			else if (pReader->ReadOutputType() == VTK_STRUCTURED_GRID)
 			{
-				// if(mpiRank == 0) std::cout << "Spliting VTK_STRUCTURED_GRID " << std::endl;
+				if(mpiRank == 0) std::cout << "Spliting VTK_STRUCTURED_GRID " << std::endl;
 				//Split the domain and pass only a portion (block) to the catalyst pipeline
 				vtkStructuredGridPartitioner* pPartitioner = vtkStructuredGridPartitioner::New();
 				pPartitioner->SetInputData(pReader->GetOutput());
@@ -167,7 +168,7 @@ void CatalystCoProcess( double time, unsigned int timeStep, int lastTimeStep)
 			else if (pReader->ReadOutputType() == VTK_STRUCTURED_POINTS
 				|| pReader->ReadOutputType() == VTK_IMAGE_DATA)
 			{
-				// if(mpiRank == 0) std::cout << "Spliting VTK_IMAGE_DATA or VTK_STRUCTURED_POINTS " << std::endl;
+				if(mpiRank == 0) std::cout << "Spliting VTK_IMAGE_DATA or VTK_STRUCTURED_POINTS " << std::endl;
 				//Split the domain and pass only a portion (block) to the catalyst pipeline
 				vtkUniformGridPartitioner* pPartitioner = vtkUniformGridPartitioner::New();
 				pPartitioner->SetInputData(pReader->GetOutput());

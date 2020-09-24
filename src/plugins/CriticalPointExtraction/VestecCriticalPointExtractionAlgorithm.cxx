@@ -84,8 +84,6 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
 	//Set active array
 	vtkDataArray *inScalars = this->GetInputArrayToProcess(0, inputVector);
 	input->GetPointData()->SetActiveVectors(inScalars->GetName());
-
-	std::cout << "[MPI:" << mpiRank << "] [RequestData] START with " << mpiRanks << " processes " << std::endl;
 	
 	//Compute critical points
 	double singularity[3] = {0.000, 0.000, 0.000}; 
@@ -94,7 +92,8 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
 
 	auto start = std::chrono::steady_clock::now();
 	CriticalPointExtractor cp_extractor(input, singularity, mpiRank); //perturbation is ON by default
-	auto end = std::chrono::steady_clock::now(); 	
+	auto end = std::chrono::steady_clock::now();
+	if(mpiRank == 0)  	
 	std::cout << "[MPI:" << mpiRank << "] [CriticalPointExtractor::Constructor] Elapsed time in milliseconds : "
 		<< std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
 		<< " ms" << std::endl;
@@ -103,13 +102,19 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
 	start = std::chrono::steady_clock::now();
 	cp_extractor.ComputeCriticalCells();
 	end = std::chrono::steady_clock::now();
+	if(mpiRank == 0) 
 	std::cout << "[MPI:" << mpiRank << "] [CriticalPointExtractor::identify_critical_points] Elapsed time in milliseconds : "
 		<< std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
 		<< " ms" << std::endl;
+	if(mpiRank == 0) 
 	std::cout << "[MPI:" << mpiRank << "] [CriticalPointExtractor::identify_critical_points] Unstable critical cells: " << output->GetNumberOfCells() << std::endl;
 	double critical_point_time = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
+	//Write cells to output
 	cp_extractor.writeCriticalCells(output);
+
+	//Sync to measure correct time for the reduce
+	controller->Barrier();
 
 	// Local cleanup done by every worker
 	start = std::chrono::steady_clock::now();	
@@ -119,6 +124,7 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
 	reducedData->Update();
 	vtkIdType numPointsBefore = reducedData->GetUnstructuredGridOutput()->GetNumberOfPoints();
 	end = std::chrono::steady_clock::now();
+	if(mpiRank == 0) 
 	std::cout << "[MPI:" << mpiRank << "] [RequestData::reduceDataSet] Elapsed time in milliseconds : "
 		<< std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
 		<< " ms" << std::endl;
@@ -131,21 +137,25 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
 	vtkIdType numPointsAfter = clean->GetOutput()->GetNumberOfPoints();
 
 	end = std::chrono::steady_clock::now();
-	std::cout << "[MPI:" << mpiRank << "] [RequestData::cleanupDataSet] Elapsed time in milliseconds : "
-		<< std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
-		<< " ms" << std::endl;
-	std::cout << "[MPI:" << mpiRank << "] [RequestData::cleanupDataSet] critical cells: " << output->GetNumberOfCells() << std::endl;
-	std::cout << "[MPI:" << mpiRank << "] [RequestData::cleanupDataSet] points removed: " << numPointsBefore - numPointsAfter << std::endl;
+	if(mpiRank == 0) {
+		std::cout << "[MPI:" << mpiRank << "] [RequestData::cleanupDataSet] Elapsed time in milliseconds : "
+			<< std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
+			<< " ms" << std::endl;
+		std::cout << "[MPI:" << mpiRank << "] [RequestData::cleanupDataSet] critical cells: " << output->GetNumberOfCells() << std::endl;
+		std::cout << "[MPI:" << mpiRank << "] [RequestData::cleanupDataSet] points removed: " << numPointsBefore - numPointsAfter << std::endl;
+	}
 
 	if(mpiRanks > 1) 
 	{
 		// aggregating timings
 		double tot_constructor_time=0;
-		controller->AllReduce(&constructor_time,&tot_constructor_time,1,vtkCommunicator::StandardOperations::MAX_OP);
-		std::cout<<"[MPI:" << mpiRank << "] [RequestData] [MAX] Constructor time: "<<tot_constructor_time<<std::endl;
+		controller->Reduce(&constructor_time, &tot_constructor_time, 1, vtkCommunicator::StandardOperations::MAX_OP, 0);
+		if(mpiRank == 0) 
+			std::cout<<"[MPI:" << mpiRank << "] [RequestData] [MAX] Constructor time: "<<tot_constructor_time<<std::endl;
 		double tot_cp_time=0;
-		controller->AllReduce(&critical_point_time,&tot_cp_time,1,vtkCommunicator::StandardOperations::MAX_OP);
-		std::cout<<"[MPI:" << mpiRank << "] [RequestData] [MAX] Critical Point Extraction time: "<<tot_cp_time<<std::endl;		
+		controller->Reduce(&critical_point_time,&tot_cp_time,1,vtkCommunicator::StandardOperations::MAX_OP,0);
+		if(mpiRank == 0) 
+			std::cout<<"[MPI:" << mpiRank << "] [RequestData] [MAX] Critical Point Extraction time: "<<tot_cp_time<<std::endl;		
 	}
 	return 1;
 }
@@ -157,8 +167,7 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 	//Configure openmp
 	// Eigen::initParallel();
 	numThreads = omp_get_max_threads(); //!< Number of OpenMP threads
-	//omp_set_num_threads(numThreads);
-	std::cout << "[MPI:" << mpiRank << "] [CriticalPointExtractor] Number of threads: " << numThreads << std::endl;
+	if(mpiRank == 0) std::cout << "[MPI:" << mpiRank << "] [CriticalPointExtractor] Number of threads: " << numThreads << std::endl;
 	
 	//Store singularity
 	singularity[0] = currentSingularity[0];
@@ -293,7 +302,7 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 		vecCellPerThread[x]->Delete();
 	}
 	vecCellPerThread.clear();
-	std::cout << "[MPI:" << mpiRank << "] [CriticalPointExtractor::identify_critical_points] Extracted " << vecCellIds.size() << " simplices" << std::endl;
+	if(mpiRank == 0) std::cout << "[MPI:" << mpiRank << "] [CriticalPointExtractor::identify_critical_points] Extracted " << vecCellIds.size() << " simplices" << std::endl;
 }
 
 void CriticalPointExtractor::Perturbate(double* values, vtkIdType id) {
