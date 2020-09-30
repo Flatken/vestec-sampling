@@ -57,8 +57,6 @@ cmake -E make_directory "%INSTALL_DIR%/include"
 rem Prepare windows build
 set Qt5_DIR="C:/Qt/Qt5.14.2/5.14.2/msvc2017_64/lib/cmake/Qt5"
 
-goto :ttk
-
 rem VTK --------------------------------------------------------------------------------------------
 :vtk
 
