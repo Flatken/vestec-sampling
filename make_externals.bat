@@ -57,8 +57,10 @@ cmake -E make_directory "%INSTALL_DIR%/include"
 rem Prepare windows build
 set Qt5_DIR="C:/Qt/Qt5.14.2/5.14.2/msvc2017_64/lib/cmake/Qt5"
 
+goto :eigen 
+
 rem VTK --------------------------------------------------------------------------------------------
-:vtk
+rem:vtk
 
 rem echo .
 rem echo Building and installing VTK from ParaView 5.6.1 ...
@@ -103,12 +105,19 @@ cmake -E make_directory "%BUILD_DIR%/ttk" && cd "%BUILD_DIR%/ttk"
 cmake %CMAKE_FLAGS% -DCMAKE_INSTALL_PREFIX=%INSTALL_DIR%^
       -DTTK_INSTALL_PLUGIN_DIR="%INSTALL_DIR%/bin/plugins"^
       -DTTK_ENABLE_ZLIB=OFF^
+      -DTTK_ENABLE_KAMIKAZE=On^
       -DTTK_ENABLE_MPI=ON^
+      -DTTK_BUILD_STANDALONE_APPS=OFF^
+      -DVTK_MODULE_ENABLE_ttkCinemaImaging=DONT_WANT^
+      -DVTK_MODULE_ENABLE_ttkUserInterfaceBase=DONT_WANT^
       -DParaView_DIR=%BUILD_DIR%/paraview^
+      -DCMAKE_VERBOSE_MAKEFILE=On^
 	-DQt5_DIR=C:/Qt/Qt5.14.2/5.14.2/msvc2017_64/lib/cmake/Qt5^
       -DCMAKE_CXX_FLAGS="/bigobj /EHsc /UBOOST_NO_EXCEPTIONS"^
       -DCMAKE_BUILD_TYPE=%BUILD_TYPE% "%EXTERNALS_DIR%/ttk"
 cmake --build . --config %BUILD_TYPE% --target install --parallel 12
+
+pause
 
 rem # EIGEN -----------------------------------------------------------------------------------------
 :eigen
