@@ -20,10 +20,8 @@ paraview_add_plugin(VestecPlugins
     ${VESTEC_VTK_MODULE_FILES}
   MODULE_ARGS # BUG: see above
     INSTALL_HEADERS ON
-    # ${VESTEC_LINKS}
   SERVER_MANAGER_XML
     ${VESTEC_XMLS}
-  # SOURCES ${VESTEC_SOURCES}
   )
 
 if(NOT "${VESTEC_INSTALL_PLUGIN_DIR}" STREQUAL "")

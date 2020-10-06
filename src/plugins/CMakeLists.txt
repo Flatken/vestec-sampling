@@ -7,7 +7,12 @@ set(VESTEC_VTK_MODULE_FILES "" ) #CACHE INTERNAL "")
 
 function(vestec_register_paraview_plugin moduleName moduleXML)
 	message("[VESTEC] Register module: " ${moduleName} " " ${moduleXML})
-	list(APPEND VESTEC_XMLS ${moduleXML})
+	# replace variables of original XML file and store generated file in build dir
+	configure_file(${CMAKE_CURRENT_LIST_DIR}/${moduleXML} ${CMAKE_BINARY_DIR}/paraview/xmls/${moduleXML})
+
+	# use generated xml file for pv plugin
+	list(APPEND VESTEC_XMLS ${CMAKE_BINARY_DIR}/paraview/xmls/${moduleXML})
+	# list(APPEND VESTEC_XMLS ${moduleXML})
 	set(VESTEC_XMLS ${VESTEC_XMLS} PARENT_SCOPE)
 	list(APPEND VESTEC_MODULES ${moduleName})
 	set(VESTEC_MODULES ${VESTEC_MODULES} PARENT_SCOPE)
@@ -109,6 +114,10 @@ paraview_plugin_scan(
   )
 
 message("BUILD")
+message("RUNTIME_DESTINATION " ${CMAKE_INSTALL_BINDIR})
+message("LIBRARY_DESTINATION " ${CMAKE_INSTALL_LIBDIR})
+message("LIBRARY_SUBDIRECTORY " ${PARAVIEW_PLUGIN_SUBDIR})
+message("VESTEC_INSTALL_PLUGIN_DIR " ${VESTEC_INSTALL_PLUGIN_DIR})
 
 paraview_plugin_build(
   TARGET
@@ -140,5 +149,5 @@ install(
     VESTECPVTargets
   DESTINATION
     "${VESTEC_INSTALL_PLUGIN_DIR}"
-  )
+)
 
