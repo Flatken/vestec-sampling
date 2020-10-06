@@ -7,7 +7,6 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_LIBDIR}"
 set(BUILD_SHARED_LIBS ON)
 
 find_package(ParaView REQUIRED)
-include("${PARAVIEW_USE_FILE}")
 
 find_package (Eigen3 3.3 REQUIRED NO_MODULE)
 find_package(OpenMP)

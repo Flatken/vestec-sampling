@@ -1,6 +1,8 @@
 NAME
-  vestecVFCriticalPoints
+  vestecCriticalPointExtraction
 DEPENDS
+  Eigen3::Eigen
+  OpenMP::OpenMP_CXX
   VTK::FiltersCore
 PRIVATE_DEPENDS
   VTK::CommonCore

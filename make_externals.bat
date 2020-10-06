@@ -57,8 +57,6 @@ cmake -E make_directory "%INSTALL_DIR%/include"
 rem Prepare windows build
 set Qt5_DIR="C:/Qt/Qt5.14.2/5.14.2/msvc2017_64/lib/cmake/Qt5"
 
-goto :eigen 
-
 rem VTK --------------------------------------------------------------------------------------------
 rem:vtk
 
@@ -83,6 +81,7 @@ echo .
 
 cmake -E make_directory "%BUILD_DIR%/paraview" && cd "%BUILD_DIR%/paraview"
 cmake %CMAKE_FLAGS% -DCMAKE_INSTALL_PREFIX="%INSTALL_DIR%"^
+      -DPARAVIEW_BUILD_EDITION=CATALYST^
       -DCMAKE_INSTALL_LIBDIR=lib^
       -DPARAVIEW_INSTALL_DEVELOPMENT_FILES=ON^
       -DPARAVIEW_USE_PYTHON=ON^
@@ -112,7 +111,7 @@ cmake %CMAKE_FLAGS% -DCMAKE_INSTALL_PREFIX=%INSTALL_DIR%^
       -DVTK_MODULE_ENABLE_ttkUserInterfaceBase=DONT_WANT^
       -DParaView_DIR=%BUILD_DIR%/paraview^
       -DCMAKE_VERBOSE_MAKEFILE=On^
-	-DQt5_DIR=C:/Qt/Qt5.14.2/5.14.2/msvc2017_64/lib/cmake/Qt5^
+	    -DQt5_DIR=C:/Qt/Qt5.14.2/5.14.2/msvc2017_64/lib/cmake/Qt5^
       -DCMAKE_CXX_FLAGS="/bigobj /EHsc /UBOOST_NO_EXCEPTIONS"^
       -DCMAKE_BUILD_TYPE=%BUILD_TYPE% "%EXTERNALS_DIR%/ttk"
 cmake --build . --config %BUILD_TYPE% --target install --parallel 12
@@ -122,16 +121,16 @@ pause
 rem # EIGEN -----------------------------------------------------------------------------------------
 :eigen
 
-echo .
-echo Building and installing Eigen
+rem echo .
+rem echo Building and installing Eigen
 
-cmake -E make_directory "%BUILD_DIR%/eigen" && cd "%BUILD_DIR%/eigen"
-cmake %CMAKE_FLAGS% -DCMAKE_INSTALL_PREFIX=%INSTALL_DIR%^
-      -DQt5_DIR=C:/Qt/Qt5.14.2/5.14.2/msvc2017_64/lib/cmake/Qt5^
-      -DCMAKE_BUILD_TYPE=%BUILD_TYPE% "%EXTERNALS_DIR%/eigen"
-cmake --build . --config %BUILD_TYPE% --target install --parallel 12
+rem cmake -E make_directory "%BUILD_DIR%/eigen" && cd "%BUILD_DIR%/eigen"
+rem cmake %CMAKE_FLAGS% -DCMAKE_INSTALL_PREFIX=%INSTALL_DIR%^
+rem       -DQt5_DIR=C:/Qt/Qt5.14.2/5.14.2/msvc2017_64/lib/cmake/Qt5^
+rem       -DCMAKE_BUILD_TYPE=%BUILD_TYPE% "%EXTERNALS_DIR%/eigen"
+rem cmake --build . --config %BUILD_TYPE% --target install --parallel 12
 
-echo .
+rem echo .
 
 cd "%CURRENT_DIR%"
 echo Finished successfully.

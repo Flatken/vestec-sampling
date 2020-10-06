@@ -1,5 +1,5 @@
 NAME
-  vestecVFSampling
+  vestecSampling
 DEPENDS
   VTK::FiltersCore
 PRIVATE_DEPENDS

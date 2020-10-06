@@ -2,9 +2,14 @@
 # https://discourse.paraview.org/t/install-headers-for-vtk-modules-build-by-paraview-5-7-0/2721
 set(_paraview_add_plugin_MODULES_FILES TRUE)
 
-message("Modules "  ${VESTEC_MODULES})
+message("Modules_NAMES "  ${VESTEC_MODULES})
 message("MODULE_FILES " ${VESTEC_VTK_MODULE_FILES})
-paraview_add_plugin(VestecSampling
+# message("Modules_SOURCES "  ${VESTEC_SOURCES})
+# message("Modules_LINKS "  ${VESTEC_LINKS})
+message("Modules_XMLS "  ${VESTEC_XMLS})
+message("")
+
+paraview_add_plugin(VestecSamplingPlugins
   VERSION "1.0"
   REQUIRED_ON_CLIENT
   REQUIRED_ON_SERVER
@@ -14,14 +19,18 @@ paraview_add_plugin(VestecSampling
     ${VESTEC_VTK_MODULE_FILES}
   MODULE_ARGS # BUG: see above
     INSTALL_HEADERS ON
+    # ${VESTEC_LINKS}
   SERVER_MANAGER_XML
     ${VESTEC_XMLS}
+  # SOURCES ${VESTEC_SOURCES}
   )
 
-install(
-  TARGETS
-    VestecSampling
-  DESTINATION
-    "lib/plugins"
-)
+if(NOT "${VESTEC_INSTALL_PLUGIN_DIR}" STREQUAL "")
+  install(
+    TARGETS
+      VestecSamplingPlugins
+    DESTINATION
+      "${VESTEC_INSTALL_PLUGIN_DIR}"
+    )
+endif()
 
