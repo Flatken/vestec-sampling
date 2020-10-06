@@ -3,4 +3,4 @@ vestec_add_paraview_plugin(vestecSampling
 	HEADERS VestecSamplingAlgorithm.h
 	PLUGIN_VERSION 1.0
 	PLUGIN_XML VestecSampling.xml
-	LINKS )
+	LINKS "")

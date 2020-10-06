@@ -3,4 +3,4 @@ vestec_add_paraview_plugin(vestecSeeding
 	HEADERS VestecSeedingAlgorithm.h
 	PLUGIN_VERSION 1.0
 	PLUGIN_XML VestecSeeding.xml
-	LINKS )
+	LINKS "")
