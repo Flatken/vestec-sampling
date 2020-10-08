@@ -39,8 +39,9 @@ endif()
 if(USE_CATALYST)
 	add_library(Adaptor ${CPP_SOURCE_FILES_ADAPTORS} ${CPP_HEADER_FILES_ADAPTORS})
 	target_link_libraries(Adaptor  
-		vtkParallelMPI 
-		vtkPVPythonCatalyst
+		ParaView::Catalyst 
+		ParaView::PythonCatalyst 
+		${VTK_LIBRARIES}
 		)
 	add_definitions("-DUSE_CATALYST")
 	if(NOT PARAVIEW_USE_MPI)
@@ -65,14 +66,10 @@ endif()
 add_executable(${TARGET_NAME} ${CPP_SOURCE_FILES} ${CPP_HEADER_FILES})
 if(USE_CATALYST)
 	IF (WIN32)
-		target_link_libraries(${TARGET_NAME} LINK_PRIVATE Adaptor OpenMP::OpenMP_CXX)
+		target_link_libraries(${TARGET_NAME} LINK_PRIVATE Adaptor OpenMP::OpenMP_CXX ParaView::Catalyst ParaView::PythonCatalyst ${VTK_LIBRARIES})
 	ELSE()
-		target_link_libraries(${TARGET_NAME} LINK_PRIVATE Adaptor stdc++fs OpenMP::OpenMP_CXX)
+		target_link_libraries(${TARGET_NAME} LINK_PRIVATE Adaptor stdc++fs OpenMP::OpenMP_CXX ParaView::Catalyst ParaView::PythonCatalyst ${VTK_LIBRARIES})
 	ENDIF()
-	
-	include(vtkModuleMacros)
-	include(vtkMPI)
-	vtk_mpi_link(${TARGET_NAME})
 else()
 	IF (WIN32)
 		target_link_libraries(${TARGET_NAME} LINK_PRIVATE ${MPI_LIBRARIES} OpenMP::OpenMP_CXX)

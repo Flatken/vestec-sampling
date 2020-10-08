@@ -1,9 +1,6 @@
-set(VESTEC_XMLS             "" ) #CACHE INTERNAL "")
-set(VESTEC_MODULES          "" ) #CACHE INTERNAL "")
-set(VESTEC_VTK_MODULE_FILES "" ) #CACHE INTERNAL "")
-# set(VESTEC_SOURCES             "" CACHE INTERNAL "")
-# set(VESTEC_HEADERS             "" CACHE INTERNAL "")
-# set(VESTEC_LINKS             "" CACHE INTERNAL "")
+set(VESTEC_XMLS             "" ) 
+set(VESTEC_MODULES          "" )
+set(VESTEC_VTK_MODULE_FILES "" )
 
 function(vestec_register_paraview_plugin moduleName moduleXML)
 	message("[VESTEC] Register module: " ${moduleName} " " ${moduleXML})
@@ -12,7 +9,6 @@ function(vestec_register_paraview_plugin moduleName moduleXML)
 
 	# use generated xml file for pv plugin
 	list(APPEND VESTEC_XMLS ${CMAKE_BINARY_DIR}/paraview/xmls/${moduleXML})
-	# list(APPEND VESTEC_XMLS ${moduleXML})
 	set(VESTEC_XMLS ${VESTEC_XMLS} PARENT_SCOPE)
 	list(APPEND VESTEC_MODULES ${moduleName})
 	set(VESTEC_MODULES ${VESTEC_MODULES} PARENT_SCOPE)
@@ -22,19 +18,13 @@ function(vestec_add_paraview_plugin library)
 	message("[VESTEC] Add module: " ${library})
 	cmake_parse_arguments(ARG "" "PLUGIN_XML;PLUGIN_VERSION;"
 		"SOURCES;HEADERS;LINKS" ${ARGN})
-	# message("sources: " ${ARG_SOURCES})
-	# message("link: " ${ARG_LINKS})
-	# message("xml: " ${ARG_PLUGIN_XML})
-	# message("Trying to add module " ${library} " " ${ARG_PLUGIN_XML})
-
+	
 	vtk_module_add_module(${library}
 	  SOURCES
 		${ARG_SOURCES}
 	  HEADERS
 		${ARG_HEADERS}
 	 )
-	
-	vtk_module_compile_options(${library} PRIVATE "/W4")
 	
 	vtk_module_link(${library}
 	  PUBLIC
@@ -56,17 +46,10 @@ function(vestec_add_paraview_plugin library)
 	)
 endfunction()
 
-# message("BEFORE Modules_SOURCES "  ${VESTEC_SOURCES})
-# message("BEFORE Modules_LINKS "  ${VESTEC_LINKS})
-# message("BEFORE Modules_XMLS "  ${VESTEC_XMLS})
-# message("")
-
 vtk_module_find_modules(
   VESTEC_VTK_MODULE_FILE
     "${CMAKE_CURRENT_SOURCE_DIR}"
   )
-
-message("VESTEC_VTK_MODULE_FILE " ${VESTEC_VTK_MODULE_FILE})
 
 vtk_module_scan(
   MODULE_FILES
@@ -77,33 +60,13 @@ vtk_module_scan(
     ON
   )
 
-message("VESTEC_PROVIDED_MODULES " ${VESTEC_PROVIDED_MODULES})
-
-# when build against ParaView,
-# vtk_module_build is already called
-# by the paraview_add_plugin
-# vtk_module_build(
-#     MODULES
-#       ${VESTEC_PROVIDED_MODULES}
-#     )
-
 file(GLOB VESTEC_PLUGIN_DIRS *)
 foreach(VESTEC_PLUGIN ${VESTEC_PLUGIN_DIRS})
 	if (IS_DIRECTORY ${VESTEC_PLUGIN} AND NOT ${VESTEC_PLUGIN} MATCHES "singlePlugin")
-		# add_subdirectory(${VESTEC_PLUGIN})
 		include(${VESTEC_PLUGIN}/VestecFilterRegister.cmake)
-		# message("INTO-FOR Modules_SOURCES "  ${VESTEC_SOURCES})
-		# message("INTO-FOR Modules_LINKS "  ${VESTEC_LINKS})
-		# message("INTO-FOR Modules_XMLS "  ${VESTEC_XMLS})
-		# message("")
-		# get_filename_component(DNAME ${VESTEC_PLUGIN} NAME)
-		# list(APPEND VESTEC_MODULES ${DNAME})
-		# list(APPEND VESTEC_MODULES ${VESTEC_PLUGIN} ";")
 		list(APPEND VESTEC_VTK_MODULE_FILES ${VESTEC_PLUGIN}/vtk.module)
 	endif()
 endforeach()
-
-message("SCAN")
 
 paraview_plugin_scan(
   PLUGIN_FILES
@@ -112,12 +75,6 @@ paraview_plugin_scan(
 	VESTEC_PLUGINS
   ENABLE_BY_DEFAULT ON
   )
-
-message("BUILD")
-message("RUNTIME_DESTINATION " ${CMAKE_INSTALL_BINDIR})
-message("LIBRARY_DESTINATION " ${CMAKE_INSTALL_LIBDIR})
-message("LIBRARY_SUBDIRECTORY " ${PARAVIEW_PLUGIN_SUBDIR})
-message("VESTEC_INSTALL_PLUGIN_DIR " ${VESTEC_INSTALL_PLUGIN_DIR})
 
 paraview_plugin_build(
   TARGET
@@ -133,16 +90,6 @@ paraview_plugin_build(
   LIBRARY_SUBDIRECTORY
 	"${PARAVIEW_PLUGIN_SUBDIR}"
  )
-
-#  message("INIT MODULES")
-#  set(VESTEC_INIT "1")
- 
-#  foreach(VESTEC_PLUGIN ${VESTEC_PLUGIN_DIRS})
-# 	 if (IS_DIRECTORY ${VESTEC_PLUGIN} AND NOT ${VESTEC_PLUGIN} MATCHES "singlePlugin")
-# 		 # add_subdirectory(${VESTEC_PLUGIN})
-# 		 include(${VESTEC_PLUGIN}/VestecFilterAdd.cmake)
-# 	 endif()
-#  endforeach()
 
 install(
   TARGETS
