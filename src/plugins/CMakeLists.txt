@@ -91,6 +91,27 @@ paraview_plugin_build(
 	"${PARAVIEW_PLUGIN_SUBDIR}"
  )
 
+ vtk_module_wrap_python(
+    MODULES
+      ${VESTEC_MODULES}
+    WRAPPED_MODULES
+      VESTEC_WRAPPED_MODULES
+    INSTALL_EXPORT
+      VESTECPython
+    PYTHON_PACKAGE
+      "vestec"
+    MODULE_DESTINATION
+      "${VESTEC_PYTHON_MODULE_DIR}"
+    CMAKE_DESTINATION
+      "${CMAKE_INSTALL_LIBDIR}/vestec/python"
+    LIBRARY_DESTINATION
+      "${CMAKE_INSTALL_LIBDIR}"
+    INSTALL_HEADERS
+      ON
+    TARGET
+      VESTEC::Python
+    )
+
 install(
   TARGETS
     VESTECPVTargets
