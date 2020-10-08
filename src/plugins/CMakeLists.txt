@@ -91,7 +91,27 @@ paraview_plugin_build(
 	"${PARAVIEW_PLUGIN_SUBDIR}"
  )
 
- vtk_module_wrap_python(
+if(NOT DEFINED VESTEC_PYTHON_MODULE_DIR)
+ if (IS_ABSOLUTE ${VTK_PYTHONPATH})
+   file(RELATIVE_PATH
+	 PYTHON_SITE_PACKAGES_SUFFIX
+	 ${VTK_PREFIX_PATH}
+	 ${VTK_PYTHONPATH}
+	 )
+ else()
+   set(PYTHON_SITE_PACKAGES_SUFFIX
+	 ${VTK_PYTHONPATH}
+	 )
+ endif()
+ set(VESTEC_PYTHON_MODULE_DIR
+   ${PYTHON_SITE_PACKAGES_SUFFIX}
+   CACHE
+   PATH
+   "Where the TTK python module in installed"
+   )
+endif()
+
+vtk_module_wrap_python(
     MODULES
       ${VESTEC_MODULES}
     WRAPPED_MODULES
@@ -110,7 +130,24 @@ paraview_plugin_build(
       ON
     TARGET
       VESTEC::Python
-    )
+)
+# Generate __init__.py
+set(InitContent "from __future__ import absolute_import\n")
+foreach(MODULE ${VESTEC_MODULES})
+  string(APPEND InitContent "from .${MODULE} import *\n")
+endforeach()
+file(GENERATE
+  OUTPUT
+  	"${CMAKE_BINARY_DIR}/${VESTEC_PYTHON_MODULE_DIR}/vestec/__init__.py"
+  CONTENT
+	"${InitContent}"
+  )
+install(
+  FILES
+	"${CMAKE_BINARY_DIR}/${VESTEC_PYTHON_MODULE_DIR}/vestec/__init__.py"
+  DESTINATION
+	"${VESTEC_PYTHON_MODULE_DIR}/vestec"
+  )
 
 install(
   TARGETS
