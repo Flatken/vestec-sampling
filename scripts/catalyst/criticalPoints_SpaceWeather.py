@@ -26,20 +26,7 @@ make_cinema_table=False
 from paraview.simple import *
 from paraview import coprocessing
 
-# --------------------------------------------------------------
-# The following loads TTK's plugins.
-# Topology Toolkit 0.9.7
-# --------------------------------------------------------------
-import glob
-import os
-from os.path import join as ttk_path_join
-
-ttk_plugins_path = "../lib/plugins/"
-for x in glob.glob(
-    ttk_path_join(ttk_plugins_path, "*.so" if os.name == "posix" else "*.dll")
-):
-    LoadPlugin(x, ns=globals())
-    print("Loading Plugin: "+x)
+LoadPlugin("D:/vestec/install/windows-release/bin/paraview-5.8/plugins/VestecPlugins/VestecPlugins.dll", ns=globals())
 
 # ----------------------- CoProcessor definition -----------------------
 
@@ -68,22 +55,9 @@ def CreateCoProcessor():
       vestecCriticalPointExtractionAlgorithm1 = VestecCriticalPointExtractionAlgorithm(Input=grid_)
       vestecCriticalPointExtractionAlgorithm1.Array = ['POINTS', 'B'] # for space-weather use-case
 
-	   # Generate seeds around critical points
-      vestecSeeding = VestecSeedingAlgorithm(Input=vestecCriticalPointExtractionAlgorithm1)
-      vestecSeeding.SeedingRadius = 7.0
-      vestecSeeding.NumberOfSeeds = 15
-      vestecSeeding.RandomDistributionMode = 'Uniform distribution'
-      vestecSeeding.Array = ['POINTS', 'p']
-
-      # Trace particles
-      vestecSamplingAlgorithm = VestecSamplingAlgorithm(Grid=grid_,Seeds=vestecSeeding)
-      vestecSamplingAlgorithm.Vectors = ['POINTS', 'B']
-      vestecSamplingAlgorithm.IntegrationDuration = 320
-      vestecSamplingAlgorithm.StepSize = 40
-      
       # ----------------------------------------------------------------
       # finally, restore active source
-      SetActiveSource(vestecSamplingAlgorithm)
+      SetActiveSource(vestecCriticalPointExtractionAlgorithm1)
       # ----------------------------------------------------------------
 	  
       # Now any catalyst writers

@@ -18,20 +18,20 @@
            </DataTypeDomain>
       </InputProperty>
       
-       <StringVectorProperty name="SelectInputVectors"
-        command="SelectInputVectors"
-        number_of_elements="5"
-        element_types="0 0 0 0 2"
-        label="Vectors">
-        <ArrayListDomain name="array_list" attribute_type="Vectors"
-          input_domain_name="input_vectors">
+        <StringVectorProperty name="SelectInputVector"
+                            label="Array"
+                            command="SetInputArrayToProcess"
+                            number_of_elements="5"
+                            element_types="0 0 0 0 2"
+                            animateable="0">
+        <ArrayListDomain name="array_list"
+                         attribute_type="Vectors"
+                         input_domain_name="inputs_array">
           <RequiredProperties>
-            <Property name="Input" function="Input"/>
+            <Property name="Input"
+                      function="Input" />
           </RequiredProperties>
         </ArrayListDomain>
-        <Documentation>
-          This property specifies the name of the input vector array to process.
-        </Documentation>
       </StringVectorProperty>
 
    
