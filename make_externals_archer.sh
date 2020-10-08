@@ -44,6 +44,7 @@ echo ""
 
 cmake -E make_directory "$BUILD_DIR/paraview" && cd "$BUILD_DIR/paraview"
 cmake -G "Eclipse CDT4 - Unix Makefiles" -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" \
+      -DPARAVIEW_BUILD_EDITION=CATALYST \
       -DCMAKE_INSTALL_LIBDIR=lib \
       -DPARAVIEW_INSTALL_DEVELOPMENT_FILES=ON \
       -DPARAVIEW_ENABLE_PYTHON=ON \
@@ -52,8 +53,17 @@ cmake -G "Eclipse CDT4 - Unix Makefiles" -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" \
       -DENABLE_osmesa=ON \
       -Dmesa_USE_SWR=OFF \
       -DPARAVIEW_USE_MPI=ON \
-      -DPARAVIEW_ENABLE_CATALYST=ON \
+      -DPARAVIEW_USE_VTKM=OFF \
       -DCMAKE_BUILD_TYPE=Release "$EXTERNALS_DIR/paraview-5.6" 
+cmake --build . --target install --parallel 8
+
+# EIGEN -----------------------------------------------------------------------------------------
+echo ""
+echo "Building and installing Eigen ..."
+
+cmake -E make_directory "$BUILD_DIR/eigen" && cd "$BUILD_DIR/eigen"
+cmake -G "Eclipse CDT4 - Unix Makefiles" -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" \
+      -DCMAKE_BUILD_TYPE=Release "$EXTERNALS_DIR/eigen"
 cmake --build . --target install --parallel 8
 
 # TTK -------------------------------------------------------------------------------------------
@@ -66,17 +76,18 @@ cmake -E make_directory "$BUILD_DIR/ttk" && cd "$BUILD_DIR/ttk"
 cmake -G "Eclipse CDT4 - Unix Makefiles" -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" \
       -DCMAKE_PREFIX_PATH=$INSTALL_DIR/lib/cmake/paraview-5.6 \
       -DParaView_CMAKE_DIR=$INSTALL_DIR/lib/cmake/paraview-5.6 \
+      -DEigen3_DIR=$INSTALL_DIR \
+      -DTTK_INSTALL_PLUGIN_DIR="$INSTALL_DIR/bin/plugins" \
+      -DTTK_ENABLE_ZLIB=OFF \
+      -DTTK_ENABLE_KAMIKAZE=On \
+      -DTTK_ENABLE_MPI=ON \
+      -DTTK_BUILD_STANDALONE_APPS=OFF \
+      -DVTK_MODULE_ENABLE_ttkCinemaImaging=DONT_WANT \
+      -DVTK_MODULE_ENABLE_ttkUserInterfaceBase=DONT_WANT \
       -DCMAKE_BUILD_TYPE=Release "$EXTERNALS_DIR/ttk"
 cmake --build . --target install --parallel 8
 
-# EIGEN -----------------------------------------------------------------------------------------
-echo ""
-echo "Building and installing Eigen ..."
 
-cmake -E make_directory "$BUILD_DIR/eigen" && cd "$BUILD_DIR/eigen"
-cmake -G "Eclipse CDT4 - Unix Makefiles" -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" \
-      -DCMAKE_BUILD_TYPE=Release "$EXTERNALS_DIR/eigen"
-cmake --build . --target install --parallel 8
 
 echo ""
 
