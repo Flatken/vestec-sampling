@@ -27,19 +27,22 @@ from paraview.simple import *
 from paraview import coprocessing
 
 # --------------------------------------------------------------
-# The following loads TTK's plugins.
-# Topology Toolkit 0.9.7
+# The following loads VESTEC's plugins.
 # --------------------------------------------------------------
-import glob
 import os
-from os.path import join as ttk_path_join
 
-ttk_plugins_path = "../lib/plugins/"
-for x in glob.glob(
-    ttk_path_join(ttk_plugins_path, "*.so" if os.name == "posix" else "*.dll")
-):
-    LoadPlugin(x, ns=globals())
-    print("Loading Plugin: "+x)
+## the path in which the Vestec Plugin is installed is different between linux and windows
+## not clear why this is happening but we have to do the following workaround to correctly link
+## the library files
+
+if os.name == "posix":
+	path_parent = os.path.dirname(os.getcwd())
+	os.chdir(path_parent)
+	vestec_plugin_path = os.path.join(path_parent,'lib/paraview-5.8/plugins/VestecPlugins/VestecPlugins.so')
+else:	# windows
+	vestec_plugin_path = os.path.join(os.getcwd(),'paraview-5.8/plugins/VestecPlugins/VestecPlugins.dll')
+LoadPlugin(vestec_plugin_path, ns=globals())
+print("Loading Plugin: "+vestec_plugin_path)
 
 # ----------------------- CoProcessor definition -----------------------
 

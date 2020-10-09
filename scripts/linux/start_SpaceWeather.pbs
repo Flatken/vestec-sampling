@@ -14,7 +14,8 @@
 # Switch to current working directory
 cd $PBS_O_WORKDIR
 
-export LD_LIBRARY_PATH=../lib:$LD_LIBRARY_PATH
+#export LD_LIBRARY_PATH=../lib:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=../lib/paraview-5.8/plugins/VestecPlugins:$LD_LIBRARY_PATH
 
 # Run the parallel program
 export OMP_NUM_THREADS=12
