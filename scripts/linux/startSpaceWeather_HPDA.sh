@@ -1,6 +1,9 @@
 #!/bin/bash
 
-export LD_LIBRARY_PATH=../lib:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=../lib/paraview-5.8/plugins/VestecPlugins:../lib/plugins/TopologyToolKit:../lib:$LD_LIBRARY_PATH
+export PYTHONPATH=../lib/python3.6/site-packages
+export PV_PLUGIN_PATH=../lib/paraview-5.8/plugins:../lib/paraview-5.8/plugins/VestecPlugins:../lib/plugins/TopologyToolKit
+
 export OMP_NUM_THREADS=$3
 export OMP_DISPLAY_ENV=true
 export OMP_PROC_BIND=spread #close,master,spread
