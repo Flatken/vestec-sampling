@@ -70,9 +70,10 @@ echo "Building and installing TTK ..."
 echo ""
 
 cmake -E make_directory "$BUILD_DIR/ttk" && cd "$BUILD_DIR/ttk"
-cmake -G "Eclipse CDT4 - Unix Makefiles" -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" \      
+cmake -G "Eclipse CDT4 - Unix Makefiles" -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" \
       -DParaView_DIR="$BUILD_DIR/paraview" \
       -DEigen3_DIR=$INSTALL_DIR \
+      -DTTK_INSTALL_PLUGIN_DIR="$INSTALL_DIR/lib/plugins" \
       -DTTK_ENABLE_ZLIB=OFF \
       -DTTK_ENABLE_KAMIKAZE=On \
       -DTTK_ENABLE_MPI=ON \
