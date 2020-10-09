@@ -38,7 +38,7 @@ cmake -E make_directory "$INSTALL_DIR/include"
 export CRAYPE_LINK_TYPE=dynamic
 
 # Paraview -----------------------------------------------------------------------------------------
-echo "Building and installing Paraview 5.6 ..."
+echo "Building and installing Paraview ..."
 echo ""
 echo ""
 
@@ -47,11 +47,9 @@ cmake -G "Eclipse CDT4 - Unix Makefiles" -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" \
       -DPARAVIEW_BUILD_EDITION=CATALYST \
       -DCMAKE_INSTALL_LIBDIR=lib \
       -DPARAVIEW_INSTALL_DEVELOPMENT_FILES=ON \
-      -DPARAVIEW_ENABLE_PYTHON=ON \
+      -DPARAVIEW_USE_PYTHON=ON \
       -DVTK_PYTHON_VERSION=3 \
-      -DPARAVIEW_BUILD_QT_GUI=OFF \
-      -DENABLE_osmesa=ON \
-      -Dmesa_USE_SWR=OFF \
+      -DPARAVIEW_USE_QT=OFF \
       -DPARAVIEW_USE_MPI=ON \
       -DPARAVIEW_USE_VTKM=OFF \
       -DCMAKE_BUILD_TYPE=Release "$EXTERNALS_DIR/paraview-5.6" 
@@ -74,10 +72,8 @@ echo ""
 
 cmake -E make_directory "$BUILD_DIR/ttk" && cd "$BUILD_DIR/ttk"
 cmake -G "Eclipse CDT4 - Unix Makefiles" -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" \
-      -DCMAKE_PREFIX_PATH=$INSTALL_DIR/lib/cmake/paraview-5.6 \
-      -DParaView_CMAKE_DIR=$INSTALL_DIR/lib/cmake/paraview-5.6 \
+      -DParaView_DIR="$BUILD_DIR/paraview" \
       -DEigen3_DIR=$INSTALL_DIR \
-      -DTTK_INSTALL_PLUGIN_DIR="$INSTALL_DIR/bin/plugins" \
       -DTTK_ENABLE_ZLIB=OFF \
       -DTTK_ENABLE_KAMIKAZE=On \
       -DTTK_ENABLE_MPI=ON \

@@ -51,7 +51,7 @@ if [ ! -d "$BUILD_DIR" ]; then
 fi
 
 # configure, compile & install ---------------------------------------------------------------------
-export Paraview_DIR=$EXTERNALS_INSTALL_DIR/lib/cmake/paraview-5.6
+export Paraview_DIR=$EXTERNALS_INSTALL_DIR/lib/cmake/paraview-5.8
 export Eigen_DIR=$EXTERNALS_INSTALL_DIR
 
 # FORCING A CRAY ENVIRONMENT TO ACCEPT SHARED LIBRARIES
