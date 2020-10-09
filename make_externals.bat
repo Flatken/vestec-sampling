@@ -93,6 +93,20 @@ cmake %CMAKE_FLAGS% -DCMAKE_INSTALL_PREFIX="%INSTALL_DIR%"^
       -DCMAKE_BUILD_TYPE="%BUILD_TYPE%" "%EXTERNALS_DIR%/paraview-5.6" 
 cmake --build . --config "%BUILD_TYPE%" --target install --parallel 12
 
+rem # EIGEN -----------------------------------------------------------------------------------------
+:eigen
+
+echo .
+echo Building and installing Eigen
+
+cmake -E make_directory "%BUILD_DIR%/eigen" && cd "%BUILD_DIR%/eigen"
+cmake %CMAKE_FLAGS% -DCMAKE_INSTALL_PREFIX=%INSTALL_DIR%^
+       -DQt5_DIR=C:/Qt/Qt5.14.2/5.14.2/msvc2017_64/lib/cmake/Qt5^
+       -DCMAKE_BUILD_TYPE=%BUILD_TYPE% "%EXTERNALS_DIR%/eigen"
+cmake --build . --config %BUILD_TYPE% --target install --parallel 12
+
+echo .
+
 rem # TTK -----------------------------------------------------------------------------------------
 :ttk
 
@@ -117,20 +131,6 @@ cmake %CMAKE_FLAGS% -DCMAKE_INSTALL_PREFIX=%INSTALL_DIR%^
 cmake --build . --config %BUILD_TYPE% --target install --parallel 12
 
 pause
-
-rem # EIGEN -----------------------------------------------------------------------------------------
-:eigen
-
-rem echo .
-rem echo Building and installing Eigen
-
-rem cmake -E make_directory "%BUILD_DIR%/eigen" && cd "%BUILD_DIR%/eigen"
-rem cmake %CMAKE_FLAGS% -DCMAKE_INSTALL_PREFIX=%INSTALL_DIR%^
-rem       -DQt5_DIR=C:/Qt/Qt5.14.2/5.14.2/msvc2017_64/lib/cmake/Qt5^
-rem       -DCMAKE_BUILD_TYPE=%BUILD_TYPE% "%EXTERNALS_DIR%/eigen"
-rem cmake --build . --config %BUILD_TYPE% --target install --parallel 12
-
-rem echo .
 
 cd "%CURRENT_DIR%"
 echo Finished successfully.
