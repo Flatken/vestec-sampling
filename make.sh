@@ -52,7 +52,7 @@ fi
 
 # configure, compile & install ---------------------------------------------------------------------
 export Paraview_DIR=$EXTERNALS_INSTALL_DIR/lib/cmake/paraview-5.8
-export Eigen_DIR=$EXTERNALS_INSTALL_DIR
+export Eigen_DIR=$EXTERNALS_INSTALL_DIR/share/eigen3/cmake
 
 cd "$BUILD_DIR"
 cmake "${CMAKE_FLAGS[@]}" -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" \

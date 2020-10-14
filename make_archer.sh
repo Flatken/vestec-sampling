@@ -52,7 +52,7 @@ fi
 
 # configure, compile & install ---------------------------------------------------------------------
 export Paraview_DIR=$EXTERNALS_INSTALL_DIR/lib/cmake/paraview-5.8
-export Eigen_DIR=$EXTERNALS_INSTALL_DIR
+export Eigen_DIR=$EXTERNALS_INSTALL_DIR/share/eigen3/cmake
 
 # FORCING A CRAY ENVIRONMENT TO ACCEPT SHARED LIBRARIES
 export CRAYPE_LINK_TYPE=dynamic

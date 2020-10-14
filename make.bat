@@ -57,7 +57,7 @@ cd "%BUILD_DIR%"
 cmake %CMAKE_FLAGS% -DCMAKE_INSTALL_PREFIX="%INSTALL_DIR%"^
 	  -DCMAKE_BUILD_TYPE=%BUILD_TYPE%^
 	  -DParaView_DIR=%Paraview_DIR%^
-	  -DEigen3_DIR=%Eigen_DIR%^
+	  -DEigen3_DIR="%Eigen_DIR%/share/eigen3/cmake"^
 	  -DUSE_CATALYST=ON^
     -DCMAKE_WINDOWS_EXPORT_ALL_SYMBOLS=On^
     -DEXTERNALS_DIR="%EXTERNALS_INSTALL_DIR%" "%CMAKE_DIR%"  || exit /b
