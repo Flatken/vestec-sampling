@@ -1,7 +1,7 @@
 
 # Catalyst pipelines
 file(GLOB CATALYST_SCRIPTS "catalyst/*.py") 
-install(FILES ${CATALYST_SCRIPTS} DESTINATION "bin")
+install(FILES ${CATALYST_SCRIPTS} DESTINATION "bin/scripts")
 
 # start script files -----------------------------------------------------------------
 if(WIN32)

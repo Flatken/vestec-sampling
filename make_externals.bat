@@ -57,18 +57,6 @@ cmake -E make_directory "%INSTALL_DIR%/include"
 rem Prepare windows build
 set Qt5_DIR="C:/Qt/Qt5.14.2/5.14.2/msvc2017_64/lib/cmake/Qt5"
 
-rem VTK --------------------------------------------------------------------------------------------
-rem:vtk
-
-rem echo .
-rem echo Building and installing VTK from ParaView 5.6.1 ...
-rem echo .
-
-rem cmake -E make_directory %BUILD_DIR%/VTK && cd %BUILD_DIR%/VTK
-rem cmake %CMAKE_FLAGS% -DCMAKE_INSTALL_PREFIX=%INSTALL_DIR%^
-rem       -DCMAKE_BUILD_TYPE=%BUILD_TYPE% %EXTERNALS_DIR%/paraview-5.6/VTK 
-rem cmake --build . --config %BUILD_TYPE% --target install --parallel 12
-
 rem Paraview --------------------------------------------------------------------------------------------
 :paraview
 
@@ -81,7 +69,6 @@ echo .
 
 cmake -E make_directory "%BUILD_DIR%/paraview" && cd "%BUILD_DIR%/paraview"
 cmake %CMAKE_FLAGS% -DCMAKE_INSTALL_PREFIX="%INSTALL_DIR%"^
-      -DPARAVIEW_BUILD_EDITION=CATALYST^
       -DCMAKE_INSTALL_LIBDIR=lib^
       -DPARAVIEW_INSTALL_DEVELOPMENT_FILES=ON^
       -DPARAVIEW_USE_PYTHON=ON^
@@ -90,7 +77,7 @@ cmake %CMAKE_FLAGS% -DCMAKE_INSTALL_PREFIX="%INSTALL_DIR%"^
       -DPARAVIEW_USE_MPI=ON^
       -DPARAVIEW_USE_VTKM=OFF^
       -DQt5_DIR="C:/Qt/Qt5.14.2/5.14.2/msvc2017_64/lib/cmake/Qt5"^
-      -DCMAKE_BUILD_TYPE="%BUILD_TYPE%" "%EXTERNALS_DIR%/paraview-5.6" 
+      -DCMAKE_BUILD_TYPE="%BUILD_TYPE%" "%EXTERNALS_DIR%/paraview-5.6"
 cmake --build . --config "%BUILD_TYPE%" --target install --parallel 12
 
 rem # EIGEN -----------------------------------------------------------------------------------------
@@ -114,6 +101,9 @@ echo .
 echo Building and installing TTK
 echo .
 
+cmake -E remove_directory "%EXTERNALS_DIR%/ttk/paraview/WRLExporter"
+cmake -E remove_directory "%EXTERNALS_DIR%/ttk/core/vtk/ttkWRLExporter"
+
 cmake -E make_directory "%BUILD_DIR%/ttk" && cd "%BUILD_DIR%/ttk"
 cmake %CMAKE_FLAGS% -DCMAKE_INSTALL_PREFIX=%INSTALL_DIR%^
       -DParaView_DIR="%BUILD_DIR%/paraview"^
@@ -124,8 +114,7 @@ cmake %CMAKE_FLAGS% -DCMAKE_INSTALL_PREFIX=%INSTALL_DIR%^
       -DTTK_ENABLE_MPI=ON^
       -DTTK_BUILD_STANDALONE_APPS=OFF^
       -DVTK_MODULE_ENABLE_ttkCinemaImaging=DONT_WANT^
-      -DVTK_MODULE_ENABLE_ttkUserInterfaceBase=DONT_WANT^      
-      -DCMAKE_VERBOSE_MAKEFILE=On^
+      -DVTK_MODULE_ENABLE_ttkUserInterfaceBase=DONT_WANT^
 	    -DQt5_DIR=C:/Qt/Qt5.14.2/5.14.2/msvc2017_64/lib/cmake/Qt5^
       -DCMAKE_CXX_FLAGS="/bigobj /EHsc /UBOOST_NO_EXCEPTIONS"^
       -DCMAKE_BUILD_TYPE=%BUILD_TYPE% "%EXTERNALS_DIR%/ttk"

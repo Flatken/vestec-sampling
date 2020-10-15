@@ -40,9 +40,10 @@ if os.name == "posix":
 	os.chdir(path_parent)
 	vestec_plugin_path = os.path.join(path_parent,'lib/paraview-5.8/plugins/VestecPlugins/VestecPlugins.so')
 else:	# windows
-	vestec_plugin_path = os.path.join(os.getcwd(),'paraview-5.8/plugins/VestecPlugins/VestecPlugins.dll')
+	vestec_plugin_path = os.path.join(os.getcwd(),'paraview-5.8\plugins\VestecPlugins\VestecPlugins.dll')
+ 
 LoadPlugin(vestec_plugin_path, ns=globals())
-print("Loading Plugin: "+vestec_plugin_path)
+
 
 
 # ----------------------- CoProcessor definition -----------------------
@@ -67,6 +68,8 @@ def CreateCoProcessor():
       # create a new 'Legacy VTK Reader'
       # create a producer from a simulation input
       grid_ = coprocessor.CreateProducer(datadescription, 'input')
+
+      print("cbnesbrbs bdibdifb ijerib")
 
       # create a new 'VestecCriticalPointExtractionAlgorithm'
       vestecCriticalPointExtractionAlgorithm1 = VestecCriticalPointExtractionAlgorithm(Input=grid_)

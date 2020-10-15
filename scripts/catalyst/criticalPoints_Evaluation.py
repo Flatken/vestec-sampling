@@ -40,9 +40,9 @@ if os.name == "posix":
 	os.chdir(path_parent)
 	vestec_plugin_path = os.path.join(path_parent,'lib/paraview-5.8/plugins/VestecPlugins/VestecPlugins.so')
 else:	# windows
-	vestec_plugin_path = os.path.join(os.getcwd(),'paraview-5.8/plugins/VestecPlugins/VestecPlugins.dll')
+	vestec_plugin_path = os.path.join(os.getcwd(),'paraview-5.8\plugins\VestecPlugins\VestecPlugins.dll')
+ 
 LoadPlugin(vestec_plugin_path, ns=globals())
-print("Loading Plugin: "+vestec_plugin_path)
 
 # ----------------------- CoProcessor definition -----------------------
 
