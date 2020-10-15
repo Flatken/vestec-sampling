@@ -70,6 +70,9 @@ echo ""
 echo "Building and installing TTK ..."
 echo ""
 
+cmake -E remove_directory "$EXTERNALS_DIR/ttk/paraview/WRLExporter"
+cmake -E remove_directory "$EXTERNALS_DIR/ttk/core/vtk/ttkWRLExporter" 
+
 cmake -E make_directory "$BUILD_DIR/ttk" && cd "$BUILD_DIR/ttk"
 cmake -G "Eclipse CDT4 - Unix Makefiles" -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" \
       -DParaView_DIR="$BUILD_DIR/paraview" \
