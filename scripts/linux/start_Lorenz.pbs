@@ -14,14 +14,12 @@
 # Switch to current working directory
 cd $PBS_O_WORKDIR
 
-#export LD_LIBRARY_PATH=../lib:$LD_LIBRARY_PATH
-export LD_LIBRARY_PATH=../lib/paraview-5.8/plugins/VestecPlugins:../lib/plugins/TopologyToolKit:../lib:$LD_LIBRARY_PATH
-export PYTHONPATH=../lib/python3.6/site-packages
-export PV_PLUGIN_PATH=../lib/paraview-5.8/plugins:../lib/paraview-5.8/plugins/VestecPlugins:../lib/plugins/TopologyToolKit
+export LD_LIBRARY_PATH=../lib:$LD_LIBRARY_PATH
+export PV_PLUGIN_PATH=../lib/paraview-5.8/plugins/VestecPlugins
 
 # Run the parallel program
 export OMP_NUM_THREADS=12
-aprun -n 8 -N 1 -d 12  ./VestecCatalystEmulator /work/d170/d170/felle85/datasets/lorenz/ .vtk 0.02 criticalPoints_Lorenz.py
+aprun -n 8 -N 1 -d 12  ./VestecCatalystEmulator /work/d170/d170/felle85/datasets/lorenz/ .vtk 0.02 $PWD/scripts/criticalPoints_Lorenz.py
 
 
 

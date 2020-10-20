@@ -35,14 +35,14 @@ import os
 ## not clear why this is happening but we have to do the following workaround to correctly link
 ## the library files
 
-if os.name == "posix":
-	path_parent = os.path.dirname(os.getcwd())
-	os.chdir(path_parent)
-	vestec_plugin_path = os.path.join(path_parent,'lib/paraview-5.8/plugins/VestecPlugins/VestecPlugins.so')
-else:	# windows
-	vestec_plugin_path = os.path.join(os.getcwd(),'paraview-5.8/plugins/VestecPlugins/VestecPlugins.dll')
-LoadPlugin(vestec_plugin_path, ns=globals())
-print("Loading Plugin: "+vestec_plugin_path)
+#if os.name == "posix":
+#	path_parent = os.path.dirname(os.getcwd())
+#	os.chdir(path_parent)
+#	vestec_plugin_path = os.path.join(path_parent,'lib/paraview-5.8/plugins/VestecPlugins/VestecPlugins.so')
+#else:	# windows
+#	vestec_plugin_path = os.path.join(os.getcwd(),'paraview-5.8/plugins/VestecPlugins/VestecPlugins.dll')
+#LoadPlugin(vestec_plugin_path, ns=globals())
+#print("Loading Plugin: "+vestec_plugin_path)
 
 # ----------------------- CoProcessor definition -----------------------
 
