@@ -45,7 +45,7 @@ cmake -G "Eclipse CDT4 - Unix Makefiles" -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" \
       -DPARAVIEW_INSTALL_DEVELOPMENT_FILES=ON \
       -DPARAVIEW_USE_PYTHON=ON \
       -DVTK_PYTHON_VERSION=3 \
-      -DPARAVIEW_USE_QT=OFF \
+      -DPARAVIEW_USE_QT=ON \
       -DPARAVIEW_USE_MPI=ON \
       -DPARAVIEW_USE_VTKM=OFF \
       -DCMAKE_BUILD_TYPE=Release "$EXTERNALS_DIR/paraview-5.6" 
@@ -69,8 +69,8 @@ echo ""
 echo "Building and installing TTK ..."
 echo ""
 
-cmake -E remove_directory "$EXTERNALS_DIR/ttk/paraview/WRLExporter"
-cmake -E remove_directory "$EXTERNALS_DIR/ttk/core/vtk/ttkWRLExporter" 
+cmake -E remove_directory "$EXTERNALS_DIR/ttk/paraview/WRLExporter"
+cmake -E remove_directory "$EXTERNALS_DIR/ttk/core/vtk/ttkWRLExporter" 
 
 cmake -E make_directory "$BUILD_DIR/ttk" && cd "$BUILD_DIR/ttk"
 cmake -G "Eclipse CDT4 - Unix Makefiles" -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" \
