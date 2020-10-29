@@ -25,7 +25,7 @@ export PV_PLUGIN_PATH=../lib/paraview-5.8/plugins/VestecPlugins
 
 # Run the parallel program
 export OMP_NUM_THREADS=12
-aprun -n 8 -N 1 -d 12  ./VestecCatalystEmulator /work/d170/d170/felle85/datasets/lorenz/ .vtk 0.02 $PWD/scripts/criticalPoints_Lorenz.py
+aprun -n 8 -N 1 -d 12  ./VestecCatalystEmulator /work/d170/d170/shared/dlr-srv/datasets/lorenz/ .vtk 0.02 $PWD/scripts/criticalPoints_Lorenz.py
 
 
 
