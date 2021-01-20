@@ -22,6 +22,7 @@
 #include <vtkCleanPolyData.h>
 #include <vtkCleanUnstructuredGrid.h>
 #include <vtkDataSetWriter.h>
+#include <vtkImageData.h>
 
 #include <sstream>
 #include <chrono>
@@ -111,7 +112,7 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
 	double critical_point_time = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
 	//Write cells to output
-	cp_extractor.writeCriticalCells(output);
+	cp_extractor.writeCriticalCells(output);	
 
 	//Sync to measure correct time for the reduce
 	controller->Barrier();
@@ -137,7 +138,9 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
 	vtkIdType numPointsAfter = clean->GetOutput()->GetNumberOfPoints();
 
 	end = std::chrono::steady_clock::now();
-	if(mpiRank == 0) {
+	// if(mpiRank == 0) 
+	if(output->GetNumberOfCells() > 0)
+	{
 		std::cout << "[MPI:" << mpiRank << "] [RequestData::cleanupDataSet] Elapsed time in milliseconds : "
 			<< std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
 			<< " ms" << std::endl;
@@ -165,7 +168,6 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 											   bool pertubate)
 {
 	//Configure openmp
-	// Eigen::initParallel();
 	numThreads = omp_get_max_threads(); //!< Number of OpenMP threads
 	if(mpiRank == 0) std::cout << "[MPI:" << mpiRank << "] [CriticalPointExtractor] Number of threads: " << numThreads << std::endl;
 	
@@ -174,8 +176,7 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 	singularity[1] = currentSingularity[1];
 	singularity[2] = currentSingularity[2];
 
-	vtkIdType numPoints = input->GetNumberOfPoints();
-	ZERO_ID = numPoints + 1;
+	vtkIdType numPoints = input->GetNumberOfPoints();	
 
 	//Allocate memory
 	vecPointCoordinates.resize(numPoints);
@@ -183,28 +184,52 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 	vecPerturbation.resize(numPoints);
 	
 	//Store vectors and point coordinates for internal usage
-	vtkSmartPointer<vtkDataArray> vectors = input->GetPointData()->GetVectors();
-
-	if(pertubate)
-		Perturbate(singularity, ZERO_ID);
+	vtkSmartPointer<vtkDataArray> vectors = input->GetPointData()->GetVectors();	
 
 	position = new double[numPoints*3];
 	vector = new double[numPoints*3];
 	perturbation = new double[numPoints*3];
 	
-	//Check for dataset dimension and configure the index in the matrix which will be set to 1
-	double bounds[6];
-	input->GetBounds(bounds);
-	double xDim = fabs(bounds[1] - bounds[0]);
-	double yDim = fabs(bounds[3] - bounds[2]);
-	double zDim = fabs(bounds[5] - bounds[4]);	
+	//Get the local bounds of the current MPI process
+	double local_bounds[6];
+	input->GetBounds(local_bounds);
+	double xDim = fabs(local_bounds[1] - local_bounds[0]);
+	double yDim = fabs(local_bounds[3] - local_bounds[2]);
+	double zDim = fabs(local_bounds[5] - local_bounds[4]);	
+
+	/// then extract some global characteristics of the dataset
+	/// like, 1. global bounds
+	double global_bounds[6];
+	vtkSmartPointer<vtkMultiProcessController> controller = vtkMultiProcessController::GetGlobalController();
+	controller->AllReduce(&local_bounds[0], &global_bounds[0], 1, vtkCommunicator::StandardOperations::MIN_OP);
+	controller->AllReduce(&local_bounds[2], &global_bounds[2], 1, vtkCommunicator::StandardOperations::MIN_OP);
+	controller->AllReduce(&local_bounds[4], &global_bounds[4], 1, vtkCommunicator::StandardOperations::MIN_OP);
+	controller->AllReduce(&local_bounds[1], &global_bounds[1], 1, vtkCommunicator::StandardOperations::MAX_OP);
+	controller->AllReduce(&local_bounds[3], &global_bounds[3], 1, vtkCommunicator::StandardOperations::MAX_OP);
+	controller->AllReduce(&local_bounds[5], &global_bounds[5], 1, vtkCommunicator::StandardOperations::MAX_OP);
+
+	// 2. global sides
+	double global_sides[3] = { fabs(global_bounds[1]-global_bounds[0]), fabs(global_bounds[3]-global_bounds[2]), fabs(global_bounds[5]-global_bounds[4]) };
+	// 3. global maximum coordinates
+	double global_max_coords[3] = { global_bounds[1] , global_bounds[3] , global_bounds[5] };
+	// 4. spacing between points (WARNING: this works only on regular grids!!)	
+	double spacing[3];
+	vtkImageData::SafeDownCast(input)->GetSpacing(spacing);
+	// 5. and the global extent (i.e., the resolution of the dataset)
+	int global_extent[6] = { 0, global_sides[0]/spacing[0], 0, global_sides[1]/spacing[1], 0, global_sides[2]/spacing[2]};
+
+	// the global max id is needed for computing the perturbation in each point
+	long max_global_id = GlobalUniqueID(global_max_coords,spacing,global_extent,global_bounds);
+
+	ZERO_ID = max_global_id + 1; // this is the of the singularity vector
+	// if(pertubate)
+	// 	Perturbate(singularity, ZERO_ID, max_global_id);
+
 
 	iExchangeIndex = 3; 					//3D dataset 
 	if (xDim == 0.0) iExchangeIndex = 0; 	//2D dataset with yz
 	if (yDim == 0.0) iExchangeIndex = 1; 	//2D dataset with xz
 	if (zDim == 0.0) iExchangeIndex = 2; 	//2D dataset with xy
-
-	// std::cout << "[CriticalPointExtractor::identify_critical_points] [MPI:" << mpiRank << "] Checking " << input->GetNumberOfCells() << " cells for critical points " << std::endl;
 
 	//Configure for parallel independent processing
     std::vector<vtkGenericCell*> vecCellPerThread;      //Cell for each thread
@@ -250,9 +275,11 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 		{
 			vectors->GetTuple(i,&vector[i * 3]);
 			input->GetPoint(i, &position[i * 3]);	
+
+			long global_id = GlobalUniqueID(&position[i * 3],spacing,global_extent,global_bounds);
 			
 			if(pertubate)
-				Perturbate(&perturbation[i * 3], i);
+				Perturbate(&perturbation[i * 3], global_id, max_global_id);
 
 			vecVectors[i] 		= &vector[i * 3];
 			vecPerturbation[i] 	= &perturbation[i * 3];
@@ -305,7 +332,29 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 	if(mpiRank == 0) std::cout << "[MPI:" << mpiRank << "] [CriticalPointExtractor::identify_critical_points] Extracted " << vecCellIds.size() << " simplices" << std::endl;
 }
 
-void CriticalPointExtractor::Perturbate(double* values, vtkIdType id) {
+long CriticalPointExtractor::GlobalUniqueID(double* pos, double *spacing, int *global_extent, double * global_bounds)
+{
+	///Function that calculates global unique id
+
+	/// 1. structured coordinates
+	long x = std::lround(pos[0]/spacing[0]-global_bounds[0]);
+	long y = std::lround(pos[1]/spacing[1]-global_bounds[2]);
+	long z = std::lround(pos[2]/spacing[2]-global_bounds[4]);
+
+	/// 2. then compute the resolution
+	long resx = global_extent[1]+1;
+	long resy = global_extent[3]+1;
+	long resz = global_extent[5]+1;
+
+	/// 3. then the global id
+	long globalid = z * resy * resx + y * resz + x;
+
+	// x + y * xDim + z * xDim * yDim
+	// return fabs(pos[0]) + fabs(pos[1]) * global_dims[0] + fabs(pos[2]) * global_dims[0] * global_dims[1];
+	return globalid;
+}
+
+void CriticalPointExtractor::Perturbate(double* values, long id, long max_global_id) {
 	// perturbation function f(e,i,j) = eps^2^i*delta-j
 	// eps ?? --> constant?
 	// i = id (in their implementation is id+1)
@@ -313,7 +362,7 @@ void CriticalPointExtractor::Perturbate(double* values, vtkIdType id) {
 
 	//eps and delta are constant.. so I compute them one time at the beginning
 	vtkIdType i = id + 1;
-	double i_norm = static_cast<double>(i)/static_cast<double>(vecPerturbation.size());
+	double i_norm = static_cast<double>(id)/static_cast<double>(max_global_id);
 	double exp_coeff = 1+i_norm*delta;
 
 	for(int j=0; j<3; j++) {
@@ -336,10 +385,6 @@ void CriticalPointExtractor::ComputeCriticalCells()
 		vecMatrices.assign(numThreads,Eigen::Matrix4d());
 	if(matrixSize == 3)
 		vecMatrices.assign(numThreads,Eigen::Matrix3d());	
-
-	//std::cout << "[CriticalPointExtractor::identify_critical_points] Matrix size(" << matrixSize << "," << matrixSize << ")"<< std::endl;
-	//std::cout << "[CriticalPointExtractor::identify_critical_points] Exchange index: " << iExchangeIndex << std::endl;
-	//std::cout << "[CriticalPointExtractor::identify_critical_points] Identifing critical cells "<< std::endl;
 
 	//Check for every cell if a critical point (passed singularity as argument) exists
 #pragma omp parallel firstprivate(vecMatrices)
@@ -499,25 +544,6 @@ double CriticalPointExtractor::ComputeDeterminant(
 		}
 		vecMatrix(i, iExchangeIndex) = 1;
 	}
-
-	/*
-	//std::cout << " \t ######################################################################### " << std::endl;
-	//std::cout << " \t\tVertex IDs ";
-	//for (int x = 0; x < tmpIds.size(); x++)
-	//	std::cout << tmpIds[x] << " ";
-	//std::cout << std::endl;
-	//std::cout << " \t\tMatrix: " << std::endl;
-	//std::cout << " \t\t ";
-	//for (int x = 0; x < vecMatrix.rows(); x++)
-	//{
-	//	for (int y = 0; y < vecMatrix.cols(); y++)
-	//		std::cout << vecMatrix(x, y) << " ";
-	//	std::cout << std::endl;
-	//	std::cout << " \t\t ";
-	//}
-	//std::cout << std::endl;
-	//std::cout << " \t ######################################################################### " << std::endl;
-	//*/
 
 	// 2. compute determinant sign
 	double det = 0;

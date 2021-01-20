@@ -18,9 +18,9 @@ typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 1, 4, 4> DynamicMa
 //Forward declaration of vtkDataSet
 class vtkDataSet;
 
-/// This class implements the algorithm described in:
-/// "Robust Detection of Singularities in Vector Fields" by Bhatia et al./// 
-/// (extending this method) "Detection and classification of critical points in piecewise linear vector fields" by Wang et al.
+/// This class extends the algorithm described in:
+/// "Detection and classification of critical points in piecewise linear vector fields" by Wang et al.
+/// (that extends the following method) "Robust Detection of Singularities in Vector Fields" by Bhatia et al./// 
 /// -----
 /// other references here:
 /// (possible extension using a different index for classification) "Morse set classification and hierarchical refinement using conley index" by Chen G et al.
@@ -99,19 +99,20 @@ class CriticalPointExtractor {
     CriticalPointType PointInCell(const vtkIdType* ids, DynamicMatrix &vecMatrix);
 
     /**
-     * Check if direction of the determinat is positive (counter-clockwise) 
+     * Check if direction of the determinant is positive (counter-clockwise) 
      */
     bool DeterminantCounterClockWise(double& det);
 
     /**
-     * Double to fixed precision and pertubation based on id
+     * Double to fixed precision and perturbation based on id
      */
-    void Perturbate(double* values, vtkIdType id);
+    void Perturbate(double* values, long id, long max_global_id);
 
-    // /**
-    //  * Calculate global unique id 
-    //  */
-    // vtkIdType GlobalUniqueID(double* pos);
+    /**
+     * Calculate global unique id 
+     */
+    long GlobalUniqueID(double* pos, double *spacing, int *global_extent, double * global_bounds);
+    
 private:
     vtkIdType ZERO_ID;  //!< Vertex ID of the singularity: always number of vertices + 1 
     int iExchangeIndex; //!< The row id of the matrix to exchange with the singularity    
@@ -122,8 +123,6 @@ private:
 	  double* vector;
 	  double* perturbation;
     std::vector<vtkIdType*> vecCellIds;  //!< The point ids for each cell
-    // std::map<vtkIdType, vtkIdType> mapGlobalMapping;
-    // std::map<vtkIdType, vtkIdType> mapLocalMapping;
     int numCellIds;
     double singularity[3]; //!< The singularity to identify
     int numThreads; //!< Number of OpenMP threads
