@@ -208,6 +208,8 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 	controller->AllReduce(&local_bounds[3], &global_bounds[3], 1, vtkCommunicator::StandardOperations::MAX_OP);
 	controller->AllReduce(&local_bounds[5], &global_bounds[5], 1, vtkCommunicator::StandardOperations::MAX_OP);
 
+	int mpiRanks = controller->GetNumberOfProcesses(); // to check how many MPI processes are up and running
+
 	// 2. global sides
 	double global_sides[3] = { fabs(global_bounds[1]-global_bounds[0]), fabs(global_bounds[3]-global_bounds[2]), fabs(global_bounds[5]-global_bounds[4]) };
 	// 3. global maximum coordinates
@@ -219,12 +221,14 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 	int global_extent[6] = { 0, global_sides[0]/spacing[0], 0, global_sides[1]/spacing[1], 0, global_sides[2]/spacing[2]};
 
 	// the global max id is needed for computing the perturbation in each point
-	long max_global_id = GlobalUniqueID(global_max_coords,spacing,global_extent,global_bounds);
+	// -- if we have just one MPI process then we can directly use the number of points value, since the indexing is given and consistent
+	// -- otherwise, in case of multiple MPI processes we have to derive the global id from some geometric information linked to the grid
+	long max_global_id = mpiRanks == 1 ? numPoints : GlobalUniqueID(global_max_coords,spacing,global_extent,global_bounds);	
 
 	ZERO_ID = max_global_id + 1; // this is the of the singularity vector
+	/// NOTICE: we do not have to perturbate the singularity vector
 	// if(pertubate)
 	// 	Perturbate(singularity, ZERO_ID, max_global_id);
-
 
 	iExchangeIndex = 3; 					//3D dataset 
 	if (xDim == 0.0) iExchangeIndex = 0; 	//2D dataset with yz
@@ -276,7 +280,9 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 			vectors->GetTuple(i,&vector[i * 3]);
 			input->GetPoint(i, &position[i * 3]);	
 
-			long global_id = GlobalUniqueID(&position[i * 3],spacing,global_extent,global_bounds);
+			// -- if we have just one MPI process then we can directly use the point id, since the indexing is given and consistent
+			// -- otherwise, in case of multiple MPI processes we have to derive the global id of the point from some geometric information linked to the grid
+			long global_id = mpiRanks == 1 ? i : GlobalUniqueID(&position[i * 3],spacing,global_extent,global_bounds);
 			
 			if(pertubate)
 				Perturbate(&perturbation[i * 3], global_id, max_global_id);
