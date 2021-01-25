@@ -7,3 +7,6 @@
 [submodule "externals/eigen"]
 	path = externals/eigen
 	url = https://gitlab.com/libeigen/eigen.git
+[submodule "externals/cnl"]
+	path = externals/cnl
+	url = https://github.com/johnmcfarlane/cnl.git
