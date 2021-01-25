@@ -35,6 +35,7 @@
 
 #include <Eigen/Core>
 
+
 #define M_PI 3.14159
 
 
@@ -227,8 +228,19 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 
 	ZERO_ID = max_global_id + 1; // this is the of the singularity vector
 	/// NOTICE: we do not have to perturbate the singularity vector
-	// if(pertubate)
-	// 	Perturbate(singularity, ZERO_ID, max_global_id);
+	if(pertubate) {
+		double zero_vec[3] = {0,0,0};
+	  	// Perturbate(sing_pert, ZERO_ID, max_global_id);
+		// toFixed(sing_pert);
+
+		Perturbate(zero_vec, ZERO_ID, max_global_id);		
+		singularity[0] += zero_vec[0];
+		singularity[1] += zero_vec[1];
+		singularity[2] += zero_vec[2];
+	 	// toFixed(singularity);	
+
+		//  int a; cin>>a;	 
+	}
 
 	iExchangeIndex = 3; 					//3D dataset 
 	if (xDim == 0.0) iExchangeIndex = 0; 	//2D dataset with yz
@@ -283,9 +295,17 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 			// -- if we have just one MPI process then we can directly use the point id, since the indexing is given and consistent
 			// -- otherwise, in case of multiple MPI processes we have to derive the global id of the point from some geometric information linked to the grid
 			long global_id = mpiRanks == 1 ? i : GlobalUniqueID(&position[i * 3],spacing,global_extent,global_bounds);
+
+			/// ADD CNL CALLS HERE
+			// toFixed(&vector[i*3]);
+			// toFixed(&position[i*3]);		
 			
-			if(pertubate)
-				Perturbate(&perturbation[i * 3], global_id, max_global_id);
+			if(pertubate) {								
+				Perturbate(&perturbation[i * 3], global_id, max_global_id);				
+				// toFixed(&perturbation[i*3]);
+			}
+			
+			// int a; cin>>a;
 
 			vecVectors[i] 		= &vector[i * 3];
 			vecPerturbation[i] 	= &perturbation[i * 3];
@@ -382,7 +402,7 @@ void CriticalPointExtractor::Perturbate(double* values, long id, long max_global
 	// j = to the component of values --> 0,1,2 (in their implementation is the component +1)
 
 	//eps and delta are constant.. so I compute them one time at the beginning
-	vtkIdType i = id + 1;
+	// vtkIdType i = id + 1;
 	double i_norm = static_cast<double>(id)/static_cast<double>(max_global_id);
 	double exp_coeff = 1+i_norm*delta;
 
