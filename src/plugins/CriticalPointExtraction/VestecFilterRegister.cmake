@@ -1,0 +1,1 @@
+vestec_register_paraview_plugin(vestecCriticalPointExtraction VestecCriticalPointExtraction.xml)

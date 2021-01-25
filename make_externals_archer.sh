@@ -34,6 +34,9 @@ cmake -E make_directory "$INSTALL_DIR/include"
 #cd $EXTERNALS_DIR/ttk/paraview/patch/
 #./patch-paraview-5.6.0.sh $EXTERNALS_DIR/paraview-5.6
 
+# FORCING A CRAY ENVIRONMENT TO ACCEPT SHARED LIBRARIES
+export CRAYPE_LINK_TYPE=dynamic
+
 # Paraview -----------------------------------------------------------------------------------------
 echo "Building and installing Paraview ..."
 echo ""
@@ -41,16 +44,16 @@ echo ""
 
 cmake -E make_directory "$BUILD_DIR/paraview" && cd "$BUILD_DIR/paraview"
 cmake -G "Eclipse CDT4 - Unix Makefiles" -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" \
+      -DPARAVIEW_BUILD_EDITION=CATALYST \
       -DCMAKE_INSTALL_LIBDIR=lib \
       -DPARAVIEW_INSTALL_DEVELOPMENT_FILES=ON \
       -DPARAVIEW_USE_PYTHON=ON \
       -DVTK_PYTHON_VERSION=3 \
-      -DPARAVIEW_USE_QT=ON \
+     -DPARAVIEW_USE_QT=OFF \
       -DPARAVIEW_USE_MPI=ON \
       -DPARAVIEW_USE_VTKM=OFF \
       -DCMAKE_BUILD_TYPE=Release "$EXTERNALS_DIR/paraview-5.6" 
-cmake --build . --target install --parallel "$(nproc)"
-
+cmake --build . --target install --parallel 8
 
 # EIGEN -----------------------------------------------------------------------------------------
 echo ""
@@ -59,9 +62,7 @@ echo "Building and installing Eigen ..."
 cmake -E make_directory "$BUILD_DIR/eigen" && cd "$BUILD_DIR/eigen"
 cmake -G "Eclipse CDT4 - Unix Makefiles" -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" \
       -DCMAKE_BUILD_TYPE=Release "$EXTERNALS_DIR/eigen"
-cmake --build . --target install --parallel "$(nproc)"
-
-echo ""
+cmake --build . --target install --parallel 8
 
 # TTK -------------------------------------------------------------------------------------------
 
@@ -84,7 +85,11 @@ cmake -G "Eclipse CDT4 - Unix Makefiles" -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" \
       -DVTK_MODULE_ENABLE_ttkCinemaImaging=DONT_WANT \
       -DVTK_MODULE_ENABLE_ttkUserInterfaceBase=DONT_WANT \
       -DCMAKE_BUILD_TYPE=Release "$EXTERNALS_DIR/ttk"
-cmake --build . --target install --parallel "$(nproc)"
+cmake --build . --target install --parallel 8
+
+
+
+echo ""
 
 cd "$CURRENT_DIR"
 

@@ -1,0 +1,175 @@
+/* Macros to access the (I,J)-th element of the parameter matrix. */
+
+#define    LOC(I,J)  (sos_common.lenp * (sos_common.d * (I) + (J) - 1))
+#define FP_LOC(I,J)                     (sos_common.d * (I) + (J) - 1)
+
+/*--------------------------------------------------------------------------*/
+
+void sos_matrix (int n0, int d, double scale, int len, int lenp)
+     /* Initializes the SoS module.
+        - Allocates a dynamic array for the global SoS parameter matrix
+          Pi[i,j] == sos_lia (i,j).  The parameter range is 1 <= i <= n
+          and 1 <= j <= d, where n == n0, initially.  The matrix can then
+          be "enlarged" (wrt. number of rows) to fit any following sos_param()
+          calls by a certain factor (default: 2.0).
+          Cf: sos_param(), sos_enlarge().
+        - Allocates space for a floating-point "shadow" matrix, storing
+          nothing but the (double) FP representation of the Lia parameters.
+          Cf: sos_fp().
+        - Parameter scale sets the value for sos_scale().
+          This can be used to "camouflage" the fact that SoS works internally
+          with long-integer (Lia) parameters.  The user can either ignore this
+          feature or use the following convention:
+          
+              "real" FP parameter [i,j] == sos_scale () "*" sos_lia (i,j)
+                                        == sos_scale ()  *  sos_fp  (i,j)
+                                        
+        - Furthermore, allocates space for the *-row with internal index 0
+          (see minor.c and lambda3_star.c). The *-row has d + 1 entries!
+          The first d entries are stored in the unused 0-row of parameter[];
+          the last entry is stored in parameter_0_d_plus_1.  The *-row is
+          accessible via sos_lia_0 (j) with 1 <= j <= d + 1. */
+{
+  unsigned long m;
+  ;
+  if (parameter)
+    basic_error ("sos_matrix: called twice");
+  lia_length (len);
+  n_enlarge = If ((n0 < 0), 1.0, ENLARGE);
+  n_max = abs (n0);
+  sos_common.n = n_max;
+  sos_common.d = d;
+  sos_common.len = len;
+  sos_common.lenp = lenp;
+  sos_common.scale = scale;
+  last_star = sos_common.d;
+  allocate (TRUE);
+  /* NOTE: We don't touch the sos_common.*minor fields! */
+  ;
+  m = basic_malloc_info ()->total;
+  lia_det ();
+  sos_minor ();
+  memory2 = basic_malloc_info ()->total - m;
+  ;
+#ifdef __DEBUG__
+  if (sos_test_flag)
+    print ("SoS: Library compiled with -DEBUG and sos_test flag set!\n");
+#endif
+}
+
+SoSUtils::ffp_param_push2 (v+1, d+1, SoSUtils::float_to_fixed(vfield->at(v)[d], sm.fix_a), sm.fix_w, sm.fix_a);
+
+static void ffp_param_push2 (int i, int j, double x, int w, int a)
+{
+    Lia lx[Lia_DIGITS(MAX_DECIMALS)];
+    lia_ffpload (lx, w, a, x);
+    sos_param (i, j, lx);
+    lia_push (lx);
+    lia_ipower (2);
+}
+
+void lia_ffpload (Lia_obj longi, int w, int a, double value)
+     /* Output: longi. */
+     /* Floating-point to Lia conversion: longi := int (value * 10^a).
+        That is, longi is given value in "fix-point" format "%<w>.<a>f"
+        ... MULTIPLIED by 10^a.
+        Assuming: a < w <= 16, since 64-bit fp has approx 16 decimal digits. */
+{
+  char buf[FFPLOAD_MAXLEN];
+  sprint (buf, "%0.1f", floor (value * (double) basic_ipower (10, a)));
+  if (((int) strlen (buf) > w + 1 + 2) or (w + 1 + 2 + 1 > FFPLOAD_MAXLEN))
+    basic_error ("lia_ffpload: overflow: %d.%d, %f, \"%s\"", a, w, value, buf);
+  lia_strload (longi, buf, "%d");
+}
+
+void sos_param (int i, int j, const Lia_obj longi)
+     /* Loads a Lia object longi into SoS parameter Pi[i,j]. */
+{
+  int loc = FP_LOC (i, j);
+  ;
+  /* Always do a range check! */
+  if ((i == 0) or (i <  1) or (j <  1) or (j > sos_common.d))
+    basic_error ("sos_param (%d, %d, ...): wrong indices", i, j);
+  if (i > sos_common.n)
+    { 
+      if (n_enlarge <= 1.0)
+        basic_error ("sos_param (%d, %d, ...): row index too large", i, j);
+      else if (i <= n_max)
+        sos_common.n = i;
+      else
+        { /* enlarge parameter matrix...  */
+          n_max *= n_enlarge;
+          sos_common.n = i;
+          allocate (FALSE);
+        }
+    }
+  ;
+  if (lia_high (longi) > sos_common.lenp - 1)
+    basic_error ("sos_param (%d, %d, ...): Lia parameter too long: %d",
+                 i, j, lia_high (longi));
+  ;
+  lia_assign (sos_lia (i, j), longi);
+  ;
+  Assert_always (loc <= fp_last_loc);
+  fp_parameter[loc] = lia_real (sos_lia (i, j));
+}
+
+void lia_push (const Lia_obj longi)
+     /* Pushes longi on top of Lia stack by copying its contents.
+        NOTE:
+        - If longi == LIA_NULL, it pushes an empty (zero) lia_object
+        - It will produce error when stack size reaches upper limit. */
+{
+  Element *new_top = NULL;
+  if (s.free)
+    {
+      new_top = s.free;
+      s.free = s.free->next;
+    }
+  else if (size == limit)
+    basic_error ("lia_push: reached upper limit (%d)", limit);
+  else
+    {
+      new_top = MALLOC (Element, 1);
+      MARK (new_top, -lia_magic);
+      new_top->lia_object = MALLOC (Lia, lia_common.max);
+      MARK (new_top->lia_object, -lia_magic);
+      size ++;
+    }
+  new_top->next = s.top;
+  s.top = new_top;
+  depth ++;
+  lia_assign (s.top->lia_object, longi);
+}
+
+void lia_ipower (int p)
+     /* Uses the Lia stack to compute top^p:
+        stack[..., top] --> stack[..., top ^ p] with p >= 0. */
+{
+  if (p == 0)
+    { /* (very) special case: stack[..., top] --> stack[..., 1] */
+      if (not s.top)
+        basic_error ("lia_ipower: undeflow");
+      s.top->lia_object[1] = 1;  /* set value to 1 */
+      s.top->lia_object[0] = 2;  /* set lenght to 1 and sign positive */
+    }
+  else if (p == 1)
+    { /* (normal) bottom of recursion: stack[..., top] --> stack[..., top] */
+      return;
+    }
+  else if (Odd (p))
+    {
+      lia_pushtop ();       /* --> stack[..., top, top]           */
+      lia_ipower (p - 1);   /* --> stack[..., top, top ^ (p - 1)] */
+      lia_binop (lia_mul);  /* --> stack[..., top ^ p]            */
+
+    }
+  else
+    { /* make time complexity logarithmic in p by squaring:             */
+      lia_ipower (p / 2);   /* --> stack[..., top ^ (p/2)]              */
+      lia_pushtop ();       /* --> stack[..., top ^ (p/2), top ^ (p/2)] */
+      lia_binop (lia_mul);  /* --> stack[..., top ^ p]                  */
+    }
+}
+
+

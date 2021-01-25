@@ -1,0 +1,7 @@
+NAME
+  VestecPlugins
+DESCRIPTION
+  Collection of VESTEC related filters
+REQUIRES_MODULES
+  VTK::CommonCore
+  VTK::FiltersCore

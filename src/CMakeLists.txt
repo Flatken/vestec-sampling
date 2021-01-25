@@ -1,9 +1,15 @@
 
 # Dependencies ==============================================================
+include(GNUInstallDirs)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_BINDIR}")
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
+set(BUILD_SHARED_LIBS ON)
+
 find_package(ParaView REQUIRED)
-include("${PARAVIEW_USE_FILE}")
 
 find_package (Eigen3 3.3 REQUIRED NO_MODULE)
+find_package(OpenMP)
 
 # Target for the emulator====================================================
 set(TARGET_NAME VestecCatalystEmulator)
@@ -33,8 +39,9 @@ endif()
 if(USE_CATALYST)
 	add_library(Adaptor ${CPP_SOURCE_FILES_ADAPTORS} ${CPP_HEADER_FILES_ADAPTORS})
 	target_link_libraries(Adaptor  
-		vtkParallelMPI 
-		vtkPVPythonCatalyst
+		ParaView::Catalyst 
+		ParaView::PythonCatalyst 
+		${VTK_LIBRARIES}
 		)
 	add_definitions("-DUSE_CATALYST")
 	if(NOT PARAVIEW_USE_MPI)
@@ -59,19 +66,15 @@ endif()
 add_executable(${TARGET_NAME} ${CPP_SOURCE_FILES} ${CPP_HEADER_FILES})
 if(USE_CATALYST)
 	IF (WIN32)
-		target_link_libraries(${TARGET_NAME} LINK_PRIVATE Adaptor)
+		target_link_libraries(${TARGET_NAME} LINK_PRIVATE Adaptor OpenMP::OpenMP_CXX ParaView::Catalyst ParaView::PythonCatalyst ${VTK_LIBRARIES})
 	ELSE()
-		target_link_libraries(${TARGET_NAME} LINK_PRIVATE Adaptor stdc++fs)
+		target_link_libraries(${TARGET_NAME} LINK_PRIVATE Adaptor stdc++fs OpenMP::OpenMP_CXX ParaView::Catalyst ParaView::PythonCatalyst ${VTK_LIBRARIES})
 	ENDIF()
-	
-	include(vtkModuleMacros)
-	include(vtkMPI)
-	vtk_mpi_link(${TARGET_NAME})
 else()
 	IF (WIN32)
-		target_link_libraries(${TARGET_NAME} LINK_PRIVATE ${MPI_LIBRARIES})
+		target_link_libraries(${TARGET_NAME} LINK_PRIVATE ${MPI_LIBRARIES} OpenMP::OpenMP_CXX)
 	ELSE()
-		target_link_libraries(${TARGET_NAME} LINK_PRIVATE ${MPI_LIBRARIES} stdc++fs)
+		target_link_libraries(${TARGET_NAME} LINK_PRIVATE ${MPI_LIBRARIES} stdc++fs OpenMP::OpenMP_CXX)
     ENDIF()
 endif()
 

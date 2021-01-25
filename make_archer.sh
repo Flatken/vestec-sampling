@@ -54,6 +54,9 @@ fi
 export Paraview_DIR=$EXTERNALS_INSTALL_DIR/lib/cmake/paraview-5.8
 export Eigen_DIR=$EXTERNALS_INSTALL_DIR/share/eigen3/cmake
 
+# FORCING A CRAY ENVIRONMENT TO ACCEPT SHARED LIBRARIES
+export CRAYPE_LINK_TYPE=dynamic
+
 cd "$BUILD_DIR"
 cmake "${CMAKE_FLAGS[@]}" -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" \
       -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DEXTERNALS_DIR="$EXTERNALS_INSTALL_DIR" \
@@ -62,9 +65,10 @@ cmake "${CMAKE_FLAGS[@]}" -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" \
       -DUSE_CATALYST=ON \
       -DCMAKE_EXPORT_COMPILE_COMMANDS=On "$CMAKE_DIR"
 
-cmake --build . --target install --parallel "$(nproc)"
+cmake --build . --target install --parallel 8
 
 # Delete empty files installed by cmake
 find "$INSTALL_DIR" -type d -empty -delete
 
 echo "Finished successfully."
+

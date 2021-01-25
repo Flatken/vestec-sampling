@@ -1,0 +1,9 @@
+NAME
+  vestecCriticalPointExtraction
+DEPENDS
+  Eigen3::Eigen
+  OpenMP::OpenMP_CXX
+  VTK::FiltersCore
+  ParaView::VTKExtensionsFiltersGeneral
+PRIVATE_DEPENDS
+  VTK::CommonCore
