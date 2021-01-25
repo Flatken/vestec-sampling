@@ -360,6 +360,21 @@ long CriticalPointExtractor::GlobalUniqueID(double* pos, double *spacing, int *g
 	return globalid;
 }
 
+void CriticalPointExtractor::toFixed(double *values) {	
+	// std::cout<<"original: "<<values[0]<<" "<<values[1]<<" "<<values[2]<<std::endl;
+	
+	auto tofixed = cnl::scaled_integer<long long, cnl::power<-14>>(values[0]);
+	values[0] = to_rep(tofixed);
+
+	tofixed = cnl::scaled_integer<long long, cnl::power<-14>>(values[1]);
+	values[1] = to_rep(tofixed);
+
+	tofixed = cnl::scaled_integer<long long, cnl::power<-14>>(values[2]);
+	values[2] = to_rep(tofixed);
+
+	// std::cout<<"to_fixed: "<<values[0]<<" "<<values[1]<<" "<<values[2]<<std::endl;
+}
+
 void CriticalPointExtractor::Perturbate(double* values, long id, long max_global_id) {
 	// perturbation function f(e,i,j) = eps^2^i*delta-j
 	// eps ?? --> constant?
