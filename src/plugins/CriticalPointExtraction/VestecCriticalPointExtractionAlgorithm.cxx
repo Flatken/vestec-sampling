@@ -387,12 +387,14 @@ void CriticalPointExtractor::Perturbate(double* values, long id, long max_global
 	// j = to the component of values --> 0,1,2 (in their implementation is the component +1)
 
 	//eps and delta are constant.. so I compute them one time at the beginning
-	// vtkIdType i = id + 1;
-	double i_norm = static_cast<double>(id)/static_cast<double>(max_global_id);
-	double exp_coeff = 1+i_norm*delta;
+	vtkIdType i = id + 1;
+	double i_norm = static_cast<double>(i)/static_cast<double>(max_global_id);
+	double exp_coeff = i_norm*delta;
+	double j_norm;
 
 	for(int j=0; j<3; j++) {
-		values[j] = std::pow(eps,std::pow(2,exp_coeff-static_cast<double>(j+1)));
+		j_norm = static_cast<double>(j+1)/3; //since we are normalizing the point id, we need to normalize as well the j-id --> to keep the perturbation small
+		values[j] = std::pow(eps,std::pow(2,exp_coeff-j_norm));
 	}
 }
 
