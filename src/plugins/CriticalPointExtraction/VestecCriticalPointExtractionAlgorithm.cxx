@@ -228,19 +228,19 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 
 	ZERO_ID = max_global_id + 1; // this is the of the singularity vector
 	/// NOTICE: we do not have to perturbate the singularity vector
-	if(pertubate) {
-		double zero_vec[3] = {0,0,0};
-	  	// Perturbate(sing_pert, ZERO_ID, max_global_id);
-		// toFixed(sing_pert);
+	// if(pertubate) {
+	// 	double zero_vec[3] = {0,0,0};
+	//   	// Perturbate(sing_pert, ZERO_ID, max_global_id);
+	// 	// toFixed(sing_pert);
 
-		Perturbate(zero_vec, ZERO_ID, max_global_id);		
-		singularity[0] += zero_vec[0];
-		singularity[1] += zero_vec[1];
-		singularity[2] += zero_vec[2];
-	 	// toFixed(singularity);	
+	// 	Perturbate(zero_vec, ZERO_ID, max_global_id);		
+	// 	singularity[0] += zero_vec[0];
+	// 	singularity[1] += zero_vec[1];
+	// 	singularity[2] += zero_vec[2];
+	//  	// toFixed(singularity);	
 
-		//  int a; cin>>a;	 
-	}
+	// 	//  int a; cin>>a;	 
+	// }
 
 	iExchangeIndex = 3; 					//3D dataset 
 	if (xDim == 0.0) iExchangeIndex = 0; 	//2D dataset with yz
