@@ -12,7 +12,6 @@
 #include <random>
 
 #include <Eigen/Dense>
-#include <cnl/all.h>
 
 //Matrix to compute the determinant
 typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 1, 4, 4> DynamicMatrix;
@@ -103,11 +102,6 @@ class CriticalPointExtractor {
      * Check if direction of the determinant is positive (counter-clockwise) 
      */
     bool DeterminantCounterClockWise(double& det);
-
-    /**
-     * Double to fixed-precision conversion (based on CNL-library)
-     */
-    void toFixed(double *values);
 
     /**
      * Perturbation based on point id
