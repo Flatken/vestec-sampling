@@ -230,16 +230,10 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 	/// NOTICE: we do not have to perturbate the singularity vector
 	// if(pertubate) {
 	// 	double zero_vec[3] = {0,0,0};
-	//   	// Perturbate(sing_pert, ZERO_ID, max_global_id);
-	// 	// toFixed(sing_pert);
-
 	// 	Perturbate(zero_vec, ZERO_ID, max_global_id);		
 	// 	singularity[0] += zero_vec[0];
 	// 	singularity[1] += zero_vec[1];
 	// 	singularity[2] += zero_vec[2];
-	//  	// toFixed(singularity);	
-
-	// 	//  int a; cin>>a;	 
 	// }
 
 	iExchangeIndex = 3; 					//3D dataset 
@@ -295,18 +289,11 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 			// -- if we have just one MPI process then we can directly use the point id, since the indexing is given and consistent
 			// -- otherwise, in case of multiple MPI processes we have to derive the global id of the point from some geometric information linked to the grid
 			long global_id = mpiRanks == 1 ? i : GlobalUniqueID(&position[i * 3],spacing,global_extent,global_bounds);
-
-			/// ADD CNL CALLS HERE
-			// toFixed(&vector[i*3]);
-			// toFixed(&position[i*3]);		
 			
 			if(pertubate) {								
-				Perturbate(&perturbation[i * 3], global_id, max_global_id);				
-				// toFixed(&perturbation[i*3]);
+				Perturbate(&perturbation[i * 3], global_id, max_global_id);	
 			}
 			
-			// int a; cin>>a;
-
 			vecVectors[i] 		= &vector[i * 3];
 			vecPerturbation[i] 	= &perturbation[i * 3];
 			vecPointCoordinates[i] 	= &position[i * 3];
@@ -392,10 +379,9 @@ long CriticalPointExtractor::GlobalUniqueID(double* pos, double *spacing, int *g
 	long resz = global_extent[5]+1;
 
 	/// 3. then the global id
-	long globalid = z * resy * resx + y * resz + x;
+	// z * xDim * yDim + y * zDim + x
+	long globalid = z * resx * resy + y * resz + x;
 
-	// x + y * xDim + z * xDim * yDim
-	// return fabs(pos[0]) + fabs(pos[1]) * global_dims[0] + fabs(pos[2]) * global_dims[0] * global_dims[1];
 	return globalid;
 }
 
@@ -505,7 +491,7 @@ void CriticalPointExtractor::writeCriticalCells(vtkSmartPointer<vtkDataSet> outp
 	outputData->GetPointData()->SetVectors(vectorField);
 }
 
-CriticalPointExtractor::CriticalPointType CriticalPointExtractor::PointInCell(/*const std::vector<vtkIdType> &ids*/ const vtkIdType* ids, DynamicMatrix &vecMatrix) {
+CriticalPointExtractor::CriticalPointType CriticalPointExtractor::PointInCell(const vtkIdType* ids, DynamicMatrix &vecMatrix) {	
 	// 1. compute the initial sign of the determinant of the cell
 	double targetDeterminant = ComputeDeterminant(ids, vecMatrix, false, 0);
 	bool targetDirection = DeterminantCounterClockWise(targetDeterminant);
@@ -542,8 +528,7 @@ CriticalPointExtractor::CriticalPointType CriticalPointExtractor::PointInCell(/*
 	return SINGULARITY; // the cell is critical, since the sign never change
 }
 
-double CriticalPointExtractor::ComputeDeterminant(
-	//const std::vector<vtkIdType> &ids,
+double CriticalPointExtractor::ComputeDeterminant(	
 	const vtkIdType* ids,
 	DynamicMatrix &vecMatrix,
 	bool usePoints,
@@ -610,6 +595,7 @@ double CriticalPointExtractor::ComputeDeterminant(
 	{
 		det *= -1;
 	}
+
 	return det;
 }
 
