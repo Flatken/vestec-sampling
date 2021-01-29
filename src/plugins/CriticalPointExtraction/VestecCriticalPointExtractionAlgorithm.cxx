@@ -349,6 +349,25 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 		}
 	}
 
+	// /// ==== DEBUG ONLY === ///
+	// /// write to 2 separate files the points and simplexes arrays
+	// std::ofstream points_file;
+	// points_file.open("points.txt");
+	// for(vtkIdType i=0; i < numPoints; i++) 
+	// {
+	// 	points_file << position[i*3] << " " << position[i*3+1] << " " << position[i*3+2] << " ";
+	// 	points_file << vector[i*3] << " " << vector[i*3+1] << " " << vector[i*3+2] << std::endl;
+	// }
+	// points_file.close();
+	// std::ofstream simplices_file;
+	// simplices_file.open("simplices.txt");
+	// for(vtkIdType i=0; i < vecCellIds.size(); i++) 
+	// {
+	// 	simplices_file << vecCellIds[i][0] << " " << vecCellIds[i][1] << " " << vecCellIds[i][2] << " " << vecCellIds[i][3] << std::endl;		
+	// }
+	// simplices_file.close();
+	// /// ==== DEBUG ONLY === ///
+
 	#pragma omp parallel for
     for(int x=0; x < numThreads;++x)
 	{
@@ -396,6 +415,12 @@ void CriticalPointExtractor::Perturbate(double* values, long id, long max_global
 		j_norm = static_cast<double>(j+1)/3; //since we are normalizing the point id, we need to normalize as well the j-id --> to keep the perturbation small
 		values[j] = std::pow(eps,std::pow(2,exp_coeff-j_norm));
 	}
+
+	/// FOR DEBUG ONLY --> a perturbation should never be 0
+	// if(values[0] == 0 || values[1] == 0 || values[2] == 0) {
+	// 	std::cout << "i_norm on id: " << id << " i_norm " << i_norm << " " << exp_coeff << std::endl;
+	// 	std::cout << "perturbation on id: " << id << " " << values[0] << " " << values[1] << " " << values[2] << std::endl;
+	// }
 }
 
 //----------------------------------------------------------------------------
