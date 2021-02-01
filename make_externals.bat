@@ -92,15 +92,6 @@ cmake %CMAKE_FLAGS% -DCMAKE_INSTALL_PREFIX=%INSTALL_DIR%^
        -DCMAKE_BUILD_TYPE=%BUILD_TYPE% "%EXTERNALS_DIR%/eigen"
 cmake --build . --config %BUILD_TYPE% --target install --parallel 12
 
-rem # CNL -----------------------------------------------------------------------------------------
-echo .
-echo Building and installing CNL
-
-cmake -E make_directory "%BUILD_DIR%/cnl" && cd "%BUILD_DIR%/cnl"
-cmake %CMAKE_FLAGS% -DCMAKE_INSTALL_PREFIX=%INSTALL_DIR%^
-      -DCMAKE_BUILD_TYPE=%BUILD_TYPE% "%EXTERNALS_DIR%/cnl"
-cmake --build . --config %BUILD_TYPE% --target install --parallel 12
-
 echo .
 
 rem # TTK -----------------------------------------------------------------------------------------
