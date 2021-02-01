@@ -209,5 +209,6 @@ void CatalystCoProcess( double time, unsigned int timeStep, int lastTimeStep)
 
 		//Cleanup memory
 		pReader->Delete();
+		VTKGrid->Delete();
 	}
 }
