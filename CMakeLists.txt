@@ -1,7 +1,6 @@
 cmake_minimum_required(VERSION 2.8)
 
 project(VestecSampling)
-find_package (Cnl REQUIRED)
 
 # ensure local modules (for dependencies etc.) are found
 list(
