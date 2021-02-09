@@ -12,7 +12,6 @@ export OMP_DISPLAY_ENV=true
 export OMP_PROC_BIND=spread #close,master,spread
 export OMP_PLACES=socket #socket,cores,threads
 
-srun -p standard -A d170 --qos=standard --time=0:40:0 -N $1 -n $2 -c 128 --exclusive ./VestecCatalystEmulator /work/d170/d170/shared/VESTEC-DATASETS/space_weather/run007/ .vtk 0.02 $PWD/scripts/criticalPoints_SpaceWeather.py 
-#> criticalPoints_spaceWeather_$1_$2_$3.csv
+srun -p standard -A d170 --qos=standard --time=0:40:0 -N $1 -n $2 -c 128 --exclusive ./VestecCatalystEmulator /work/d170/d170/shared/VESTEC-DATASETS/taylor_green/ .vtk 0.02 $PWD/scripts/criticalPoints_TaylorGreen.py > criticalPoints_TaylorGreen_$1_$2_$3.csv
 
 
