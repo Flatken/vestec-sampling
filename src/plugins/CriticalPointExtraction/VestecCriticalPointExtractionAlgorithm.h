@@ -58,7 +58,8 @@ class CriticalPointExtractor {
      
      #pragma omp parallel for
      for(vtkIdType x=0; x < vecCellIds.size(); ++x)
-        delete vecCellIds[x];
+        if(x%(this->numCellIds+1)==0)
+          delete vecCellIds[x];
 
      vecCellIds.clear();
      vecPointCoordinates.clear();
@@ -89,7 +90,7 @@ class CriticalPointExtractor {
      * currentSingularity: The singularity e.g. zero vector (0,0,0)
      * vecMatrix: The matrix used to compute the determinant
      */
-    double ComputeDeterminant(const vtkIdType* ids, DynamicMatrix &vecMatrix, bool usePoints, long perturbationID = -1);
+    double ComputeDeterminant(std::array<vtkIdType, 4> &tmpIds, DynamicMatrix &vecMatrix, bool usePoints, long perturbationID = -1);
    
     /**
      * Check if the singularity is in cell

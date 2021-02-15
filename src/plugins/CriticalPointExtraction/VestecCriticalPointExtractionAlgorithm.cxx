@@ -190,6 +190,9 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 	position = new double[numPoints*3];
 	vector = new double[numPoints*3];
 	perturbation = new double[numPoints*3];
+
+	long long max_memory = (numPoints*3*3)*sizeof(double);
+	
 	
 	//Get the local bounds of the current MPI process
 	double local_bounds[6];
@@ -308,17 +311,24 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 			vtkIdList* ids = vecCellPerThread[threadIdx]->GetPointIds();
 			
 			if (VTK_PIXEL == cellType || VTK_QUAD == cellType)
-			{			
-				vecCellIds[i * 2]     = new vtkIdType[3]{ ids->GetId(0) , ids->GetId(1), ids->GetId(2)};
-				vecCellIds[i * 2 + 1] = new vtkIdType[3]{ ids->GetId(1) , ids->GetId(3), ids->GetId(2)};
+			{
+				vtkIdType* test = new vtkIdType[6]{ ids->GetId(0) , ids->GetId(1), ids->GetId(2), 
+						ids->GetId(1), ids->GetId(3) , ids->GetId(2)};
+				vecCellIds[i * 2] = &test[0];
+				vecCellIds[i * 2 + 1] = &test[3];
 			}
 			else if (VTK_VOXEL == cellType || VTK_HEXAHEDRON == cellType)
 			{
-				vecCellIds[i * 5]     = new vtkIdType[4]{ ids->GetId(0) , ids->GetId(6), ids->GetId(4), ids->GetId(5)};
-				vecCellIds[i * 5 + 1] = new vtkIdType[4]{ ids->GetId(3) , ids->GetId(5), ids->GetId(7), ids->GetId(6)};
-				vecCellIds[i * 5 + 2] = new vtkIdType[4]{ ids->GetId(3) , ids->GetId(1), ids->GetId(5), ids->GetId(0)};
-				vecCellIds[i * 5 + 3] = new vtkIdType[4]{ ids->GetId(0) , ids->GetId(3), ids->GetId(2), ids->GetId(6)};
-				vecCellIds[i * 5 + 4] = new vtkIdType[4]{ ids->GetId(0) , ids->GetId(6), ids->GetId(3), ids->GetId(5)};
+				vtkIdType* test = new vtkIdType[20]{ ids->GetId(0) , ids->GetId(6), ids->GetId(4), ids->GetId(5), 
+						ids->GetId(3) , ids->GetId(5), ids->GetId(7), ids->GetId(6),
+						ids->GetId(3) , ids->GetId(1), ids->GetId(5), ids->GetId(0),
+						ids->GetId(0) , ids->GetId(3), ids->GetId(2), ids->GetId(6),
+						ids->GetId(0) , ids->GetId(6), ids->GetId(3), ids->GetId(5)};
+				vecCellIds[i * 5] = &test[0];
+				vecCellIds[i * 5 + 1] = &test[4];
+				vecCellIds[i * 5 + 2] = &test[8];
+				vecCellIds[i * 5 + 3] = &test[12];
+				vecCellIds[i * 5 + 4] = &test[16];
 			}
 			else if (VTK_TRIANGLE == cellType)
 			{
@@ -335,6 +345,10 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 			
 		}
 	}
+
+	max_memory += numCells*5*4*sizeof(vtkIdType);
+	std::cout<<"Memory allocated 3D-case: "<<max_memory<<" (bytes) "<<max_memory / std::pow(1024,2) << "(MBs)"<<std::endl;
+	// std::cout<<"Time for perturbating: "<<t_pert<<std::endl;
 
 	// /// ==== DEBUG ONLY === ///
 	// /// write to 2 separate files the points and simplexes arrays
@@ -491,9 +505,16 @@ void CriticalPointExtractor::writeCriticalCells(vtkSmartPointer<vtkDataSet> outp
 	outputData->GetPointData()->SetVectors(vectorField);
 }
 
-CriticalPointExtractor::CriticalPointType CriticalPointExtractor::PointInCell(const vtkIdType* ids, DynamicMatrix &vecMatrix) {	
+CriticalPointExtractor::CriticalPointType CriticalPointExtractor::PointInCell(const vtkIdType* ids, DynamicMatrix &vecMatrix) {		
+	std::array<vtkIdType, 4> tmpIds;
+	int numIds = numCellIds;
+	if(numIds == 3)
+		tmpIds = {ids[0],ids[1],ids[2]};
+	else
+		tmpIds = {ids[0],ids[1],ids[2],ids[3]};
+
 	// 1. compute the initial sign of the determinant of the cell
-	double targetDeterminant = ComputeDeterminant(ids, vecMatrix, false, 0);
+	double targetDeterminant = ComputeDeterminant(tmpIds, vecMatrix, false, 0);
 	bool targetDirection = DeterminantCounterClockWise(targetDeterminant);
 	//Check for non data values (vector is zero and determinant also) 
 	if (targetDeterminant == 0)
@@ -506,8 +527,12 @@ CriticalPointExtractor::CriticalPointType CriticalPointExtractor::PointInCell(co
 	// 2. for each facet (i.e. an edge in a triangle or a triangle in a tetrahedron) do
 	// 2.1. replace each row of the matrix with the origin vector (0,0) or (0,0,0) given as i to Positive function
 	for (int i = 1; i < numCellIds; i++) {
+		if(numIds == 3)
+			tmpIds = {ids[0],ids[1],ids[2]};
+		else
+			tmpIds = {ids[0],ids[1],ids[2],ids[3]};
 		// 2.2. compute the determinant sign again 
-		tmpDeterminant   = ComputeDeterminant(ids, vecMatrix, false, i);
+		tmpDeterminant   = ComputeDeterminant(tmpIds, vecMatrix, false, i);
 		tmpDirection    = DeterminantCounterClockWise(tmpDeterminant);
 		
 		// 2.3. check if it changes --> if so return false
@@ -517,7 +542,11 @@ CriticalPointExtractor::CriticalPointType CriticalPointExtractor::PointInCell(co
 		}
 	}
 
-	double initialDeterminant = ComputeDeterminant(ids, vecMatrix, true);	
+	if(numIds == 3)
+		tmpIds = {ids[0],ids[1],ids[2]};
+	else
+		tmpIds = {ids[0],ids[1],ids[2],ids[3]};
+	double initialDeterminant = ComputeDeterminant(tmpIds, vecMatrix, true);	
 	bool initialDirection     = DeterminantCounterClockWise(initialDeterminant);	
 	
 	if (initialDirection != targetDirection)
@@ -529,19 +558,14 @@ CriticalPointExtractor::CriticalPointType CriticalPointExtractor::PointInCell(co
 }
 
 double CriticalPointExtractor::ComputeDeterminant(	
-	const vtkIdType* ids,
+	std::array<vtkIdType, 4> &tmpIds,
 	DynamicMatrix &vecMatrix,
 	bool usePoints,
-	long perturbationID
+	long perturbationID	
 ){
-	
-	std::array<vtkIdType, 4> tmpIds;
+		
 	int numIds = numCellIds;
-	if(numIds == 3)
-		tmpIds = {ids[0],ids[1],ids[2]};
-	else
-		tmpIds = {ids[0],ids[1],ids[2],ids[3]};
-
+	
 	//Exchanges every facet with the zero vector
 	if (perturbationID != -1)
 	{
@@ -551,7 +575,7 @@ double CriticalPointExtractor::ComputeDeterminant(
 	// 1. Sort and check swap operations (check)
 	int swapOperations = Sort(&tmpIds[0], numIds);
 
-	double vecValues[3];
+	// double vecValues[3];
 	for (vtkIdType i = 0; i < numIds; i++) 
 	{
 		vtkIdType& pointID = tmpIds[i];
@@ -559,26 +583,22 @@ double CriticalPointExtractor::ComputeDeterminant(
 		{
 			if(!usePoints)
 			{
-				vecValues[0] = vecVectors[pointID][0] + vecPerturbation[pointID][0] ;
-				vecValues[1] = vecVectors[pointID][1] + vecPerturbation[pointID][1] ;
-				vecValues[2] = vecVectors[pointID][2] + vecPerturbation[pointID][2] ;
+				vecMatrix(i,0) = vecVectors[pointID][0] + vecPerturbation[pointID][0] ;
+				vecMatrix(i,1) = vecVectors[pointID][1] + vecPerturbation[pointID][1] ;
+				vecMatrix(i,2) = vecVectors[pointID][2] + vecPerturbation[pointID][2] ;
 			}
 			else
 			{
-				vecValues[0] = vecPointCoordinates[pointID][0];
-				vecValues[1] = vecPointCoordinates[pointID][1];
-				vecValues[2] = vecPointCoordinates[pointID][2];
+				vecMatrix(i,0) = vecPointCoordinates[pointID][0];
+				vecMatrix(i,1) = vecPointCoordinates[pointID][1];
+				vecMatrix(i,2) = vecPointCoordinates[pointID][2];
 			}
 		}
 		else
 		{
-			vecValues[0] = singularity[0];
-			vecValues[1] = singularity[1];
-			vecValues[2] = singularity[2];
-		}
-
-		for (vtkIdType j = 0; j < vecMatrix.cols(); j++) {
-			vecMatrix(i,j) = vecValues[j];
+			vecMatrix(i,0) = singularity[0];
+			vecMatrix(i,1) = singularity[1];
+			vecMatrix(i,2) = singularity[2];
 		}
 		vecMatrix(i, iExchangeIndex) = 1;
 	}
