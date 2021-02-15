@@ -31,7 +31,7 @@ class CriticalPointExtractor {
     /**
      * Store vector and points in internal data structure 
      */
-    CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input, double* currentSingularity, int mpiRank, bool pertubate = true);
+    CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input, double* currentSingularity, int mpiRank/*, bool pertubate = true*/);
 
     /**
      * Identify the critical cells 
@@ -54,7 +54,7 @@ class CriticalPointExtractor {
     ~CriticalPointExtractor() {     
       delete position;
 	    delete vector;
-	    delete perturbation;
+	    // delete perturbation;
      
      #pragma omp parallel for
      for(vtkIdType x=0; x < vecCellIds.size(); ++x)
@@ -64,7 +64,7 @@ class CriticalPointExtractor {
      vecCellIds.clear();
      vecPointCoordinates.clear();
      vecVectors.clear();
-     vecPerturbation.clear();
+    //  vecPerturbation.clear();
     }
     
   private:
@@ -119,10 +119,10 @@ private:
     int iExchangeIndex; //!< The row id of the matrix to exchange with the singularity    
     std::vector<double*> vecPointCoordinates; //!< Store point coordinates
     std::vector<double*> vecVectors; //!< Store vector field
-    std::vector<double*> vecPerturbation; //!< Store vector field perturbation
+    // std::vector<double*> vecPerturbation; //!< Store vector field perturbation
     double* position;
 	  double* vector;
-	  double* perturbation;
+	  // double* perturbation;
     std::vector<vtkIdType*> vecCellIds;  //!< The point ids for each cell
     int numCellIds;
     double singularity[3]; //!< The singularity to identify

@@ -165,8 +165,8 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
 }
 
 CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input,
-											   double *currentSingularity, int mpiRank,
-											   bool pertubate)
+											   double *currentSingularity, int mpiRank/*,
+											   bool pertubate*/)
 {
 	//Configure openmp
 	numThreads = omp_get_max_threads(); //!< Number of OpenMP threads
@@ -182,14 +182,14 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 	//Allocate memory
 	vecPointCoordinates.resize(numPoints);
 	vecVectors.resize(numPoints);
-	vecPerturbation.resize(numPoints);
+	// vecPerturbation.resize(numPoints);
 	
 	//Store vectors and point coordinates for internal usage
 	vtkSmartPointer<vtkDataArray> vectors = input->GetPointData()->GetVectors();	
 
 	position = new double[numPoints*3];
 	vector = new double[numPoints*3];
-	perturbation = new double[numPoints*3];
+	// perturbation = new double[numPoints*3];
 
 	long long max_memory = (numPoints*3*3)*sizeof(double);
 	
@@ -293,12 +293,12 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 			// -- otherwise, in case of multiple MPI processes we have to derive the global id of the point from some geometric information linked to the grid
 			long global_id = mpiRanks == 1 ? i : GlobalUniqueID(&position[i * 3],spacing,global_extent,global_bounds);
 			
-			if(pertubate) {								
-				Perturbate(&perturbation[i * 3], global_id, max_global_id);	
-			}
+			// if(pertubate) {								
+				Perturbate(&vector[i * 3], global_id, max_global_id);	
+			// }
 			
 			vecVectors[i] 		= &vector[i * 3];
-			vecPerturbation[i] 	= &perturbation[i * 3];
+			// vecPerturbation[i] 	= &perturbation[i * 3];
 			vecPointCoordinates[i] 	= &position[i * 3];
 		}
 
@@ -413,7 +413,7 @@ void CriticalPointExtractor::Perturbate(double* values, long id, long max_global
 
 	for(int j=0; j<3; j++) {
 		j_norm = static_cast<double>(j+1)/3; //since we are normalizing the point id, we need to normalize as well the j-id --> to keep the perturbation small
-		values[j] = std::pow(eps,std::pow(2,exp_coeff-j_norm));
+		values[j] += std::pow(eps,std::pow(2,exp_coeff-j_norm));
 	}
 
 	/// FOR DEBUG ONLY --> a perturbation should never be 0
@@ -440,13 +440,13 @@ void CriticalPointExtractor::ComputeCriticalCells()
 		vecMatrices.assign(numThreads,Eigen::Matrix3d());	
 
 	//Check for every cell if a critical point (passed singularity as argument) exists
-#pragma omp parallel firstprivate(vecMatrices)
+#pragma omp parallel firstprivate(vecMatrices) //private(singularity,ZERO_ID)
 	{
 		//Local variables per thread
 		int threadIdx = omp_get_thread_num();	//Thread ID
 
 		//Remove synchronization with nowait
-		#pragma omp for
+		#pragma omp for 
 		for (vtkIdType i = 0; i < vecCellIds.size(); i++) {
 			//If the cell contains a the singularity add them to the output and we can break
 			CriticalPointType ret = PointInCell(vecCellIds[i], vecMatrices[threadIdx]);
@@ -583,9 +583,9 @@ double CriticalPointExtractor::ComputeDeterminant(
 		{
 			if(!usePoints)
 			{
-				vecMatrix(i,0) = vecVectors[pointID][0] + vecPerturbation[pointID][0] ;
-				vecMatrix(i,1) = vecVectors[pointID][1] + vecPerturbation[pointID][1] ;
-				vecMatrix(i,2) = vecVectors[pointID][2] + vecPerturbation[pointID][2] ;
+				vecMatrix(i,0) = vecVectors[pointID][0];// + vecPerturbation[pointID][0] ;
+				vecMatrix(i,1) = vecVectors[pointID][1];// + vecPerturbation[pointID][1] ;
+				vecMatrix(i,2) = vecVectors[pointID][2];// + vecPerturbation[pointID][2] ;
 			}
 			else
 			{
