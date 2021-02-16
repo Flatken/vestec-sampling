@@ -13,6 +13,8 @@
 
 #include <Eigen/Dense>
 
+#include "VestecSimplicialGrid.h"
+
 //Matrix to compute the determinant
 typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 1, 4, 4> DynamicMatrix;
 //Forward declaration of vtkDataSet
@@ -52,22 +54,26 @@ class CriticalPointExtractor {
     };
 
     ~CriticalPointExtractor() {     
-      delete position;
-	    delete vector;
-	    // delete perturbation;
+    //   delete position;
+	  //   delete vector;
+	  //   // delete perturbation;
      
-     #pragma omp parallel for
-     for(vtkIdType x=0; x < vecCellIds.size(); ++x)
-        if(x%(this->numCellIds+1)==0)
-          delete vecCellIds[x];
+    //  #pragma omp parallel for
+    //  for(vtkIdType x=0; x < vecCellIds.size(); ++x)
+    //     if(x%(this->numCellIds+1)==0)
+    //       delete vecCellIds[x];
 
-     vecCellIds.clear();
-     vecPointCoordinates.clear();
-     vecVectors.clear();
-    //  vecPerturbation.clear();
+    //  vecCellIds.clear();
+    //  vecPointCoordinates.clear();
+    //  vecVectors.clear();
+    // //  vecPerturbation.clear();
+      vecCriticalCellIDs.clear();
+      for(vtkIdType x=0; x < vecGridPerThread.size(); ++x)
+        delete vecGridPerThread[x];
+      vecGridPerThread.clear();
     }
     
-  private:
+private:
     /**
      * Sort the vector integers but returns the needed swap operations
      */
@@ -90,46 +96,48 @@ class CriticalPointExtractor {
      * currentSingularity: The singularity e.g. zero vector (0,0,0)
      * vecMatrix: The matrix used to compute the determinant
      */
-    double ComputeDeterminant(std::array<vtkIdType, 4> &tmpIds, DynamicMatrix &vecMatrix, bool usePoints, long perturbationID = -1);
+    double ComputeDeterminant(std::array<vtkIdType, 4> &tmpIds, DynamicMatrix &vecMatrix, SimplicialGrid *grid, bool usePoints, long perturbationID = -1);
    
     /**
      * Check if the singularity is in cell
      * ids: The vertex ids spanning the cell
      * vecMatrix: The matrix used to compute the determinant
      */ 
-    CriticalPointType PointInCell(const vtkIdType* ids, DynamicMatrix &vecMatrix);
+    CriticalPointType PointInCell(const vtkIdType* ids, DynamicMatrix &vecMatrix, SimplicialGrid *grid);
 
     /**
      * Check if direction of the determinant is positive (counter-clockwise) 
      */
     bool DeterminantCounterClockWise(double& det);
 
-    /**
-     * Perturbation based on point id
-     */
-    void Perturbate(double* values, long id, long max_global_id);
+    // /**
+    //  * Perturbation based on point id
+    //  */
+    // void Perturbate(double* values, long id, long max_global_id);
 
-    /**
-     * Calculate global unique id 
-     */
-    long GlobalUniqueID(double* pos, double *spacing, int *global_extent, double * global_bounds);
+    // /**
+    //  * Calculate global unique id 
+    //  */
+    // long GlobalUniqueID(double* pos, double *spacing, int *global_extent, double * global_bounds);
     
 private:
     vtkIdType ZERO_ID;  //!< Vertex ID of the singularity: always number of vertices + 1 
     int iExchangeIndex; //!< The row id of the matrix to exchange with the singularity    
-    std::vector<double*> vecPointCoordinates; //!< Store point coordinates
-    std::vector<double*> vecVectors; //!< Store vector field
-    // std::vector<double*> vecPerturbation; //!< Store vector field perturbation
-    double* position;
-	  double* vector;
-	  // double* perturbation;
-    std::vector<vtkIdType*> vecCellIds;  //!< The point ids for each cell
-    int numCellIds;
+    // std::vector<double*> vecPointCoordinates; //!< Store point coordinates
+    // std::vector<double*> vecVectors; //!< Store vector field
+    // // std::vector<double*> vecPerturbation; //!< Store vector field perturbation
+    // double* position;
+	  // double* vector;
+	  // // double* perturbation;
+    // std::vector<vtkIdType*> vecCellIds;  //!< The point ids for each cell
+    std::vector<SimplicialGrid*> vecGridPerThread;
+    // int numCellIds;
     double singularity[3]; //!< The singularity to identify
     int numThreads; //!< Number of OpenMP threads
-    double eps = 1 / std::pow(10,14);
-	  double delta = 4; // >=n    
+    // double eps = 1 / std::pow(10,14);
+	  // double delta = 4; // >=n    
 	  std::vector<CriticalPoint> vecCriticalCellIDs; //!< Vector of critical cell ids
+    vtkIdType chunk_size;
 };
 
 
