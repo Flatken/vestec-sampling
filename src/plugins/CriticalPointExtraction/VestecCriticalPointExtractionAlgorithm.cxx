@@ -464,7 +464,7 @@ void CriticalPointExtractor::ComputeCriticalCells()
 		vecMatrices.assign(numThreads,Eigen::Matrix3d());	
 
 	//Check for every cell if a critical point (passed singularity as argument) exists
-#pragma omp parallel firstprivate(vecMatrices) private(vector,position)//private(singularity,ZERO_ID)
+#pragma omp parallel firstprivate(vecMatrices) //private(vector,position)//private(singularity,ZERO_ID)
 	{
 		//Local variables per thread
 		int threadIdx = omp_get_thread_num();	//Thread ID
