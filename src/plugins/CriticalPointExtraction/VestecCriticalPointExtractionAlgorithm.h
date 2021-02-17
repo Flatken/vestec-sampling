@@ -31,7 +31,7 @@ class CriticalPointExtractor {
     /**
      * Store vector and points in internal data structure 
      */
-    CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input, double* currentSingularity, int mpiRank/*, bool pertubate = true*/);
+    CriticalPointExtractor(vtkDataSet* input, double* currentSingularity, int mpiRank/*, bool pertubate = true*/);
 
     /**
      * Identify the critical cells 
@@ -53,17 +53,18 @@ class CriticalPointExtractor {
 
     ~CriticalPointExtractor() {     
       delete position;
-	    delete vector;
+	  delete vector;
 	    // delete perturbation;
      
-     #pragma omp parallel for
+     /*#pragma omp parallel for
      for(vtkIdType x=0; x < vecCellIds.size(); ++x)
         if(x%(this->numCellIds+1)==0)
-          delete vecCellIds[x];
+          delete vecCellIds[x];*/
+	  delete vecCellIds;
 
-     vecCellIds.clear();
-     vecPointCoordinates.clear();
-     vecVectors.clear();
+     //vecCellIds.clear();
+     //vecPointCoordinates.clear();
+     //vecVectors.clear();
     //  vecPerturbation.clear();
     }
     
@@ -117,19 +118,21 @@ class CriticalPointExtractor {
 private:
     vtkIdType ZERO_ID;  //!< Vertex ID of the singularity: always number of vertices + 1 
     int iExchangeIndex; //!< The row id of the matrix to exchange with the singularity    
-    std::vector<double*> vecPointCoordinates; //!< Store point coordinates
-    std::vector<double*> vecVectors; //!< Store vector field
+    //std::vector<double*> vecPointCoordinates; //!< Store point coordinates
+    //std::vector<double*> vecVectors; //!< Store vector field
     // std::vector<double*> vecPerturbation; //!< Store vector field perturbation
-    double* position;
-	  double* vector;
+    double* position; //!< Store point coordinates
+	double* vector; //!< Store vector field
 	  // double* perturbation;
-    std::vector<vtkIdType*> vecCellIds;  //!< The point ids for each cell
+//    std::vector<vtkIdType*> vecCellIds;  //!< The point ids for each cell
+    vtkIdType* vecCellIds;  //!< The point ids for each cell
     int numCellIds;
     double singularity[3]; //!< The singularity to identify
     int numThreads; //!< Number of OpenMP threads
     double eps = 1 / std::pow(10,14);
-	  double delta = 4; // >=n    
-	  std::vector<CriticalPoint> vecCriticalCellIDs; //!< Vector of critical cell ids
+	double delta = 4; // >=n    
+	std::vector<CriticalPoint> vecCriticalCellIDs; //!< Vector of critical cell ids
+    vtkIdType numSimplices;
 };
 
 
