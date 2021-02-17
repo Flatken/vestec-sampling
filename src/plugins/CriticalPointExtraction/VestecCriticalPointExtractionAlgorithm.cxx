@@ -263,6 +263,7 @@ CriticalPointExtractor::CriticalPointExtractor(vtkDataSet* input,
 	//Allocate size for cells which depends on input cell type
 	if(VTK_PIXEL == cellType || VTK_QUAD == cellType) {
 		//vecCellIds.reserve(numCells * 2);
+		vecCellIds = new vtkIdType[numCells * 6];
 		numCellIds=3;
 		numSimplices = numCells * 2;
 	}
@@ -274,11 +275,13 @@ CriticalPointExtractor::CriticalPointExtractor(vtkDataSet* input,
 	}
 	else if (VTK_TRIANGLE == cellType) {
 		//vecCellIds.reserve(numCells);
+		vecCellIds = new vtkIdType[numCells];
 		numCellIds=3;
 		numSimplices = numCells;
 	}
 	else if (VTK_TETRA == cellType) {
 		//vecCellIds.reserve(numCells);
+		vecCellIds = new vtkIdType[numCells];
 		numCellIds=4;
 		numSimplices = numCells;
 	}
