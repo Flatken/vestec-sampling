@@ -1,7 +1,9 @@
 #include "VestecSimplicialGrid.h"
 
 SimplicialGrid::SimplicialGrid(vtkIdType numPoints, vtkIdType numCells, vtkIdType cellType) {
-    pointIDsForMesh.reserve(numPoints); 
+    pointIDsForMesh.reserve(numPoints); //allocate
+
+	vecPoints.reserve(numPoints); //allocate
 	   
     //Allocate size for cells which depends on input cell type
 	if(VTK_PIXEL == cellType || VTK_QUAD == cellType) {
@@ -27,8 +29,7 @@ SimplicialGrid::SimplicialGrid(vtkIdType numPoints, vtkIdType numCells, vtkIdTyp
 }
 
 void SimplicialGrid::AddSimplex(
-    vtkSmartPointer<vtkDataSet> input, vtkIdType &i, vtkIdList* ids, vtkIdType &cellType, vtkIdType &chunk_size, 
-    vtkIdType &mpiRanks, double* spacing, int* global_extent, double* global_bounds, vtkIdType &max_global_id) {
+    vtkSmartPointer<vtkDataSet> input, vtkIdType &i, vtkIdList* ids, vtkIdType &cellType, vtkIdType &chunk_size) {
 
     vtkIdType numPoints;
 	vtkIdType local_id = i % chunk_size;
@@ -69,7 +70,12 @@ void SimplicialGrid::AddSimplex(
 	return;
 }
 
-void SimplicialGrid::CopyVectorsAndPoints(vtkSmartPointer<vtkDataSet> input)
+void SimplicialGrid::CopyVectorsAndPoints(	vtkSmartPointer<vtkDataSet> input,
+											vtkIdType &mpiRanks,
+											double* spacing,
+											int* global_extent,
+											double* global_bounds,
+											vtkIdType &max_global_id)
 {
 	//Sort to discard duplicated point ids later
 	std::sort(pointIDsForMesh.begin(), pointIDsForMesh.end());
@@ -87,22 +93,14 @@ void SimplicialGrid::CopyVectorsAndPoints(vtkSmartPointer<vtkDataSet> input)
 			prevID = pointIDsForMesh[j];
 			double* c = new double[6];
 				
-			
 		    input->GetPoint(prevID, &c[0]);	  //Coordinates
             vectors->GetTuple(prevID, &c[3]); //vector values
 
 		    // -- if we have just one MPI process then we can directly use the point id, since the indexing is given and consistent
 		    // -- otherwise, in case of multiple MPI processes we have to derive the global id of the point from some geometric information linked to the grid
-		    //long global_id = mpiRanks == 1 ? v_id : SimplicialGrid::GlobalUniqueID(&c[0],spacing,global_extent,global_bounds);
-			
-		    // if(pertubate) {								
-		    //SimplicialGrid::Perturbate(&c[3], global_id, max_global_id);	
-		    // }
-			
-		    // if(pertubate) {								
-		    // SimplicialGrid::Perturbate(&c[3], global_id, max_global_id);	
-		    // }
-			
+		    long global_id = mpiRanks == 1 ? prevID : SimplicialGrid::GlobalUniqueID(&c[0],spacing,global_extent,global_bounds);
+							
+		    SimplicialGrid::Perturbate(&c[3], global_id, max_global_id);	
 		    vecPoints[prevID] = c;
         }
     }

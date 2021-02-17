@@ -165,8 +165,7 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
 }
 
 CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input,
-											   double *currentSingularity, int mpiRank/*,
-											   bool pertubate*/)
+											   double *currentSingularity, int mpiRank)
 {
 	//Configure openmp
 	numThreads = omp_get_max_threads(); //!< Number of OpenMP threads
@@ -180,22 +179,6 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 	vtkIdType numPoints = input->GetNumberOfPoints();	
 	std::cout<<"POINTS NUMBER " << numPoints<<std::endl;
 
-	//Allocate memory
-	// vecPointCoordinates.resize(numPoints);
-	// vecVectors.resize(numPoints);
-	// vecPerturbation.resize(numPoints);
-	
-	//Store vectors and point coordinates for internal usage
-	// vtkSmartPointer<vtkDataArray> vectors = input->GetPointData()->GetVectors();	
-
-	// position = new double[numPoints*3];
-	// vector = new double[numPoints*3];
-	// perturbation = new double[numPoints*3];
-
-
-	// long long max_memory = (numPoints*3*3)*sizeof(double);
-	
-	
 	//Get the local bounds of the current MPI process
 	double local_bounds[6];
 	input->GetBounds(local_bounds);
@@ -232,14 +215,6 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 	vtkIdType max_global_id = mpiRanks == 1 ? numPoints : SimplicialGrid::GlobalUniqueID(global_max_coords,spacing,global_extent,global_bounds);	
 
 	ZERO_ID = max_global_id + 1; // this is the of the singularity vector
-	/// NOTICE: we do not have to perturbate the singularity vector
-	// if(pertubate) {
-	// 	double zero_vec[3] = {0,0,0};
-	// 	Perturbate(zero_vec, ZERO_ID, max_global_id);		
-	// 	singularity[0] += zero_vec[0];
-	// 	singularity[1] += zero_vec[1];
-	// 	singularity[2] += zero_vec[2];
-	// }
 
 	iExchangeIndex = 3; 					//3D dataset 
 	if (xDim == 0.0) iExchangeIndex = 0; 	//2D dataset with yz
@@ -257,6 +232,9 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 
 	chunk_size = numCells / numThreads;
 	
+	//enable nested openmp
+	omp_set_nested(1);
+
 	// per thread allocations
 	vecCellPerThread.resize(numThreads);	
 	vecGridPerThread.resize(numThreads);
@@ -290,15 +268,14 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 													i,
 													ids,
 													lcellType,
-													lChunkSize,
-													lRanks,
+													lChunkSize);
+	
+		}//END FOR
+		vecGridPerThread[threadIdx]->CopyVectorsAndPoints(input,lRanks,
 													spacing,
 													global_extent,
 													global_bounds,
 													lmax_global_id);
-	
-		}//END FOR
-		vecGridPerThread[threadIdx]->CopyVectorsAndPoints(input);
 	}
 
 	

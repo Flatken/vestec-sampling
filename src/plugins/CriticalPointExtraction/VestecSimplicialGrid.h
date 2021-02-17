@@ -48,16 +48,24 @@ public:
         delete cellIds;
 
         for(auto it=vecPoints.begin(); it!=vecPoints.end(); ++it) {
-            delete it->second;
+            delete *it;
         }            
         vecPoints.clear();
         // vecVectors.clear();
     }    
 
-    void CopyVectorsAndPoints(vtkSmartPointer<vtkDataSet> input);
+    void CopyVectorsAndPoints(vtkSmartPointer<vtkDataSet> input,
+                              vtkIdType &mpiRanks,
+                              double* spacing,
+                              int* global_extent,
+                              double* global_bounds,
+                              vtkIdType &max_global_id);
 
-    void AddSimplex(vtkSmartPointer<vtkDataSet> input, vtkIdType &i, vtkIdList* ids, vtkIdType &cellType, vtkIdType &chunk_size, 
-        vtkIdType &mpiRanks, double* spacing, int* global_extent, double* global_bounds, vtkIdType &max_global_id);
+    void AddSimplex( vtkSmartPointer<vtkDataSet> input,
+                     vtkIdType &i,
+                     vtkIdList* ids,
+                     vtkIdType &cellType,
+                     vtkIdType &chunk_size);
 
     // inline vtkIdType GetSimplicesNum() { return vecCellIds.size(); }
     // inline vtkIdType* GetSimplex(vtkIdType i) { return vecCellIds[i]; }
@@ -80,7 +88,7 @@ public:
 
 private:
     /// the first array encodes the coordinates, while the second the vector associated to a point
-    std::map<int,double*> vecPoints; //!< Store point coordinates + vectors
+    std::vector<double*> vecPoints; //!< Store point coordinates + vectors
     // std::map<int,std::pair<double*,double*> > vecPoints; //!< Store point coordinates + vectors
     // std::map<int,double*> vecVectors; //!< Store vector field
     // std::vector<double*> vecPerturbation; //!< Store vector field perturbation
