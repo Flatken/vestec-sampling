@@ -263,53 +263,20 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 	#pragma omp parallel for
     for(int x=0; x < numThreads;++x)
 	{
-		vecCellPerThread[x] = vtkGenericCell::New();
+		vtkIdType threadIdx = omp_get_thread_num();//Thread ID
 		vtkIdType loc_num_points = numPoints / numThreads;
-		vecGridPerThread[x] = new SimplicialGrid(numPoints,chunk_size,cellType);
+		vecCellPerThread[threadIdx] = vtkGenericCell::New();
+		vecGridPerThread[threadIdx] = new SimplicialGrid(numPoints,chunk_size,cellType);
 	}
 
-	// //Allocate size for cells which depends on input cell type
-	// if(VTK_PIXEL == cellType || VTK_QUAD == cellType) {
-	// 	vecCellIds.resize(numCells * 2);
-	// 	numCellIds=3;
-	// }
-	// else if (VTK_VOXEL == cellType || VTK_HEXAHEDRON == cellType) {
-	// 	vecCellIds.resize(numCells * 5);
-	// 	numCellIds=4;
-	// }
-	// else if (VTK_TRIANGLE == cellType) {
-	// 	vecCellIds.resize(numCells);
-	// 	numCellIds=3;
-	// }
-	// else if (VTK_TETRA == cellType) {
-	// 	vecCellIds.resize(numCells);
-	// 	numCellIds=4;
-	// }
-
-	#pragma omp parallel firstprivate(vecCellPerThread) 
+	#pragma omp parallel firstprivate(vecCellPerThread) private(spacing, global_extent,global_bounds)
 	{
 		//Local variables per thread
-		int threadIdx = omp_get_thread_num();//Thread ID
-
-		// #pragma omp for nowait
-		// for(vtkIdType i=0; i < numPoints; i++) 
-		// {
-		// 	vectors->GetTuple(i,&vector[i * 3]);
-		// 	input->GetPoint(i, &position[i * 3]);	
-
-		// 	// -- if we have just one MPI process then we can directly use the point id, since the indexing is given and consistent
-		// 	// -- otherwise, in case of multiple MPI processes we have to derive the global id of the point from some geometric information linked to the grid
-		// 	long global_id = mpiRanks == 1 ? i : GlobalUniqueID(&position[i * 3],spacing,global_extent,global_bounds);
-			
-		// 	// if(pertubate) {								
-		// 		Perturbate(&vector[i * 3], global_id, max_global_id);	
-		// 	// }
-			
-		// 	vecVectors[i] 		= &vector[i * 3];
-		// 	// vecPerturbation[i] 	= &perturbation[i * 3];
-		// 	vecPointCoordinates[i] 	= &position[i * 3];
-		// }
-		
+		vtkIdType threadIdx = omp_get_thread_num();//Thread ID
+		vtkIdType lChunkSize = chunk_size;
+		vtkIdType lRanks = mpiRanks;
+		vtkIdType lcellType = cellType;
+		vtkIdType lmax_global_id = max_global_id;
 
 		#pragma omp for schedule(static,chunk_size)
 		for (vtkIdType i = 0; i < numCells; i++) {
@@ -319,43 +286,22 @@ CriticalPointExtractor::CriticalPointExtractor(vtkSmartPointer<vtkDataSet> input
 			//Get the associated point ids for the cell 
 			vtkIdList* ids = vecCellPerThread[threadIdx]->GetPointIds();
 
-			vecGridPerThread[threadIdx]->AddSimplex(input,i,ids,cellType,chunk_size,mpiRanks,spacing,global_extent,global_bounds,max_global_id);
-			
-			// if (VTK_PIXEL == cellType || VTK_QUAD == cellType)
-			// {
-			// 	vtkIdType* test = new vtkIdType[6]{ ids->GetId(0) , ids->GetId(1), ids->GetId(2), 
-			// 			ids->GetId(1), ids->GetId(3) , ids->GetId(2)};
-			// 	vecCellIds[i * 2] = &test[0];
-			// 	vecCellIds[i * 2 + 1] = &test[3];
-			// }
-			// else if (VTK_VOXEL == cellType || VTK_HEXAHEDRON == cellType)
-			// {
-			// 	vtkIdType* test = new vtkIdType[20]{ ids->GetId(0) , ids->GetId(6), ids->GetId(4), ids->GetId(5), 
-			// 			ids->GetId(3) , ids->GetId(5), ids->GetId(7), ids->GetId(6),
-			// 			ids->GetId(3) , ids->GetId(1), ids->GetId(5), ids->GetId(0),
-			// 			ids->GetId(0) , ids->GetId(3), ids->GetId(2), ids->GetId(6),
-			// 			ids->GetId(0) , ids->GetId(6), ids->GetId(3), ids->GetId(5)};
-			// 	vecCellIds[i * 5] = &test[0];
-			// 	vecCellIds[i * 5 + 1] = &test[4];
-			// 	vecCellIds[i * 5 + 2] = &test[8];
-			// 	vecCellIds[i * 5 + 3] = &test[12];
-			// 	vecCellIds[i * 5 + 4] = &test[16];
-			// }
-			// else if (VTK_TRIANGLE == cellType)
-			// {
-			// 	vecCellIds[i] = new vtkIdType[3]{ ids->GetId(0) , ids->GetId(1), ids->GetId(2)};
-			// }
-			// else if (VTK_TETRA == cellType)
-			// {
-			// 	vecCellIds[i] = new vtkIdType[4]{ ids->GetId(0) , ids->GetId(1), ids->GetId(2), ids->GetId(3)};
-			// }
-			// else {
-			// 	std::cout << "[MPI:" << mpiRank << "] [CriticalPointExtractor::identify_critical_points] Error: unknown cell type " << std::endl;
-			// 		continue;
-			// }	
-			
-		}
+			vecGridPerThread[threadIdx]->AddSimplex(input,
+													i,
+													ids,
+													lcellType,
+													lChunkSize,
+													lRanks,
+													spacing,
+													global_extent,
+													global_bounds,
+													lmax_global_id);
+	
+		}//END FOR
+		vecGridPerThread[threadIdx]->CopyVectorsAndPoints(input);
 	}
+
+	
 
 	// max_memory += numCells*5*4*sizeof(vtkIdType);
 	// std::cout<<"Memory allocated 3D-case: "<<max_memory<<" (bytes) "<<max_memory / std::pow(1024,2) << "(MBs)"<<std::endl;

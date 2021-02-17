@@ -1,34 +1,25 @@
 #include "VestecSimplicialGrid.h"
 
 SimplicialGrid::SimplicialGrid(vtkIdType numPoints, vtkIdType numCells, vtkIdType cellType) {
-    /// RICCARDO: changed from resize to reserve, since this is going to be the maximum memory needed.. but not actually used
-
-    //Allocate memory for encoding points coordinates and vectors
-	// vecPointCoordinates.resize(numPoints);
-	// vecVectors.resize(numPoints);
-    
-
+    pointIDsForMesh.reserve(numPoints); 
+	   
     //Allocate size for cells which depends on input cell type
 	if(VTK_PIXEL == cellType || VTK_QUAD == cellType) {
-		// vecCellIds.resize(numCells * 2);
 		numCellIds=3;
 		cellIds = new vtkIdType[numCells*2*numCellIds];
         numSimplices = numCells*2;
 	}
-	else if (VTK_VOXEL == cellType || VTK_HEXAHEDRON == cellType) {
-		// vecCellIds.resize(numCells * 5);        
+	else if (VTK_VOXEL == cellType || VTK_HEXAHEDRON == cellType) {  
 		numCellIds=4;
         cellIds = new vtkIdType[numCells*5*numCellIds];
         numSimplices = numCells*5;
 	}
 	else if (VTK_TRIANGLE == cellType) {
-		// vecCellIds.resize(numCells);
 		numCellIds=3;
 		cellIds = new vtkIdType[numCells*numCellIds];
         numSimplices = numCells;		
 	}
 	else if (VTK_TETRA == cellType) {
-		// vecCellIds.resize(numCells);
 		numCellIds=4;
 		cellIds = new vtkIdType[numCells*numCellIds];
         numSimplices = numCells;
@@ -39,42 +30,23 @@ void SimplicialGrid::AddSimplex(
     vtkSmartPointer<vtkDataSet> input, vtkIdType &i, vtkIdList* ids, vtkIdType &cellType, vtkIdType &chunk_size, 
     vtkIdType &mpiRanks, double* spacing, int* global_extent, double* global_bounds, vtkIdType &max_global_id) {
 
-    vtkSmartPointer<vtkDataArray> vectors = input->GetPointData()->GetVectors();	
     vtkIdType numPoints;
-
 	vtkIdType local_id = i % chunk_size;
 
     if (VTK_PIXEL == cellType || VTK_QUAD == cellType)
 	{
-		// vtkIdType* test = new vtkIdType[6]{ ids->GetId(0) , ids->GetId(1), ids->GetId(2), 
-		// 	ids->GetId(1), ids->GetId(3) , ids->GetId(2)};
-		// vecCellIds[i * 2] = &test[0];
-		// vecCellIds[i * 2 + 1] = &test[3];
 		cellIds[local_id*6] = ids->GetId(0); cellIds[local_id*6+1] = ids->GetId(1); cellIds[local_id*6+2] = ids->GetId(2);
 		cellIds[local_id*6+3] = ids->GetId(1); cellIds[local_id*6+4] = ids->GetId(3); cellIds[local_id*6+5] = ids->GetId(2);
         numPoints = 4;
 	}
 	else if (VTK_VOXEL == cellType || VTK_HEXAHEDRON == cellType)
 	{
-		// vtkIdType* test = new vtkIdType[20]{ ids->GetId(0) , ids->GetId(6), ids->GetId(4), ids->GetId(5), 
-		// 	ids->GetId(3) , ids->GetId(5), ids->GetId(7), ids->GetId(6),
-		// 	ids->GetId(3) , ids->GetId(1), ids->GetId(5), ids->GetId(0),
-		// 	ids->GetId(0) , ids->GetId(3), ids->GetId(2), ids->GetId(6),
-		// 	ids->GetId(0) , ids->GetId(6), ids->GetId(3), ids->GetId(5)};
-		// vecCellIds[i * 5] = &test[0];
-		// vecCellIds[i * 5 + 1] = &test[4];
-		// vecCellIds[i * 5 + 2] = &test[8];
-		// vecCellIds[i * 5 + 3] = &test[12];
-		// vecCellIds[i * 5 + 4] = &test[16];
-        
         cellIds[local_id*20] = ids->GetId(0); cellIds[local_id*20+1] = ids->GetId(6); cellIds[local_id*20+2] = ids->GetId(4); cellIds[local_id*20+3] = ids->GetId(5);
         cellIds[local_id*20+4] = ids->GetId(3); cellIds[local_id*20+5] = ids->GetId(5); cellIds[local_id*20+6] = ids->GetId(7); cellIds[local_id*20+7] = ids->GetId(6);
         cellIds[local_id*20+8] = ids->GetId(3); cellIds[local_id*20+9] = ids->GetId(1); cellIds[local_id*20+10] = ids->GetId(5); cellIds[local_id*20+11] = ids->GetId(0);
         cellIds[local_id*20+12] = ids->GetId(0); cellIds[local_id*20+13] = ids->GetId(3); cellIds[local_id*20+14] = ids->GetId(2); cellIds[local_id*20+15] = ids->GetId(6);
         cellIds[local_id*20+16] = ids->GetId(0); cellIds[local_id*20+17] = ids->GetId(6); cellIds[local_id*20+18] = ids->GetId(3); cellIds[local_id*20+19] = ids->GetId(5);
-
-        numPoints = 8;
-       
+		numPoints = 8;   
 	}
 	else if (VTK_TRIANGLE == cellType)
 	{
@@ -91,46 +63,49 @@ void SimplicialGrid::AddSimplex(
 	else {
 		std::cout << "[MPI:] [SimplicialGrid::AddSimplex] Error: unknown cell type " << std::endl;
 		return;
-        // continue;
 	}
+	//Store point indices
+	for(int x=0; x < numPoints; ++x) pointIDsForMesh.push_back(ids->GetId(x));
+	return;
+}
 
-    for(vtkIdType j=0; j < numPoints; j++) 
+void SimplicialGrid::CopyVectorsAndPoints(vtkSmartPointer<vtkDataSet> input)
+{
+	//Sort to discard duplicated point ids later
+	std::sort(pointIDsForMesh.begin(), pointIDsForMesh.end());
+
+	//Previous point id
+	vtkIdType prevID = -1;
+
+	vtkSmartPointer<vtkDataArray> vectors = input->GetPointData()->GetVectors();	
+	
+	//Fill the vecPoints map with vector values and coordinates
+	for(vtkIdType j=0; j < pointIDsForMesh.size(); j++) 
     {
-        vtkIdType v_id = ids->GetId(j);        
-        if(vecPoints.find(v_id)==vecPoints.end()) {
-            double* c = new double[6];
-            // double* v = new double[3];
-            
-		    input->GetPoint(v_id, &c[0]);	
-            vectors->GetTuple(v_id,&c[3]);
+		if(prevID != pointIDsForMesh[j]) 
+		{
+			prevID = pointIDsForMesh[j];
+			double* c = new double[6];
+				
+			
+		    input->GetPoint(prevID, &c[0]);	  //Coordinates
+            vectors->GetTuple(prevID, &c[3]); //vector values
 
 		    // -- if we have just one MPI process then we can directly use the point id, since the indexing is given and consistent
 		    // -- otherwise, in case of multiple MPI processes we have to derive the global id of the point from some geometric information linked to the grid
-		    long global_id = mpiRanks == 1 ? v_id : SimplicialGrid::GlobalUniqueID(&c[0],spacing,global_extent,global_bounds);
+		    //long global_id = mpiRanks == 1 ? v_id : SimplicialGrid::GlobalUniqueID(&c[0],spacing,global_extent,global_bounds);
 			
 		    // if(pertubate) {								
-		    SimplicialGrid::Perturbate(&c[3], global_id, max_global_id);	
+		    //SimplicialGrid::Perturbate(&c[3], global_id, max_global_id);	
 		    // }
 			
-		    vecPoints[v_id] = c;
+		    // if(pertubate) {								
+		    // SimplicialGrid::Perturbate(&c[3], global_id, max_global_id);	
+		    // }
+			
+		    vecPoints[prevID] = c;
         }
     }
-	// {
-	// 	vectors->GetTuple(i,&vector[i * 3]);
-	// 	input->GetPoint(i, &position[i * 3]);	
-
-	// 	// -- if we have just one MPI process then we can directly use the point id, since the indexing is given and consistent
-	// 	// -- otherwise, in case of multiple MPI processes we have to derive the global id of the point from some geometric information linked to the grid
-	// 	long global_id = mpiRanks == 1 ? i : GlobalUniqueID(&position[i * 3],spacing,global_extent,global_bounds);
-			
-	// 	// if(pertubate) {								
-	// 		Perturbate(&vector[i * 3], global_id, max_global_id);	
-	// 	// }
-			
-	// 	vecVectors[i] 		= &vector[i * 3];
-	// 	// vecPerturbation[i] 	= &perturbation[i * 3];
-	// 	vecPointCoordinates[i] 	= &position[i * 3];
-	// }
 }
 
 long SimplicialGrid::GlobalUniqueID(double* pos, double *spacing, int *global_extent, double * global_bounds)

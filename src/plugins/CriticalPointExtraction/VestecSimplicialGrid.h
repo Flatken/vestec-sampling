@@ -23,6 +23,7 @@
 #include <vtkImageData.h>
 
 #include <map>
+#include <unordered_set>
 
 const double EPS = 1 / std::pow(10,14);
 const double DELTA = 4; // >=n   
@@ -52,6 +53,8 @@ public:
         vecPoints.clear();
         // vecVectors.clear();
     }    
+
+    void CopyVectorsAndPoints(vtkSmartPointer<vtkDataSet> input);
 
     void AddSimplex(vtkSmartPointer<vtkDataSet> input, vtkIdType &i, vtkIdList* ids, vtkIdType &cellType, vtkIdType &chunk_size, 
         vtkIdType &mpiRanks, double* spacing, int* global_extent, double* global_bounds, vtkIdType &max_global_id);
@@ -88,4 +91,5 @@ private:
     vtkIdType* cellIds;
     int numCellIds;    
     vtkIdType numSimplices;
+    std::vector<vtkIdType> pointIDsForMesh;    
 };
