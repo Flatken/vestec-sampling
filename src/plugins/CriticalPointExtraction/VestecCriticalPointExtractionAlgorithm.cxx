@@ -620,21 +620,21 @@ double CriticalPointExtractor::ComputeDeterminant(
 		if (pointID != ZERO_ID)
 		{
 			// std::cout<<std::endl<<"point id: "<<pointID<<" ";
-			std::pair<double*,double*> &point = grid->GetPoint(pointID);		
+			double* point = grid->GetPoint(pointID);		
 			// std::cout<<point.first[0]<<" "<<point.first[1]<<" "<<point.first[2]<<std::endl;
 			// std::cout<<point.second[0]<<" "<<point.second[1]<<" "<<point.second[2]<<std::endl;
 
 			if(!usePoints)
 			{
-				vecMatrix(i,0) = point.second[0];//vecVectors[pointID][0];// + vecPerturbation[pointID][0] ;
-				vecMatrix(i,1) = point.second[1];//vecVectors[pointID][1];// + vecPerturbation[pointID][1] ;
-				vecMatrix(i,2) = point.second[2];//vecVectors[pointID][2];// + vecPerturbation[pointID][2] ;
+				vecMatrix(i,0) = point[3];//vecVectors[pointID][0];// + vecPerturbation[pointID][0] ;
+				vecMatrix(i,1) = point[4];//vecVectors[pointID][1];// + vecPerturbation[pointID][1] ;
+				vecMatrix(i,2) = point[5];//vecVectors[pointID][2];// + vecPerturbation[pointID][2] ;
 			}
 			else
 			{
-				vecMatrix(i,0) = point.first[0];//vecPointCoordinates[pointID][0];
-				vecMatrix(i,1) = point.first[1];//vecPointCoordinates[pointID][1];
-				vecMatrix(i,2) = point.first[2];//vecPointCoordinates[pointID][2];
+				vecMatrix(i,0) = point[0];//vecPointCoordinates[pointID][0];
+				vecMatrix(i,1) = point[1];//vecPointCoordinates[pointID][1];
+				vecMatrix(i,2) = point[2];//vecPointCoordinates[pointID][2];
 			}
 		}
 		else

@@ -38,16 +38,16 @@ public:
     // #pragma omp parallel for
         // for(vtkIdType x=0; x < vecCellIds.size(); ++x)
         int count = 0;
-        for(auto it=vecCellIds.begin(); it!=vecCellIds.end(); ++it) {
-            if(count%(this->numCellIds+1)==0)
-              delete it->second;
-            count++;
-        }            
-        vecCellIds.clear();
+        // for(auto it=vecCellIds.begin(); it!=vecCellIds.end(); ++it) {
+        //     if(count%(this->numCellIds+1)==0)
+        //       delete it->second;
+        //     count++;
+        // }            
+        // vecCellIds.clear();
+        delete cellIds;
 
         for(auto it=vecPoints.begin(); it!=vecPoints.end(); ++it) {
-            delete it->second.first;
-            delete it->second.second;
+            delete it->second;
         }            
         vecPoints.clear();
         // vecVectors.clear();
@@ -58,12 +58,12 @@ public:
 
     // inline vtkIdType GetSimplicesNum() { return vecCellIds.size(); }
     // inline vtkIdType* GetSimplex(vtkIdType i) { return vecCellIds[i]; }
-    inline std::map<int,vtkIdType*>::iterator GetCellIds_Begin() { return vecCellIds.begin(); }
-    inline std::map<int,vtkIdType*>::iterator GetCellIds_End() { return vecCellIds.end(); }
+    // inline std::map<int,vtkIdType*>::iterator GetCellIds_Begin() { return vecCellIds.begin(); }
+    // inline std::map<int,vtkIdType*>::iterator GetCellIds_End() { return vecCellIds.end(); }
     inline int GetNumCellIds() { return numCellIds; }
     inline vtkIdType GetNumCells() { return numSimplices/*vecCellIds.size()*/; }
     inline vtkIdType* GetSimplex(vtkIdType i) { return &cellIds[i*numCellIds]; }
-    inline std::pair<double*,double*>& GetPoint(vtkIdType pId) { /*std::cout<<"numPoints: "<<vecPoints.size()<<std::endl;*/ return vecPoints[pId]; }
+    inline double* GetPoint(vtkIdType pId) { return vecPoints[pId]; }
 
     /**
      * Perturbation based on point id
@@ -77,13 +77,14 @@ public:
 
 private:
     /// the first array encodes the coordinates, while the second the vector associated to a point
-    std::map<int,std::pair<double*,double*> > vecPoints; //!< Store point coordinates
+    std::map<int,double*> vecPoints; //!< Store point coordinates + vectors
+    // std::map<int,std::pair<double*,double*> > vecPoints; //!< Store point coordinates + vectors
     // std::map<int,double*> vecVectors; //!< Store vector field
     // std::vector<double*> vecPerturbation; //!< Store vector field perturbation
     // double* position;
 	// double* vector;
 	// double* perturbation;
-    std::map<int,vtkIdType*> vecCellIds;  //!< The point ids for each cell
+    // std::map<int,vtkIdType*> vecCellIds;  //!< The point ids for each cell
     vtkIdType* cellIds;
     int numCellIds;    
     vtkIdType numSimplices;

@@ -12,20 +12,26 @@ SimplicialGrid::SimplicialGrid(vtkIdType numPoints, vtkIdType numCells, vtkIdTyp
 	if(VTK_PIXEL == cellType || VTK_QUAD == cellType) {
 		// vecCellIds.resize(numCells * 2);
 		numCellIds=3;
+		cellIds = new vtkIdType[numCells*2*numCellIds];
+        numSimplices = numCells*2;
 	}
 	else if (VTK_VOXEL == cellType || VTK_HEXAHEDRON == cellType) {
 		// vecCellIds.resize(numCells * 5);        
 		numCellIds=4;
-        cellIds = new vtkIdType[numCells*5*4];
+        cellIds = new vtkIdType[numCells*5*numCellIds];
         numSimplices = numCells*5;
 	}
 	else if (VTK_TRIANGLE == cellType) {
 		// vecCellIds.resize(numCells);
 		numCellIds=3;
+		cellIds = new vtkIdType[numCells*numCellIds];
+        numSimplices = numCells;		
 	}
 	else if (VTK_TETRA == cellType) {
 		// vecCellIds.resize(numCells);
 		numCellIds=4;
+		cellIds = new vtkIdType[numCells*numCellIds];
+        numSimplices = numCells;
 	}
 }
 
@@ -36,12 +42,16 @@ void SimplicialGrid::AddSimplex(
     vtkSmartPointer<vtkDataArray> vectors = input->GetPointData()->GetVectors();	
     vtkIdType numPoints;
 
+	vtkIdType local_id = i % chunk_size;
+
     if (VTK_PIXEL == cellType || VTK_QUAD == cellType)
 	{
-		vtkIdType* test = new vtkIdType[6]{ ids->GetId(0) , ids->GetId(1), ids->GetId(2), 
-			ids->GetId(1), ids->GetId(3) , ids->GetId(2)};
-		vecCellIds[i * 2] = &test[0];
-		vecCellIds[i * 2 + 1] = &test[3];
+		// vtkIdType* test = new vtkIdType[6]{ ids->GetId(0) , ids->GetId(1), ids->GetId(2), 
+		// 	ids->GetId(1), ids->GetId(3) , ids->GetId(2)};
+		// vecCellIds[i * 2] = &test[0];
+		// vecCellIds[i * 2 + 1] = &test[3];
+		cellIds[local_id*6] = ids->GetId(0); cellIds[local_id*6+1] = ids->GetId(1); cellIds[local_id*6+2] = ids->GetId(2);
+		cellIds[local_id*6+3] = ids->GetId(1); cellIds[local_id*6+4] = ids->GetId(3); cellIds[local_id*6+5] = ids->GetId(2);
         numPoints = 4;
 	}
 	else if (VTK_VOXEL == cellType || VTK_HEXAHEDRON == cellType)
@@ -56,8 +66,7 @@ void SimplicialGrid::AddSimplex(
 		// vecCellIds[i * 5 + 2] = &test[8];
 		// vecCellIds[i * 5 + 3] = &test[12];
 		// vecCellIds[i * 5 + 4] = &test[16];
-
-        vtkIdType local_id = i % chunk_size;
+        
         cellIds[local_id*20] = ids->GetId(0); cellIds[local_id*20+1] = ids->GetId(6); cellIds[local_id*20+2] = ids->GetId(4); cellIds[local_id*20+3] = ids->GetId(5);
         cellIds[local_id*20+4] = ids->GetId(3); cellIds[local_id*20+5] = ids->GetId(5); cellIds[local_id*20+6] = ids->GetId(7); cellIds[local_id*20+7] = ids->GetId(6);
         cellIds[local_id*20+8] = ids->GetId(3); cellIds[local_id*20+9] = ids->GetId(1); cellIds[local_id*20+10] = ids->GetId(5); cellIds[local_id*20+11] = ids->GetId(0);
@@ -69,14 +78,14 @@ void SimplicialGrid::AddSimplex(
 	}
 	else if (VTK_TRIANGLE == cellType)
 	{
-		vecCellIds[i] = new vtkIdType[3]{ ids->GetId(0) , ids->GetId(1), ids->GetId(2)};
-
+		// vecCellIds[i] = new vtkIdType[3]{ ids->GetId(0) , ids->GetId(1), ids->GetId(2)};
+		cellIds[local_id*3] = ids->GetId(0); cellIds[local_id*3+1] = ids->GetId(1); cellIds[local_id*3+2] = ids->GetId(2);
         numPoints = 3;
 	}
 	else if (VTK_TETRA == cellType)
 	{
-		vecCellIds[i] = new vtkIdType[4]{ ids->GetId(0) , ids->GetId(1), ids->GetId(2), ids->GetId(3)};
-
+		// vecCellIds[i] = new vtkIdType[4]{ ids->GetId(0) , ids->GetId(1), ids->GetId(2), ids->GetId(3)};
+		cellIds[local_id*4] = ids->GetId(0); cellIds[local_id*4+1] = ids->GetId(1); cellIds[local_id*4+2] = ids->GetId(2); cellIds[local_id*4+3] = ids->GetId(3);
         numPoints = 4;
 	}
 	else {
@@ -103,7 +112,7 @@ void SimplicialGrid::AddSimplex(
 		    SimplicialGrid::Perturbate(&c[3], global_id, max_global_id);	
 		    // }
 			
-		    vecPoints[v_id] = std::make_pair(&c[0],&c[3]);
+		    vecPoints[v_id] = c;
         }
     }
 	// {
