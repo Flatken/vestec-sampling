@@ -286,14 +286,14 @@ CriticalPointExtractor::CriticalPointExtractor(vtkDataSet* input,
 	}
 	else if (VTK_TRIANGLE == cellType) {
 		//vecCellIds.reserve(numCells);
-		vecCellIds = new vtkIdType[numCells];
+		vecCellIds = new vtkIdType[numCells * 3];
 		numCellIds=3;
 		numSimplices = numCells;
 		numSimplicesPerCell = 1;
 	}
 	else if (VTK_TETRA == cellType) {
 		//vecCellIds.reserve(numCells);
-		vecCellIds = new vtkIdType[numCells];
+		vecCellIds = new vtkIdType[numCells * 4];
 		numCellIds=4;
 		numSimplices = numCells;
 		numSimplicesPerCell = 1;
@@ -559,7 +559,6 @@ void CriticalPointExtractor::ComputeCriticalCells()
 
 void CriticalPointExtractor::writeCriticalCells(vtkSmartPointer<vtkDataSet> output) 
 {
-	return;
 	vtkSmartPointer<vtkUnstructuredGrid> outputData = vtkUnstructuredGrid::SafeDownCast(output);
 
 	vtkSmartPointer<vtkPoints> pointArray = vtkSmartPointer<vtkPoints>::New();
@@ -607,7 +606,7 @@ void CriticalPointExtractor::writeCriticalCells(vtkSmartPointer<vtkDataSet> outp
 			vtkIdType newPointID = pointArray->InsertNextPoint(midPoint[0], midPoint[1], midPoint[2]);
 			newPointIDs->InsertNextId(newPointID);
 		}
-		if(numCellIds == 5)
+		if(numCellIds == 3)
 		{
 			//Insert the type of singularity 
 			singularityType->InsertNextTuple1(cellID.type);
@@ -627,27 +626,10 @@ void CriticalPointExtractor::writeCriticalCells(vtkSmartPointer<vtkDataSet> outp
 			pCoords3[1] = position[vecVertexIds[2] * 3 + 1];
 			pCoords3[2] = position[vecVertexIds[2] * 3 + 2];
 
-			double midPoint12[3];
-			midPoint12[0] = (pCoords1[0] + pCoords2[0]) / 2;
-			midPoint12[1] = (pCoords1[1] + pCoords2[1]) / 2;
-			midPoint12[2] = (pCoords1[2] + pCoords2[2]) / 2;
-
-			double dir[3];
-			dir[0] = (midPoint12[0] - pCoords3[0]) * 0;
-			dir[1] = (midPoint12[1] - pCoords3[1]) / 2;
-			dir[2] = (midPoint12[2] - pCoords3[2]) / 2;
-
-			float distance = sqrt(dir[0]*dir[0] + dir[1]*dir[1] + dir[2]*dir[2]);
-
-			//normalize
-			dir[0] /= distance;
-			dir[1] /= distance;
-			dir[2] /= distance;
-
 			double midPoint[3];
-			midPoint[0] = midPoint12[0] + (0.33 * distance) * dir[0];
-			midPoint[1] = midPoint12[1] + (0.33 * distance) * dir[1];
-			midPoint[2] = midPoint12[2] + (0.33 * distance) * dir[2];
+			midPoint[0] = (pCoords1[0] + pCoords2[0] + pCoords3[0] ) / 3; 
+			midPoint[1] = (pCoords1[1] + pCoords2[1] + pCoords3[1] ) / 3; 
+			midPoint[2] = (pCoords1[2] + pCoords2[2] + pCoords3[2] ) / 3; 
 			
 			vtkIdType newPointID = pointArray->InsertNextPoint(midPoint[0], midPoint[1], midPoint[2]);
 			newPointIDs->InsertNextId(newPointID);
