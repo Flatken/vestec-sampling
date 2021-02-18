@@ -224,6 +224,9 @@ CriticalPointExtractor::CriticalPointExtractor(vtkDataSet* input,
 	// 5. and the global extent (i.e., the resolution of the dataset)
 	int global_extent[6] = { 0, global_sides[0]/spacing[0], 0, global_sides[1]/spacing[1], 0, global_sides[2]/spacing[2]};
 
+	int dimensions[3];
+	vtkImageData::SafeDownCast(input)->GetDimensions(dimensions);
+
 	// the global max id is needed for computing the perturbation in each point
 	// -- if we have just one MPI process then we can directly use the number of points value, since the indexing is given and consistent
 	// -- otherwise, in case of multiple MPI processes we have to derive the global id from some geometric information linked to the grid
@@ -286,31 +289,61 @@ CriticalPointExtractor::CriticalPointExtractor(vtkDataSet* input,
 		numSimplices = numCells;
 	}
 
+	// std::vector<int> touched; touched.assign(numPoints,0);
+
 	#pragma omp parallel firstprivate(vecCellPerThread)
 	{
 		//Local variables per thread
 		int threadIdx = omp_get_thread_num();//Thread ID
 
 		#pragma omp for nowait
-		for(vtkIdType i=0; i < numPoints; i++) 
-		{
-			vectors->GetTuple(i,&vector[i * 3]); /// vectors is a vtkSmartPointer
-			input->GetPoint(i, &position[i * 3]); /// input is a vtkSmartPointer
+		for(vtkIdType w=0; w < dimensions[2]; w+=2) { //Z
+			for(vtkIdType j=0; j < dimensions[1]; j+=2) { //Y				
+				for(vtkIdType i=0; i < dimensions[0]; i+=2) { //X
+					
+					/// these 3 loops iterate over one line					
+					for(vtkIdType z=0; z < 2; z++) {
+						for(vtkIdType y=0; y < 2; y++) {
+							for(vtkIdType x=0; x < 2; x++) {
+								vtkIdType id = i + x + (j+y)*dimensions[1] + (w+z)*dimensions[1]*dimensions[2];
+								vectors->GetTuple(id,&vector[id * 3]); /// vectors is a vtkSmartPointer
+								input->GetPoint(id, &position[id * 3]); /// input is a vtkSmartPointer
 
-			// -- if we have just one MPI process then we can directly use the point id, since the indexing is given and consistent
-			// -- otherwise, in case of multiple MPI processes we have to derive the global id of the point from some geometric information linked to the grid
-			long global_id = mpiRanks == 1 ? i : GlobalUniqueID(&position[i * 3],spacing,global_extent,global_bounds);
+								// -- if we have just one MPI process then we can directly use the point id, since the indexing is given and consistent
+								// -- otherwise, in case of multiple MPI processes we have to derive the global id of the point from some geometric information linked to the grid
+								long global_id = mpiRanks == 1 ? id : GlobalUniqueID(&position[id * 3],spacing,global_extent,global_bounds);
 			
-			// if(pertubate) {								
-				Perturbate(&vector[i * 3], global_id, max_global_id);	
-			// }
-			
-			//vecVectors[i] 		= &vector[i * 3];
-			// vecPerturbation[i] 	= &perturbation[i * 3];
-			//vecPointCoordinates[i] 	= &position[i * 3];
-		}
+								Perturbate(&vector[id * 3], global_id, max_global_id);	
+								// touched[id]++;
+								//std::cout<<id<<" ";
+							}	
+						}			
+					}
+				}
+			}
+		}		
+		// //std::cout<<std::endl;
+		// for(vtkIdType i=0; i<touched.size(); i++){
+		// 	if(touched[i] == 0 || touched[i]>1) 
+		// 		std::cout<<"point "<<i<<" touched "<<touched[i]<<" times"<<std::endl;
+		// }
+		// std::cout<<"DONE"<<std::endl;
+		// int a; cin>>a;
 
-		#pragma omp for schedule(static,10000)
+		// #pragma omp for nowait
+		// for(vtkIdType i=0; i < numPoints; i++) 
+		// {
+		// 	vectors->GetTuple(i,&vector[i * 3]); /// vectors is a vtkSmartPointer
+		// 	input->GetPoint(i, &position[i * 3]); /// input is a vtkSmartPointer
+
+		// 	// -- if we have just one MPI process then we can directly use the point id, since the indexing is given and consistent
+		// 	// -- otherwise, in case of multiple MPI processes we have to derive the global id of the point from some geometric information linked to the grid
+		// 	long global_id = mpiRanks == 1 ? i : GlobalUniqueID(&position[i * 3],spacing,global_extent,global_bounds);
+						
+		// 	Perturbate(&vector[i * 3], global_id, max_global_id);
+		// }
+
+		#pragma omp for //schedule(static,10000)
 		for (vtkIdType i = 0; i < numCells; i++) {
 			//get the current cell
 			input->GetCell(i, vecCellPerThread[threadIdx]); /// input is a vtkSmartPointer
@@ -470,7 +503,7 @@ void CriticalPointExtractor::ComputeCriticalCells()
 		int threadIdx = omp_get_thread_num();	//Thread ID
 
 		//Remove synchronization with nowait
-		#pragma omp for schedule(static,50000)
+		#pragma omp for //schedule(static,50000)
 		for (vtkIdType i = 0; i < numSimplices; i++) {
 /*#pragma omp critical			
 			std::cout<<"thread: "<<threadIdx<<" processed "<<i<<std::endl;*/
