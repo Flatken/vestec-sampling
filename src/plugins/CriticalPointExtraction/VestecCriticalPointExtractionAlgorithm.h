@@ -51,6 +51,18 @@ class CriticalPointExtractor {
       }
     };
 
+    struct DataSetMetadata {
+      double local_bounds[6];
+      double global_bounds[6];
+      int* global_extent;
+      double spacing[3];
+      vtkIdType max_global_id;
+      int dimensions[3];
+      ~DataSetMetadata() { 
+        delete global_extent;
+      }
+    };
+
     ~CriticalPointExtractor() {     
       delete position;
 	  delete vector;
@@ -113,7 +125,17 @@ class CriticalPointExtractor {
     /**
      * Calculate global unique id 
      */
-    long GlobalUniqueID(double* pos, double *spacing, int *global_extent, double * global_bounds);
+    vtkIdType GlobalUniqueID(double* pos, DataSetMetadata &dm/*, double *spacing, int *global_extent, double * global_bounds*/);
+
+    /**
+     * Initialize and Perturbate the points array considering an access pattern that mitigates the NUMA allocation issue (3D-case)
+     */
+    void InitializePointsArray_2D(vtkDataSet* input, vtkDataArray* vectors, DataSetMetadata &dm, int &mpiRanks);
+
+    /**
+     * Initialize and Perturbate the points array considering an access pattern that mitigates the NUMA allocation issue (2D-case)
+     */
+    void InitializePointsArray_3D(vtkDataSet* input, vtkDataArray* vectors, DataSetMetadata &dm, int &mpiRanks);
     
 private:
     vtkIdType ZERO_ID;  //!< Vertex ID of the singularity: always number of vertices + 1 
@@ -122,7 +144,7 @@ private:
     //std::vector<double*> vecVectors; //!< Store vector field
     // std::vector<double*> vecPerturbation; //!< Store vector field perturbation
     double* position; //!< Store point coordinates
-	double* vector; //!< Store vector field
+	  double* vector; //!< Store vector field
 	  // double* perturbation;
 //    std::vector<vtkIdType*> vecCellIds;  //!< The point ids for each cell
     vtkIdType* vecCellIds;  //!< The point ids for each cell

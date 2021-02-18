@@ -192,47 +192,49 @@ CriticalPointExtractor::CriticalPointExtractor(vtkDataSet* input,
 	// perturbation = new double[numPoints*3];
 
 	long long max_memory = (numPoints*3*3)*sizeof(double);
-	
+
+	DataSetMetadata dm;	
 	
 	//Get the local bounds of the current MPI process
-	double local_bounds[6];
-	input->GetBounds(local_bounds);
-	double xDim = fabs(local_bounds[1] - local_bounds[0]);
-	double yDim = fabs(local_bounds[3] - local_bounds[2]);
-	double zDim = fabs(local_bounds[5] - local_bounds[4]);	
+	// double local_bounds[6];
+	input->GetBounds(dm.local_bounds);
+	// get global sides
+	double xDim = fabs(dm.local_bounds[1] - dm.local_bounds[0]);
+	double yDim = fabs(dm.local_bounds[3] - dm.local_bounds[2]);
+	double zDim = fabs(dm.local_bounds[5] - dm.local_bounds[4]);	
 
 	/// then extract some global characteristics of the dataset
 	/// like, 1. global bounds
-	double global_bounds[6];
+	// double global_bounds[6];
 	vtkSmartPointer<vtkMultiProcessController> controller = vtkMultiProcessController::GetGlobalController();
-	controller->AllReduce(&local_bounds[0], &global_bounds[0], 1, vtkCommunicator::StandardOperations::MIN_OP);
-	controller->AllReduce(&local_bounds[2], &global_bounds[2], 1, vtkCommunicator::StandardOperations::MIN_OP);
-	controller->AllReduce(&local_bounds[4], &global_bounds[4], 1, vtkCommunicator::StandardOperations::MIN_OP);
-	controller->AllReduce(&local_bounds[1], &global_bounds[1], 1, vtkCommunicator::StandardOperations::MAX_OP);
-	controller->AllReduce(&local_bounds[3], &global_bounds[3], 1, vtkCommunicator::StandardOperations::MAX_OP);
-	controller->AllReduce(&local_bounds[5], &global_bounds[5], 1, vtkCommunicator::StandardOperations::MAX_OP);
+	controller->AllReduce(&dm.local_bounds[0], &dm.global_bounds[0], 1, vtkCommunicator::StandardOperations::MIN_OP);
+	controller->AllReduce(&dm.local_bounds[2], &dm.global_bounds[2], 1, vtkCommunicator::StandardOperations::MIN_OP);
+	controller->AllReduce(&dm.local_bounds[4], &dm.global_bounds[4], 1, vtkCommunicator::StandardOperations::MIN_OP);
+	controller->AllReduce(&dm.local_bounds[1], &dm.global_bounds[1], 1, vtkCommunicator::StandardOperations::MAX_OP);
+	controller->AllReduce(&dm.local_bounds[3], &dm.global_bounds[3], 1, vtkCommunicator::StandardOperations::MAX_OP);
+	controller->AllReduce(&dm.local_bounds[5], &dm.global_bounds[5], 1, vtkCommunicator::StandardOperations::MAX_OP);
 
 	int mpiRanks = controller->GetNumberOfProcesses(); // to check how many MPI processes are up and running
 
 	// 2. global sides
-	double global_sides[3] = { fabs(global_bounds[1]-global_bounds[0]), fabs(global_bounds[3]-global_bounds[2]), fabs(global_bounds[5]-global_bounds[4]) };
+	// double global_sides[3] = { xDim, yDim, zDim };
 	// 3. global maximum coordinates
-	double global_max_coords[3] = { global_bounds[1] , global_bounds[3] , global_bounds[5] };
+	double global_max_coords[3] = { dm.global_bounds[1] , dm.global_bounds[3] , dm.global_bounds[5] };
 	// 4. spacing between points (WARNING: this works only on regular grids!!)	
-	double spacing[3];
-	vtkImageData::SafeDownCast(input)->GetSpacing(spacing);
+	// double spacing[3];
+	vtkImageData::SafeDownCast(input)->GetSpacing(dm.spacing);
 	// 5. and the global extent (i.e., the resolution of the dataset)
-	int global_extent[6] = { 0, global_sides[0]/spacing[0], 0, global_sides[1]/spacing[1], 0, global_sides[2]/spacing[2]};
+	/*int global_extent[6]*/dm.global_extent = new int[6]{0, static_cast<int>(xDim/dm.spacing[0]), 0, static_cast<int>(yDim/dm.spacing[1]), 0, static_cast<int>(zDim/dm.spacing[2])};
 
-	int dimensions[3];
-	vtkImageData::SafeDownCast(input)->GetDimensions(dimensions);
+	// int dimensions[3];
+	vtkImageData::SafeDownCast(input)->GetDimensions(dm.dimensions);
 
 	// the global max id is needed for computing the perturbation in each point
 	// -- if we have just one MPI process then we can directly use the number of points value, since the indexing is given and consistent
 	// -- otherwise, in case of multiple MPI processes we have to derive the global id from some geometric information linked to the grid
-	long max_global_id = mpiRanks == 1 ? numPoints : GlobalUniqueID(global_max_coords,spacing,global_extent,global_bounds);	
+	dm.max_global_id = mpiRanks == 1 ? numPoints : GlobalUniqueID(global_max_coords,dm/*.spacing,dm.global_extent,dm.global_bounds*/);	
 
-	ZERO_ID = max_global_id + 1; // this is the of the singularity vector
+	ZERO_ID = dm.max_global_id + 1; // this is the of the singularity vector
 	/// NOTICE: we do not have to perturbate the singularity vector
 	// if(pertubate) {
 	// 	double zero_vec[3] = {0,0,0};
@@ -287,59 +289,29 @@ CriticalPointExtractor::CriticalPointExtractor(vtkDataSet* input,
 		vecCellIds = new vtkIdType[numCells];
 		numCellIds=4;
 		numSimplices = numCells;
-	}
+	}	
 
-	// std::vector<int> touched; touched.assign(numPoints,0);
-
-	#pragma omp parallel firstprivate(vecCellPerThread)
+	#pragma omp parallel firstprivate(vecCellPerThread) //private(dm,mpiRanks)
 	{
 		//Local variables per thread
 		int threadIdx = omp_get_thread_num();//Thread ID
 
-		#pragma omp for nowait
-		for(vtkIdType w=0; w < dimensions[2]; w+=2) { //Z
-			for(vtkIdType j=0; j < dimensions[1]; j+=2) { //Y				
-				for(vtkIdType i=0; i < dimensions[0]; i+=2) { //X
-					
-					/// these 3 loops iterate over one line					
-					for(vtkIdType z=0; z < 2; z++) {
-						for(vtkIdType y=0; y < 2; y++) {
-							for(vtkIdType x=0; x < 2; x++) {
-								vtkIdType id = i + x + (j+y)*dimensions[1] + (w+z)*dimensions[1]*dimensions[2];
-								vectors->GetTuple(id,&vector[id * 3]); /// vectors is a vtkSmartPointer
-								input->GetPoint(id, &position[id * 3]); /// input is a vtkSmartPointer
-
-								// -- if we have just one MPI process then we can directly use the point id, since the indexing is given and consistent
-								// -- otherwise, in case of multiple MPI processes we have to derive the global id of the point from some geometric information linked to the grid
-								long global_id = mpiRanks == 1 ? id : GlobalUniqueID(&position[id * 3],spacing,global_extent,global_bounds);
-			
-								Perturbate(&vector[id * 3], global_id, max_global_id);	
-								// touched[id]++;
-								//std::cout<<id<<" ";
-							}	
-						}			
-					}
-				}
-			}
-		}		
-		// //std::cout<<std::endl;
-		// for(vtkIdType i=0; i<touched.size(); i++){
-		// 	if(touched[i] == 0 || touched[i]>1) 
-		// 		std::cout<<"point "<<i<<" touched "<<touched[i]<<" times"<<std::endl;
-		// }
-		// std::cout<<"DONE"<<std::endl;
-		// int a; cin>>a;
+		if(VTK_PIXEL == cellType || VTK_QUAD == cellType || VTK_TRIANGLE == cellType)
+			InitializePointsArray_2D(input,vectors,dm,mpiRanks);
+		else if(VTK_VOXEL == cellType || VTK_HEXAHEDRON == cellType || VTK_TETRA == cellType)
+			InitializePointsArray_3D(input,vectors,dm,mpiRanks);
+		else {
+			std::cout << "[MPI:" << mpiRank << "] [CriticalPointExtractor::identify_critical_points] Error: unknown cell type " << std::endl;			
+		}	
 
 		// #pragma omp for nowait
 		// for(vtkIdType i=0; i < numPoints; i++) 
 		// {
-		// 	vectors->GetTuple(i,&vector[i * 3]); /// vectors is a vtkSmartPointer
-		// 	input->GetPoint(i, &position[i * 3]); /// input is a vtkSmartPointer
-
+		// 	vectors->GetTuple(i,&vector[i * 3]);
+		// 	input->GetPoint(i, &position[i * 3]);
 		// 	// -- if we have just one MPI process then we can directly use the point id, since the indexing is given and consistent
 		// 	// -- otherwise, in case of multiple MPI processes we have to derive the global id of the point from some geometric information linked to the grid
-		// 	long global_id = mpiRanks == 1 ? i : GlobalUniqueID(&position[i * 3],spacing,global_extent,global_bounds);
-						
+		// 	long global_id = mpiRanks == 1 ? i : GlobalUniqueID(&position[i * 3],spacing,global_extent,global_bounds);						
 		// 	Perturbate(&vector[i * 3], global_id, max_global_id);
 		// }
 
@@ -353,46 +325,23 @@ CriticalPointExtractor::CriticalPointExtractor(vtkDataSet* input,
 			
 			if (VTK_PIXEL == cellType || VTK_QUAD == cellType)
 			{
-				/*vtkIdType* test = new vtkIdType[6]{ ids->GetId(0) , ids->GetId(1), ids->GetId(2), 
-						ids->GetId(1), ids->GetId(3) , ids->GetId(2)};
-				vecCellIds[i * 2] = &test[0];
-				vecCellIds[i * 2 + 1] = &test[3];*/
-
 				vecCellIds[i*6] = ids->GetId(0); vecCellIds[i*6+1] = ids->GetId(1); vecCellIds[i*6+2] = ids->GetId(2);
 				vecCellIds[i*6+3] = ids->GetId(1); vecCellIds[i*6+4] = ids->GetId(3); vecCellIds[i*6+5] = ids->GetId(2);
-
 			}
 			else if (VTK_VOXEL == cellType || VTK_HEXAHEDRON == cellType)
 			{
-				/*vtkIdType* test = new vtkIdType[20]{ ids->GetId(0) , ids->GetId(6), ids->GetId(4), ids->GetId(5), 
-						ids->GetId(3) , ids->GetId(5), ids->GetId(7), ids->GetId(6),
-						ids->GetId(3) , ids->GetId(1), ids->GetId(5), ids->GetId(0),
-						ids->GetId(0) , ids->GetId(3), ids->GetId(2), ids->GetId(6),
-						ids->GetId(0) , ids->GetId(6), ids->GetId(3), ids->GetId(5)};
-				vecCellIds[i * 5] = &test[0];
-				vecCellIds[i * 5 + 1] = &test[4];
-				vecCellIds[i * 5 + 2] = &test[8];
-				vecCellIds[i * 5 + 3] = &test[12];
-				vecCellIds[i * 5 + 4] = &test[16];*/
-
 				vecCellIds[i*20] = ids->GetId(0); vecCellIds[i*20+1] = ids->GetId(6); vecCellIds[i*20+2] = ids->GetId(4); vecCellIds[i*20+3] = ids->GetId(5);
 				vecCellIds[i*20+4] = ids->GetId(3); vecCellIds[i*20+5] = ids->GetId(5); vecCellIds[i*20+6] = ids->GetId(7); vecCellIds[i*20+7] = ids->GetId(6);
 				vecCellIds[i*20+8] = ids->GetId(3); vecCellIds[i*20+9] = ids->GetId(1); vecCellIds[i*20+10] = ids->GetId(5); vecCellIds[i*20+11] = ids->GetId(0);
 				vecCellIds[i*20+12] = ids->GetId(0); vecCellIds[i*20+13] = ids->GetId(3); vecCellIds[i*20+14] = ids->GetId(2); vecCellIds[i*20+15] = ids->GetId(6);
 				vecCellIds[i*20+16] = ids->GetId(0); vecCellIds[i*20+17] = ids->GetId(6); vecCellIds[i*20+18] = ids->GetId(3); vecCellIds[i*20+19] = ids->GetId(5);
-
-/*#pragma omp critical		
-std::cout<<"thread: "<<threadIdx<<" created "<<i*5<<" "<<i*5+1<<" "<<i*5+2<<" "<<i*5+3<<" "<<i*5+4<<std::endl;*/
-
 			}
 			else if (VTK_TRIANGLE == cellType)
 			{
-				//vecCellIds[i] = new vtkIdType[3]{ ids->GetId(0) , ids->GetId(1), ids->GetId(2)};
 				vecCellIds[i*3] = ids->GetId(0); vecCellIds[i*3+1] = ids->GetId(1); vecCellIds[i*3+2] = ids->GetId(2);
 			}
 			else if (VTK_TETRA == cellType)
 			{
-				//vecCellIds[i] = new vtkIdType[4]{ ids->GetId(0) , ids->GetId(1), ids->GetId(2), ids->GetId(3)};
 				vecCellIds[i*4] = ids->GetId(0); vecCellIds[i*4+1] = ids->GetId(1); vecCellIds[i*4+2] = ids->GetId(2); vecCellIds[i*4+3] = ids->GetId(3);
 			}
 			else {
@@ -435,23 +384,85 @@ std::cout<<"thread: "<<threadIdx<<" created "<<i*5<<" "<<i*5+1<<" "<<i*5+2<<" "<
 	if(mpiRank == 0) std::cout << "[MPI:" << mpiRank << "] [CriticalPointExtractor::identify_critical_points] Extracted " << numSimplices/*vecCellIds.size()*/ << " simplices" << std::endl;
 }
 
-long CriticalPointExtractor::GlobalUniqueID(double* pos, double *spacing, int *global_extent, double * global_bounds)
+void CriticalPointExtractor::InitializePointsArray_2D(vtkDataSet * input, vtkDataArray * vectors, DataSetMetadata &dm, int &mpiRanks) 
+{
+	// std::vector<int> touched; touched.assign(numPoints,0);
+	#pragma omp for nowait
+	for(vtkIdType j=0; j < dm.dimensions[1]; j+=2) { //Y				
+		for(vtkIdType i=0; i < dm.dimensions[0]; i+=2) { //X
+				
+			/// these 2 loops iterate over one line					
+			for(vtkIdType y=0; y < 2; y++) {
+				for(vtkIdType x=0; x < 2; x++) {
+					vtkIdType id = i + x + (j+y)*dm.dimensions[1];
+					vectors->GetTuple(id,&vector[id * 3]);
+					input->GetPoint(id, &position[id * 3]);
+
+					// -- if we have just one MPI process then we can directly use the point id, since the indexing is given and consistent
+					// -- otherwise, in case of multiple MPI processes we have to derive the global id of the point from some geometric information linked to the grid
+					long global_id = mpiRanks == 1 ? id : GlobalUniqueID(&position[id * 3],dm);			
+					Perturbate(&vector[id * 3], global_id, dm.max_global_id);					
+				}	
+			}
+		}
+	}
+}
+
+void CriticalPointExtractor::InitializePointsArray_3D(vtkDataSet * input, vtkDataArray * vectors, DataSetMetadata &dm, int &mpiRanks) 
+{
+	// std::vector<int> touched; touched.assign(numPoints,0);
+	#pragma omp for nowait
+	for(vtkIdType w=0; w < dm.dimensions[2]; w+=2) { //Z
+		for(vtkIdType j=0; j < dm.dimensions[1]; j+=2) { //Y				
+			for(vtkIdType i=0; i < dm.dimensions[0]; i+=2) { //X
+				
+				/// these 3 loops iterate over one line					
+				for(vtkIdType z=0; z < 2; z++) {
+					for(vtkIdType y=0; y < 2; y++) {
+						for(vtkIdType x=0; x < 2; x++) {
+							vtkIdType id = i + x + (j+y)*dm.dimensions[1] + (w+z)*dm.dimensions[1]*dm.dimensions[2];
+							vectors->GetTuple(id,&vector[id * 3]);
+							input->GetPoint(id, &position[id * 3]);
+
+							// -- if we have just one MPI process then we can directly use the point id, since the indexing is given and consistent
+							// -- otherwise, in case of multiple MPI processes we have to derive the global id of the point from some geometric information linked to the grid
+							long global_id = mpiRanks == 1 ? id : GlobalUniqueID(&position[id * 3],dm);
+			
+							Perturbate(&vector[id * 3], global_id, dm.max_global_id);	
+							// touched[id]++;
+							//std::cout<<id<<" ";
+						}	
+					}			
+				}
+			}
+		}
+	}		
+	// //std::cout<<std::endl;
+	// for(vtkIdType i=0; i<touched.size(); i++){
+	// 	if(touched[i] == 0 || touched[i]>1) 
+	// 		std::cout<<"point "<<i<<" touched "<<touched[i]<<" times"<<std::endl;
+	// }
+	// std::cout<<"DONE"<<std::endl;
+	// int a; cin>>a;
+}
+
+vtkIdType CriticalPointExtractor::GlobalUniqueID(double* pos, DataSetMetadata &dm/*double *spacing, int *global_extent, double * global_bounds*/)
 {
 	///Function that calculates global unique id
 
 	/// 1. structured coordinates
-	long x = std::lround(pos[0]/spacing[0]-global_bounds[0]);
-	long y = std::lround(pos[1]/spacing[1]-global_bounds[2]);
-	long z = std::lround(pos[2]/spacing[2]-global_bounds[4]);
+	long x = std::lround(pos[0]/dm.spacing[0]-dm.global_bounds[0]);
+	long y = std::lround(pos[1]/dm.spacing[1]-dm.global_bounds[2]);
+	long z = std::lround(pos[2]/dm.spacing[2]-dm.global_bounds[4]);
 
 	/// 2. then compute the resolution
-	long resx = global_extent[1]+1;
-	long resy = global_extent[3]+1;
-	long resz = global_extent[5]+1;
+	long resx = dm.global_extent[1]+1;
+	long resy = dm.global_extent[3]+1;
+	long resz = dm.global_extent[5]+1;
 
 	/// 3. then the global id
 	// z * xDim * yDim + y * zDim + x
-	long globalid = z * resx * resy + y * resz + x;
+	vtkIdType globalid = z * resx * resy + y * resz + x;
 
 	return globalid;
 }
