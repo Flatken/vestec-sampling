@@ -52,12 +52,12 @@ class CriticalPointExtractor {
     };
 
     struct DataSetMetadata {
-      double local_bounds[6];
-      double global_bounds[6];
+      double local_bounds[6] = {-1,-1,-1,-1,-1,-1};
+      double global_bounds[6] = {-1,-1,-1,-1,-1,-1};
       int* global_extent;
-      double spacing[3];
+      double spacing[3] = {-1,-1,-1};
       vtkIdType max_global_id;
-      int dimensions[3];
+      int dimensions[3] = {-1,-1,-1};
       ~DataSetMetadata() { 
         delete global_extent;
       }
@@ -152,7 +152,8 @@ private:
     double singularity[3]; //!< The singularity to identify
     int numThreads; //!< Number of OpenMP threads
     double eps = 1 / std::pow(10,14);
-	double delta = 4; // >=n    
+	double delta = 4; // >=n  
+  vtkIdType numSimplicesPerCell; 
 	std::vector<CriticalPoint> vecCriticalCellIDs; //!< Vector of critical cell ids
     vtkIdType numSimplices;
 };
