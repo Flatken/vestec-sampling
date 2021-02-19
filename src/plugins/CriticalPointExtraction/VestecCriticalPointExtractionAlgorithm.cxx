@@ -24,6 +24,11 @@
 #include <vtkDataSetWriter.h>
 #include <vtkImageData.h>
 
+#include <vtkm/cont/DataSet.h>
+#include <vtkm/cont/Initialize.h>
+#include <vtkmDataSet.h>
+#include <vtkmlib/DataSetConverters.h>
+
 #include <sstream>
 #include <chrono>
 #include <cmath>
@@ -74,10 +79,21 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
                                   vtkInformation* vtkNotUsed(request),
     vtkInformationVector **inputVector,
     vtkInformationVector* outputVector )
-{
+{	
+	char *argv[]={"program name","arg1","arg2",NULL};
+	int argc = sizeof(argv) / sizeof(char*) -1;
+	vtkm::cont::Initialize(argc,argv);
 	// get the input and output
-	vtkDataSet* input = vtkDataSet::GetData(inputVector[0], 0);
+	vtkDataSet* in = vtkDataSet::GetData(inputVector[0], 0);
 	vtkUnstructuredGrid* output = vtkUnstructuredGrid::GetData(outputVector, 0);
+	in->Print(std::cout);
+	
+    vtkm::cont::DataSet conv;
+    conv = tovtkm::Convert(in,tovtkm::FieldsFlag::PointsAndCells);
+	std::cout<<"CONVERTED"<<std::endl;
+	conv.PrintSummary(std::cout);
+	vtkmDataSet* input = vtkmDataSet::New();
+	input->SetVtkmDataSet(conv);
 
 	vtkSmartPointer<vtkMultiProcessController> controller = vtkMultiProcessController::GetGlobalController();
 	int mpiRank  = controller->GetLocalProcessId();

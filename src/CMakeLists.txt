@@ -7,7 +7,7 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 set(BUILD_SHARED_LIBS ON)
 
 find_package(ParaView REQUIRED)
-
+find_package(VTKm REQUIRED)
 find_package (Eigen3 3.3 REQUIRED NO_MODULE)
 find_package(OpenMP)
 
