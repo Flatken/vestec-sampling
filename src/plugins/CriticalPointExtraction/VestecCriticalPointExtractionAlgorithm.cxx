@@ -198,7 +198,7 @@ CriticalPointExtractor::CriticalPointExtractor(vtkDataSet* input,
 	double yDim = fabs(dm.local_bounds[3] - dm.local_bounds[2]);
 	double zDim = fabs(dm.local_bounds[5] - dm.local_bounds[4]);	
 
-	std::cout << "xDim " << xDim << " yDim " << yDim << " zDim " << zDim << std::endl;
+	// std::cout << "xDim " << xDim << " yDim " << yDim << " zDim " << zDim << std::endl;
 
 	/// then extract some global characteristics of the dataset
 	/// like, 1. global bounds
@@ -317,8 +317,6 @@ CriticalPointExtractor::CriticalPointExtractor(vtkDataSet* input,
 			std::cout << "[MPI:" << mpiRank << "] [CriticalPointExtractor::identify_critical_points] Error: bad cell type! MPI is not supported here " << std::endl;			
 		}	
 
-		
-
 		#pragma omp for
 		for (vtkIdType i = 0; i < numCells; i++) {
 			//get the current cell
@@ -401,7 +399,11 @@ void CriticalPointExtractor::InitializePointsArray_2D(vtkDataSet * input, vtkDat
 	 //std::cout<<"DONE"<<std::endl;
 	// int b; cin>>b;
 	//std::vector<int> touched; touched.assign(input->GetNumberOfPoints(),0);
+#ifdef _WIN32
 	#pragma omp for nowait
+#else
+	#pragma omp for collapse(2)
+#endif
 	for(vtkIdType j=0; j < dm.dimensions[j_pos]; j+=2) { //Y				
 		for(vtkIdType i=0; i < dm.dimensions[i_pos]; i+=2) { //X
 				
@@ -431,9 +433,13 @@ void CriticalPointExtractor::InitializePointsArray_2D(vtkDataSet * input, vtkDat
 }
 
 void CriticalPointExtractor::InitializePointsArray_3D(vtkDataSet * input, vtkDataArray * vectors, DataSetMetadata &dm, int &mpiRanks) 
-{
-	// std::vector<int> touched; touched.assign(numPoints,0);
+{	
+	// std::vector<int> touched; touched.assign(input->GetNumberOfPoints(),0);
+#ifdef _WIN32
 	#pragma omp for nowait
+#else
+	#pragma omp for collapse(3)
+#endif
 	for(vtkIdType w=0; w < dm.dimensions[2]; w+=2) { //Z
 		for(vtkIdType j=0; j < dm.dimensions[1]; j+=2) { //Y				
 			for(vtkIdType i=0; i < dm.dimensions[0]; i+=2) { //X
@@ -442,14 +448,12 @@ void CriticalPointExtractor::InitializePointsArray_3D(vtkDataSet * input, vtkDat
 				for(vtkIdType z=0; z < 2; z++) {
 					for(vtkIdType y=0; y < 2; y++) {
 						for(vtkIdType x=0; x < 2; x++) {
-							vtkIdType id = i + x + (j+y)*dm.dimensions[1] + (w+z)*dm.dimensions[1]*dm.dimensions[2];
+							vtkIdType id = i + x + (j+y)*dm.dimensions[0] + (w+z)*dm.dimensions[0]*dm.dimensions[1];
 							vectors->GetTuple(id,&vector[id * 3]);
 							input->GetPoint(id, &position[id * 3]);
-
 							// -- if we have just one MPI process then we can directly use the point id, since the indexing is given and consistent
 							// -- otherwise, in case of multiple MPI processes we have to derive the global id of the point from some geometric information linked to the grid
-							vtkIdType global_id = mpiRanks == 1 ? id : GlobalUniqueID(&position[id * 3],dm);
-			
+							vtkIdType global_id = mpiRanks == 1 ? id : GlobalUniqueID(&position[id * 3],dm);			
 							Perturbate(&vector[id * 3], global_id, dm.max_global_id);	
 							// touched[id]++;
 							//std::cout<<id<<" ";
@@ -694,7 +698,7 @@ double CriticalPointExtractor::ComputeDeterminant(
 	std::array<vtkIdType, 4> &tmpIds,
 	DynamicMatrix &vecMatrix,
 	bool usePoints,
-	short perturbationID	
+	int perturbationID	
 ){
 		
 	int numIds = numCellIds;
