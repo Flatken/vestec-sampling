@@ -103,7 +103,7 @@ class CriticalPointExtractor {
      * currentSingularity: The singularity e.g. zero vector (0,0,0)
      * vecMatrix: The matrix used to compute the determinant
      */
-    double ComputeDeterminant(std::array<vtkIdType, 4> &tmpIds, DynamicMatrix &vecMatrix, bool usePoints, long perturbationID = -1);
+    double ComputeDeterminant(std::array<vtkIdType, 4> &tmpIds, DynamicMatrix &vecMatrix, bool usePoints, short perturbationID = -1);
    
     /**
      * Check if the singularity is in cell
@@ -120,7 +120,7 @@ class CriticalPointExtractor {
     /**
      * Perturbation based on point id
      */
-    void Perturbate(double* values, long id, long max_global_id);
+    void Perturbate(double* values, vtkIdType &id, vtkIdType &max_global_id);
 
     /**
      * Calculate global unique id 

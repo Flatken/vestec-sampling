@@ -179,20 +179,15 @@ CriticalPointExtractor::CriticalPointExtractor(vtkDataSet* input,
 
 	vtkIdType numPoints = input->GetNumberOfPoints();	
 
-	//Allocate memory
-	//vecPointCoordinates.resize(numPoints);
-	//vecVectors.resize(numPoints);
-	// vecPerturbation.resize(numPoints);
-	
 	//Store vectors and point coordinates for internal usage
 	vtkDataArray* vectors = input->GetPointData()->GetVectors();	
 
 	position = new double[numPoints*3];
 	vector = new double[numPoints*3];
-	// perturbation = new double[numPoints*3];
 
-	long long max_memory = (numPoints*3*3)*sizeof(double);
-
+	//Data that needs to be read and write (half read, half write)
+	long long max_memory = (numPoints*3*3)*sizeof(double) * 2;
+	
 	DataSetMetadata dm;	
 	
 	//Get the local bounds of the current MPI process
@@ -316,7 +311,7 @@ CriticalPointExtractor::CriticalPointExtractor(vtkDataSet* input,
 			 	input->GetPoint(i, &position[i * 3]);
 			 	// -- if we have just one MPI process then we can directly use the point id, since the indexing is given and consistent
 			 	// -- otherwise, in case of multiple MPI processes we have to derive the global id of the point from some geometric information linked to the grid
-			 	long global_id = mpiRanks == 1 ? i : GlobalUniqueID(&position[i * 3],dm);						
+			 	vtkIdType global_id = mpiRanks == 1 ? i : GlobalUniqueID(&position[i * 3],dm);						
 			 	Perturbate(&vector[i * 3], global_id, dm.max_global_id);
 			 }
 			std::cout << "[MPI:" << mpiRank << "] [CriticalPointExtractor::identify_critical_points] Error: bad cell type! MPI is not supported here " << std::endl;			
@@ -361,8 +356,8 @@ CriticalPointExtractor::CriticalPointExtractor(vtkDataSet* input,
 		}
 	}
 
-	max_memory += numCells*numSimplicesPerCell*numCellIds*sizeof(vtkIdType);
-	std::cout<<"Memory allocated 3D-case: "<<max_memory<<" (bytes) "<<max_memory / std::pow(1024,2) << "(MBs)"<<std::endl;
+	max_memory += numCells*numSimplicesPerCell*numCellIds*sizeof(vtkIdType) * 2;
+	std::cout<<"Memory read/write 3D-case: "<<max_memory<<" (bytes) "<<max_memory / std::pow(1024,2) << "(MBs)"<<std::endl;
 	// std::cout<<"Time for perturbating: "<<t_pert<<std::endl;
 
 	// /// ==== DEBUG ONLY === ///
@@ -419,7 +414,7 @@ void CriticalPointExtractor::InitializePointsArray_2D(vtkDataSet * input, vtkDat
 
 					// -- if we have just one MPI process then we can directly use the point id, since the indexing is given and consistent
 					// -- otherwise, in case of multiple MPI processes we have to derive the global id of the point from some geometric information linked to the grid
-					long global_id = mpiRanks == 1 ? id : GlobalUniqueID(&position[id * 3],dm);			
+					vtkIdType global_id = mpiRanks == 1 ? id : GlobalUniqueID(&position[id * 3],dm);			
 					Perturbate(&vector[id * 3], global_id, dm.max_global_id);
 					//touched[id]++;					
 				}	
@@ -453,7 +448,7 @@ void CriticalPointExtractor::InitializePointsArray_3D(vtkDataSet * input, vtkDat
 
 							// -- if we have just one MPI process then we can directly use the point id, since the indexing is given and consistent
 							// -- otherwise, in case of multiple MPI processes we have to derive the global id of the point from some geometric information linked to the grid
-							long global_id = mpiRanks == 1 ? id : GlobalUniqueID(&position[id * 3],dm);
+							vtkIdType global_id = mpiRanks == 1 ? id : GlobalUniqueID(&position[id * 3],dm);
 			
 							Perturbate(&vector[id * 3], global_id, dm.max_global_id);	
 							// touched[id]++;
@@ -494,7 +489,7 @@ vtkIdType CriticalPointExtractor::GlobalUniqueID(double* pos, DataSetMetadata &d
 	return globalid;
 }
 
-void CriticalPointExtractor::Perturbate(double* values, long id, long max_global_id) {
+void CriticalPointExtractor::Perturbate(double* values, vtkIdType &id, vtkIdType &max_global_id) {
 	// perturbation function f(e,i,j) = eps^2^i*delta-j
 	// eps ?? --> constant?
 	// i = id (in their implementation is id+1)
@@ -699,7 +694,7 @@ double CriticalPointExtractor::ComputeDeterminant(
 	std::array<vtkIdType, 4> &tmpIds,
 	DynamicMatrix &vecMatrix,
 	bool usePoints,
-	long perturbationID	
+	short perturbationID	
 ){
 		
 	int numIds = numCellIds;
