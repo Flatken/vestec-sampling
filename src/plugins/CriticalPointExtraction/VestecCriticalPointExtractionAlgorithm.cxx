@@ -80,20 +80,20 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
     vtkInformationVector **inputVector,
     vtkInformationVector* outputVector )
 {	
-	char *argv[]={"program name","arg1","arg2",NULL};
-	int argc = sizeof(argv) / sizeof(char*) -1;
-	vtkm::cont::Initialize(argc,argv);
+	//char *argv[]={"program name","arg1","arg2",NULL};
+	//int argc = sizeof(argv) / sizeof(char*) -1;	
+	//std::cout<<config.Usage<<std::endl;
 	// get the input and output
-	vtkDataSet* in = vtkDataSet::GetData(inputVector[0], 0);
+	vtkDataSet* input = vtkDataSet::GetData(inputVector[0], 0);
 	vtkUnstructuredGrid* output = vtkUnstructuredGrid::GetData(outputVector, 0);
-	in->Print(std::cout);
+	//input->Print(std::cout);
 	
-    vtkm::cont::DataSet conv;
+    /*vtkm::cont::DataSet conv;
     conv = tovtkm::Convert(in,tovtkm::FieldsFlag::PointsAndCells);
 	std::cout<<"CONVERTED"<<std::endl;
 	conv.PrintSummary(std::cout);
 	vtkmDataSet* input = vtkmDataSet::New();
-	input->SetVtkmDataSet(conv);
+	input->SetVtkmDataSet(conv);*/
 
 	vtkSmartPointer<vtkMultiProcessController> controller = vtkMultiProcessController::GetGlobalController();
 	int mpiRank  = controller->GetLocalProcessId();
@@ -317,7 +317,7 @@ CriticalPointExtractor::CriticalPointExtractor(vtkDataSet* input,
 
 		if(VTK_PIXEL == cellType || VTK_QUAD == cellType)
 			InitializePointsArray_2D(input,vectors,dm,mpiRanks);
-		else if(VTK_VOXEL == cellType || VTK_TETRA == cellType)
+		else if(VTK_VOXEL == cellType || VTK_TETRA == cellType || VTK_HEXAHEDRON == cellType)
 			InitializePointsArray_3D(input,vectors,dm,mpiRanks);
 		else {
 			 #pragma omp for nowait
@@ -330,7 +330,7 @@ CriticalPointExtractor::CriticalPointExtractor(vtkDataSet* input,
 			 	vtkIdType global_id = mpiRanks == 1 ? i : GlobalUniqueID(&position[i * 3],dm);						
 			 	Perturbate(&vector[i * 3], global_id, dm.max_global_id);
 			 }
-			std::cout << "[MPI:" << mpiRank << "] [CriticalPointExtractor::identify_critical_points] Error: bad cell type! MPI is not supported here " << std::endl;			
+			std::cout << "[MPI:" << mpiRank << "] [CriticalPointExtractor::identify_critical_points] Error: bad cell type! MPI is not supported here -> "<< cellType << std::endl;			
 		}	
 
 		#pragma omp for

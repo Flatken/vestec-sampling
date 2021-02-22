@@ -30,6 +30,9 @@
 #include <vtkResampleWithDataSet.h>
 #include <vtkCPPythonScriptPipeline.h>
 
+#include <vtkmDataSet.h>
+#include <vtkm/io/reader/VTKDataSetReader.h>
+
 namespace
 {
 	vtkCPProcessor* Processor = NULL;
@@ -94,12 +97,21 @@ void CatalystCoProcess( double time, unsigned int timeStep, int lastTimeStep)
 	if (Processor->RequestDataDescription(dataDescription.GetPointer()) != 0)
 	{
 		//Load the correct data for the timeStep
-		vtkDataSetReader* pReader = vtkDataSetReader::New();
+		std::cout<<"enter "<<inputFiles[timeStep]<<std::endl;
+		vtkm::io::reader::VTKDataSetReader pReader(inputFiles[timeStep]);
+		std::cout<<"init"<<std::endl;
+		vtkm::cont::DataSet conv;
+		conv = pReader.ReadDataSet();
+		//conv.PrintSummary(std::cout);
+		vtkmDataSet* input = vtkmDataSet::New();
+		input->SetVtkmDataSet(conv);
+		//input->Print(std::cout);
+		//vtkDataSetReader* pReader = vtkDataSetReader::New();
 		
 		//Get the file for the correct timestep (files are here dataPath)
-		pReader->SetFileName(inputFiles[timeStep].c_str());
-		pReader->SetReadAllScalars(true);
-		pReader->Update();
+		//pReader->SetFileName(inputFiles[timeStep].c_str());
+		//pReader->SetReadAllScalars(true);
+		//pReader->Update();
 
 		//Partition and split the dataset for evaluating parallel algorithms using MPI
 		//Information: The speed is low, its just to evaluate algorithms. Normally the data is passed (in-situ)
@@ -109,12 +121,12 @@ void CatalystCoProcess( double time, unsigned int timeStep, int lastTimeStep)
 			if(mpiRank == 0)
 			std::cout << "[CatalystCoProcess::Load and prepare data] Partitioning " << std::endl;
 			//Check the current data type
-			if (pReader->ReadOutputType() == VTK_RECTILINEAR_GRID)
+			if (input->GetDataObjectType() == VTK_RECTILINEAR_GRID)
 			{
 				if(mpiRank == 0) std::cout << "Splitting VTK_RECTILINEAR_GRID " << std::endl;
 				//Split the domain and pass only a portion (block) to the catalyst pipeline
 				vtkRectilinearGridPartitioner* pPartitioner = vtkRectilinearGridPartitioner::New();
-				pPartitioner->SetInputData(pReader->GetOutput());
+				pPartitioner->SetInputData(input);
 				pPartitioner->SetNumberOfPartitions(mpiRanks);
 				pPartitioner->Update();
 				
@@ -123,7 +135,7 @@ void CatalystCoProcess( double time, unsigned int timeStep, int lastTimeStep)
 				vtkMultiBlockDataSet *mbds = vtkMultiBlockDataSet::SafeDownCast(pPartitioner->GetOutput());
 				vtkResampleWithDataSet* pResample = vtkResampleWithDataSet::New();
 				pResample->SetInputData(mbds->GetBlock(mpiRank));
-				pResample->SetSourceData(pReader->GetOutput());
+				pResample->SetSourceData(input);
 				pResample->PassPointArraysOn();
 				pResample->PassCellArraysOn();
 				pResample->PassFieldArraysOn();
@@ -137,12 +149,12 @@ void CatalystCoProcess( double time, unsigned int timeStep, int lastTimeStep)
 				pPartitioner->Delete();
 				pResample->Delete();
 			}
-			else if (pReader->ReadOutputType() == VTK_STRUCTURED_GRID)
+			else if (input->GetDataObjectType() == VTK_STRUCTURED_GRID)
 			{
 				if(mpiRank == 0) std::cout << "Splitting VTK_STRUCTURED_GRID " << std::endl;
 				//Split the domain and pass only a portion (block) to the catalyst pipeline
 				vtkStructuredGridPartitioner* pPartitioner = vtkStructuredGridPartitioner::New();
-				pPartitioner->SetInputData(pReader->GetOutput());
+				pPartitioner->SetInputData(input);
 				pPartitioner->SetNumberOfPartitions(mpiRanks);
 				pPartitioner->Update();
 				
@@ -151,7 +163,7 @@ void CatalystCoProcess( double time, unsigned int timeStep, int lastTimeStep)
 				vtkMultiBlockDataSet *mbds = vtkMultiBlockDataSet::SafeDownCast(pPartitioner->GetOutput());
 				vtkResampleWithDataSet* pResample = vtkResampleWithDataSet::New();
 				pResample->SetInputData(mbds->GetBlock(mpiRank));
-				pResample->SetSourceData(pReader->GetOutput());
+				pResample->SetSourceData(input);
 				pResample->PassPointArraysOn();
 				pResample->PassCellArraysOn();
 				pResample->PassFieldArraysOn();
@@ -165,13 +177,13 @@ void CatalystCoProcess( double time, unsigned int timeStep, int lastTimeStep)
 				pPartitioner->Delete();
 				pResample->Delete();
 			}
-			else if (pReader->ReadOutputType() == VTK_STRUCTURED_POINTS
-				|| pReader->ReadOutputType() == VTK_IMAGE_DATA)
+			else if (input->GetDataObjectType() == VTK_STRUCTURED_POINTS
+				|| input->GetDataObjectType() == VTK_IMAGE_DATA)
 			{
 				if(mpiRank == 0) std::cout << "Splitting VTK_IMAGE_DATA or VTK_STRUCTURED_POINTS " << std::endl;
 				//Split the domain and pass only a portion (block) to the catalyst pipeline
 				vtkUniformGridPartitioner* pPartitioner = vtkUniformGridPartitioner::New();
-				pPartitioner->SetInputData(pReader->GetOutput());
+				pPartitioner->SetInputData(input);
 				pPartitioner->SetNumberOfPartitions(mpiRanks);
 				pPartitioner->Update();
 				
@@ -180,7 +192,7 @@ void CatalystCoProcess( double time, unsigned int timeStep, int lastTimeStep)
 				vtkMultiBlockDataSet *mbds = vtkMultiBlockDataSet::SafeDownCast(pPartitioner->GetOutput());
 				vtkResampleWithDataSet* pResample = vtkResampleWithDataSet::New();
 				pResample->SetInputData(mbds->GetBlock(mpiRank));
-				pResample->SetSourceData(pReader->GetOutput());
+				pResample->SetSourceData(input);
 				pResample->PassPointArraysOn();
 				pResample->PassCellArraysOn();
 				pResample->PassFieldArraysOn();
@@ -199,8 +211,8 @@ void CatalystCoProcess( double time, unsigned int timeStep, int lastTimeStep)
 			}
 		}else{
 			//Copy dataset from reader
-			VTKGrid = pReader->GetOutput()->NewInstance();
-			VTKGrid->ShallowCopy(pReader->GetOutput());
+			VTKGrid = input->NewInstance();
+			VTKGrid->ShallowCopy(input);
 		}
 			
 		//Pass grid (portion) to the catalyst pipeline
@@ -208,7 +220,8 @@ void CatalystCoProcess( double time, unsigned int timeStep, int lastTimeStep)
 		Processor->CoProcess(dataDescription.GetPointer());
 
 		//Cleanup memory
-		pReader->Delete();
+		//pReader->Delete();
+		input->Delete();
 		VTKGrid->Delete();
 	}
 }

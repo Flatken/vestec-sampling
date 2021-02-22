@@ -6,7 +6,9 @@
 
 #include "Adaptors/VestecAdaptor.hpp"
 
-
+#include <vtkm/cont/Initialize.h>
+#include <vtkm/cont/openmp/DeviceAdapterOpenMP.h>
+#include <vtkm/cont/RuntimeDeviceTracker.h>
 #include <experimental/filesystem>
 
 using namespace std;
@@ -72,11 +74,20 @@ std::vector<std::string> getAllFilesInDir(const std::string &dirPath, const std:
 
 
 int main(int argc, char** argv) {
+	vtkm::cont::InitializeOptions options =vtkm::cont::InitializeOptions::ErrorOnBadArgument
+			|vtkm::cont::InitializeOptions::DefaultAnyDevice;		
+	int dummy=0;			
+	vtkm::cont::InitializeResult config = vtkm::cont:: Initialize(dummy,nullptr,options);
+	//std::cerr<<config.Usage<<std::endl;
+	vtkm::cont::ScopedRuntimeDeviceTracker(vtkm::cont::DeviceAdapterTagOpenMP{});
+	
 	if (argc <= 3)
 	{
 		printf("Usage: VesteVestecSampling [PATH-TO-DATA] [FILE-SELECTOR] [DELTA_TIME] [CATALYST_PYTHON_SCRIPTS] \n");
 		return 0;
 	}
+	
+	
 	
 	// Initialize the MPI environment
     MPI_Init(NULL, NULL);
