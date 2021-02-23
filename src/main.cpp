@@ -85,9 +85,7 @@ int main(int argc, char** argv) {
 	{
 		printf("Usage: VesteVestecSampling [PATH-TO-DATA] [FILE-SELECTOR] [DELTA_TIME] [CATALYST_PYTHON_SCRIPTS] \n");
 		return 0;
-	}
-	
-	
+	}	
 	
 	// Initialize the MPI environment
     MPI_Init(NULL, NULL);
