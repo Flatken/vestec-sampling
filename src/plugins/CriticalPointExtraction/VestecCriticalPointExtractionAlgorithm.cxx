@@ -182,8 +182,8 @@ CriticalPointExtractor::CriticalPointExtractor(vtkDataSet* input,
 	//Store vectors and point coordinates for internal usage
 	vtkDataArray* vectors = input->GetPointData()->GetVectors();	
 
-	position = new double[numPoints*3];
-	vector = new double[numPoints*3];
+	position = new double[numPoints*3]();
+	vector = new double[numPoints*3]();
 
 	//Data that needs to be read and write (half read, half write)
 	long long max_memory = (numPoints*3*3)*sizeof(double) * 2;
@@ -274,7 +274,7 @@ CriticalPointExtractor::CriticalPointExtractor(vtkDataSet* input,
 	}
 	else if (VTK_VOXEL == cellType || VTK_HEXAHEDRON == cellType) {
 		//vecCellIds.reserve(numCells * 5);
-		vecCellIds = new vtkIdType[numCells * 20];
+		vecCellIds = new vtkIdType[numCells * 20]();
 		numCellIds=4;
 		numSimplices = numCells * 5;
 		numSimplicesPerCell = 5;
