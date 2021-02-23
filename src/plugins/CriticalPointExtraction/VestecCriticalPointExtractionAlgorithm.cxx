@@ -307,12 +307,13 @@ CriticalPointExtractor::CriticalPointExtractor(vtkDataSet* input,
 			 #pragma omp for nowait
 			 for(vtkIdType i=0; i < numPoints; i++) 
 			 {
-			 	vectors->GetTuple(i,&vector[i * 4]);
-			 	input->GetPoint(i, &position[i * 4]);
+				vtkIdType pointerPos = i * 4;
+			 	vectors->GetTuple(i,&vector[pointerPos]);
+			 	input->GetPoint(i, &position[pointerPos]);
 			 	// -- if we have just one MPI process then we can directly use the point id, since the indexing is given and consistent
 			 	// -- otherwise, in case of multiple MPI processes we have to derive the global id of the point from some geometric information linked to the grid
-			 	vtkIdType global_id = mpiRanks == 1 ? i : GlobalUniqueID(&position[i * 4],dm);						
-			 	Perturbate(&vector[i * 4], global_id, dm.max_global_id);
+			 	vtkIdType global_id = mpiRanks == 1 ? i : GlobalUniqueID(&position[pointerPos],dm);						
+			 	Perturbate(&vector[pointerPos], global_id, dm.max_global_id);
 			 }
 			std::cout << "[MPI:" << mpiRank << "] [CriticalPointExtractor::identify_critical_points] Error: bad cell type! MPI is not supported here " << std::endl;			
 		}	
@@ -327,16 +328,18 @@ CriticalPointExtractor::CriticalPointExtractor(vtkDataSet* input,
 			
 			if (VTK_PIXEL == cellType || VTK_QUAD == cellType)
 			{
+				//vtkIdType pointerPos = id * 6;
 				vecCellIds[i*6] = ids->GetId(0); vecCellIds[i*6+1] = ids->GetId(1); vecCellIds[i*6+2] = ids->GetId(2);
 				vecCellIds[i*6+3] = ids->GetId(1); vecCellIds[i*6+4] = ids->GetId(3); vecCellIds[i*6+5] = ids->GetId(2);
 			}
 			else if (VTK_VOXEL == cellType)
 			{
-				vecCellIds[i*20] = ids->GetId(0); vecCellIds[i*20+1] = ids->GetId(6); vecCellIds[i*20+2] = ids->GetId(4); vecCellIds[i*20+3] = ids->GetId(5);
-				vecCellIds[i*20+4] = ids->GetId(3); vecCellIds[i*20+5] = ids->GetId(5); vecCellIds[i*20+6] = ids->GetId(7); vecCellIds[i*20+7] = ids->GetId(6);
-				vecCellIds[i*20+8] = ids->GetId(3); vecCellIds[i*20+9] = ids->GetId(1); vecCellIds[i*20+10] = ids->GetId(5); vecCellIds[i*20+11] = ids->GetId(0);
-				vecCellIds[i*20+12] = ids->GetId(0); vecCellIds[i*20+13] = ids->GetId(3); vecCellIds[i*20+14] = ids->GetId(2); vecCellIds[i*20+15] = ids->GetId(6);
-				vecCellIds[i*20+16] = ids->GetId(0); vecCellIds[i*20+17] = ids->GetId(6); vecCellIds[i*20+18] = ids->GetId(3); vecCellIds[i*20+19] = ids->GetId(5);
+				vtkIdType pointerPos = i * 20;
+				vecCellIds[pointerPos] = ids->GetId(0); vecCellIds[pointerPos+1] = ids->GetId(6); vecCellIds[pointerPos+2] = ids->GetId(4); vecCellIds[pointerPos+3] = ids->GetId(5);
+				vecCellIds[pointerPos+4] = ids->GetId(3); vecCellIds[pointerPos+5] = ids->GetId(5); vecCellIds[pointerPos+6] = ids->GetId(7); vecCellIds[pointerPos+7] = ids->GetId(6);
+				vecCellIds[pointerPos+8] = ids->GetId(3); vecCellIds[pointerPos+9] = ids->GetId(1); vecCellIds[pointerPos+10] = ids->GetId(5); vecCellIds[pointerPos+11] = ids->GetId(0);
+				vecCellIds[pointerPos+12] = ids->GetId(0); vecCellIds[pointerPos+13] = ids->GetId(3); vecCellIds[pointerPos+14] = ids->GetId(2); vecCellIds[pointerPos+15] = ids->GetId(6);
+				vecCellIds[pointerPos+16] = ids->GetId(0); vecCellIds[pointerPos+17] = ids->GetId(6); vecCellIds[pointerPos+18] = ids->GetId(3); vecCellIds[pointerPos+19] = ids->GetId(5);
 			}
 			else if (VTK_HEXAHEDRON == cellType)
 			{
