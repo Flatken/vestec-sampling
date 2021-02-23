@@ -330,13 +330,29 @@ CriticalPointExtractor::CriticalPointExtractor(vtkDataSet* input,
 				vecCellIds[i*6] = ids->GetId(0); vecCellIds[i*6+1] = ids->GetId(1); vecCellIds[i*6+2] = ids->GetId(2);
 				vecCellIds[i*6+3] = ids->GetId(1); vecCellIds[i*6+4] = ids->GetId(3); vecCellIds[i*6+5] = ids->GetId(2);
 			}
-			else if (VTK_VOXEL == cellType || VTK_HEXAHEDRON == cellType)
+			else if (VTK_VOXEL == cellType)
 			{
 				vecCellIds[i*20] = ids->GetId(0); vecCellIds[i*20+1] = ids->GetId(6); vecCellIds[i*20+2] = ids->GetId(4); vecCellIds[i*20+3] = ids->GetId(5);
 				vecCellIds[i*20+4] = ids->GetId(3); vecCellIds[i*20+5] = ids->GetId(5); vecCellIds[i*20+6] = ids->GetId(7); vecCellIds[i*20+7] = ids->GetId(6);
 				vecCellIds[i*20+8] = ids->GetId(3); vecCellIds[i*20+9] = ids->GetId(1); vecCellIds[i*20+10] = ids->GetId(5); vecCellIds[i*20+11] = ids->GetId(0);
 				vecCellIds[i*20+12] = ids->GetId(0); vecCellIds[i*20+13] = ids->GetId(3); vecCellIds[i*20+14] = ids->GetId(2); vecCellIds[i*20+15] = ids->GetId(6);
 				vecCellIds[i*20+16] = ids->GetId(0); vecCellIds[i*20+17] = ids->GetId(6); vecCellIds[i*20+18] = ids->GetId(3); vecCellIds[i*20+19] = ids->GetId(5);
+			}
+			else if (VTK_HEXAHEDRON == cellType)
+			{
+				if(i%2){
+					vecCellIds[i*20] = ids->GetId(0); vecCellIds[i*20+1] = ids->GetId(1); vecCellIds[i*20+2] = ids->GetId(3); vecCellIds[i*20+3] = ids->GetId(4);
+				vecCellIds[i*20+4] = ids->GetId(1); vecCellIds[i*20+5] = ids->GetId(4); vecCellIds[i*20+6] = ids->GetId(5); vecCellIds[i*20+7] = ids->GetId(6);
+				vecCellIds[i*20+8] = ids->GetId(1); vecCellIds[i*20+9] = ids->GetId(4); vecCellIds[i*20+10] = ids->GetId(6); vecCellIds[i*20+11] = ids->GetId(3);
+				vecCellIds[i*20+12] = ids->GetId(1); vecCellIds[i*20+13] = ids->GetId(3); vecCellIds[i*20+14] = ids->GetId(6); vecCellIds[i*20+15] = ids->GetId(2);
+				vecCellIds[i*20+16] = ids->GetId(3); vecCellIds[i*20+17] = ids->GetId(6); vecCellIds[i*20+18] = ids->GetId(7); vecCellIds[i*20+19] = ids->GetId(4);
+				} else {
+					vecCellIds[i*20] = ids->GetId(2); vecCellIds[i*20+1] = ids->GetId(1); vecCellIds[i*20+2] = ids->GetId(5); vecCellIds[i*20+3] = ids->GetId(0);
+				vecCellIds[i*20+4] = ids->GetId(0); vecCellIds[i*20+5] = ids->GetId(2); vecCellIds[i*20+6] = ids->GetId(3); vecCellIds[i*20+7] = ids->GetId(7);
+				vecCellIds[i*20+8] = ids->GetId(2); vecCellIds[i*20+9] = ids->GetId(5); vecCellIds[i*20+10] = ids->GetId(6); vecCellIds[i*20+11] = ids->GetId(7);
+				vecCellIds[i*20+12] = ids->GetId(0); vecCellIds[i*20+13] = ids->GetId(7); vecCellIds[i*20+14] = ids->GetId(4); vecCellIds[i*20+15] = ids->GetId(5);
+				vecCellIds[i*20+16] = ids->GetId(0); vecCellIds[i*20+17] = ids->GetId(2); vecCellIds[i*20+18] = ids->GetId(7); vecCellIds[i*20+19] = ids->GetId(5);
+				}
 			}
 			else if (VTK_TRIANGLE == cellType)
 			{
