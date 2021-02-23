@@ -299,11 +299,12 @@ CriticalPointExtractor::CriticalPointExtractor(vtkDataSet* input,
 		//Local variables per thread
 		int threadIdx = omp_get_thread_num();//Thread ID
 
-		if(VTK_PIXEL == cellType || VTK_QUAD == cellType)
+		/*if(VTK_PIXEL == cellType || VTK_QUAD == cellType)
 			InitializePointsArray_2D(input,vectors,dm,mpiRanks);
 		else if(VTK_VOXEL == cellType || VTK_TETRA == cellType)
 			InitializePointsArray_3D(input,vectors,dm,mpiRanks);
-		else {
+		else */
+		{
 			 #pragma omp for nowait
 			 for(vtkIdType i=0; i < numPoints; i++) 
 			 {
@@ -314,7 +315,7 @@ CriticalPointExtractor::CriticalPointExtractor(vtkDataSet* input,
 			 	vtkIdType global_id = mpiRanks == 1 ? i : GlobalUniqueID(&position[i * 3],dm);						
 			 	Perturbate(&vector[i * 3], global_id, dm.max_global_id);
 			 }
-			std::cout << "[MPI:" << mpiRank << "] [CriticalPointExtractor::identify_critical_points] Error: bad cell type! MPI is not supported here " << std::endl;			
+			//std::cout << "[MPI:" << mpiRank << "] [CriticalPointExtractor::identify_critical_points] Error: bad cell type! MPI is not supported here " << std::endl;			
 		}	
 
 		#pragma omp for
@@ -342,16 +343,16 @@ CriticalPointExtractor::CriticalPointExtractor(vtkDataSet* input,
 			{
 				if(i%2){
 					vecCellIds[i*20] = ids->GetId(0); vecCellIds[i*20+1] = ids->GetId(1); vecCellIds[i*20+2] = ids->GetId(3); vecCellIds[i*20+3] = ids->GetId(4);
-				vecCellIds[i*20+4] = ids->GetId(1); vecCellIds[i*20+5] = ids->GetId(4); vecCellIds[i*20+6] = ids->GetId(5); vecCellIds[i*20+7] = ids->GetId(6);
-				vecCellIds[i*20+8] = ids->GetId(1); vecCellIds[i*20+9] = ids->GetId(4); vecCellIds[i*20+10] = ids->GetId(6); vecCellIds[i*20+11] = ids->GetId(3);
-				vecCellIds[i*20+12] = ids->GetId(1); vecCellIds[i*20+13] = ids->GetId(3); vecCellIds[i*20+14] = ids->GetId(6); vecCellIds[i*20+15] = ids->GetId(2);
-				vecCellIds[i*20+16] = ids->GetId(3); vecCellIds[i*20+17] = ids->GetId(6); vecCellIds[i*20+18] = ids->GetId(7); vecCellIds[i*20+19] = ids->GetId(4);
+					vecCellIds[i*20+4] = ids->GetId(1); vecCellIds[i*20+5] = ids->GetId(4); vecCellIds[i*20+6] = ids->GetId(5); vecCellIds[i*20+7] = ids->GetId(6);
+					vecCellIds[i*20+8] = ids->GetId(1); vecCellIds[i*20+9] = ids->GetId(4); vecCellIds[i*20+10] = ids->GetId(6); vecCellIds[i*20+11] = ids->GetId(3);
+					vecCellIds[i*20+12] = ids->GetId(1); vecCellIds[i*20+13] = ids->GetId(3); vecCellIds[i*20+14] = ids->GetId(6); vecCellIds[i*20+15] = ids->GetId(2);
+					vecCellIds[i*20+16] = ids->GetId(3); vecCellIds[i*20+17] = ids->GetId(6); vecCellIds[i*20+18] = ids->GetId(7); vecCellIds[i*20+19] = ids->GetId(4);
 				} else {
 					vecCellIds[i*20] = ids->GetId(2); vecCellIds[i*20+1] = ids->GetId(1); vecCellIds[i*20+2] = ids->GetId(5); vecCellIds[i*20+3] = ids->GetId(0);
-				vecCellIds[i*20+4] = ids->GetId(0); vecCellIds[i*20+5] = ids->GetId(2); vecCellIds[i*20+6] = ids->GetId(3); vecCellIds[i*20+7] = ids->GetId(7);
-				vecCellIds[i*20+8] = ids->GetId(2); vecCellIds[i*20+9] = ids->GetId(5); vecCellIds[i*20+10] = ids->GetId(6); vecCellIds[i*20+11] = ids->GetId(7);
-				vecCellIds[i*20+12] = ids->GetId(0); vecCellIds[i*20+13] = ids->GetId(7); vecCellIds[i*20+14] = ids->GetId(4); vecCellIds[i*20+15] = ids->GetId(5);
-				vecCellIds[i*20+16] = ids->GetId(0); vecCellIds[i*20+17] = ids->GetId(2); vecCellIds[i*20+18] = ids->GetId(7); vecCellIds[i*20+19] = ids->GetId(5);
+					vecCellIds[i*20+4] = ids->GetId(0); vecCellIds[i*20+5] = ids->GetId(2); vecCellIds[i*20+6] = ids->GetId(3); vecCellIds[i*20+7] = ids->GetId(7);
+					vecCellIds[i*20+8] = ids->GetId(2); vecCellIds[i*20+9] = ids->GetId(5); vecCellIds[i*20+10] = ids->GetId(6); vecCellIds[i*20+11] = ids->GetId(7);
+					vecCellIds[i*20+12] = ids->GetId(0); vecCellIds[i*20+13] = ids->GetId(7); vecCellIds[i*20+14] = ids->GetId(4); vecCellIds[i*20+15] = ids->GetId(5);
+					vecCellIds[i*20+16] = ids->GetId(0); vecCellIds[i*20+17] = ids->GetId(2); vecCellIds[i*20+18] = ids->GetId(7); vecCellIds[i*20+19] = ids->GetId(5);
 				}
 			}
 			else if (VTK_TRIANGLE == cellType)
@@ -371,8 +372,7 @@ CriticalPointExtractor::CriticalPointExtractor(vtkDataSet* input,
 	}
 
 	max_memory += numCells*numSimplicesPerCell*numCellIds*sizeof(vtkIdType) * 2;
-	std::cout<<"Memory read/write 3D-case: "<<max_memory<<" (bytes) "<<max_memory / std::pow(1024,2) << "(MBs)"<<std::endl;
-	// std::cout<<"Time for perturbating: "<<t_pert<<std::endl;
+	std::cout<<"Memory read/write 3D-case: "<<max_memory<<" (bytes) "<<max_memory / std::pow(1024,2) << "(MBs)"<<std::endl;	
 
 	// /// ==== DEBUG ONLY === ///
 	// /// write to 2 separate files the points and simplexes arrays
@@ -404,17 +404,11 @@ CriticalPointExtractor::CriticalPointExtractor(vtkDataSet* input,
 
 void CriticalPointExtractor::InitializePointsArray_2D(vtkDataSet * input, vtkDataArray * vectors, DataSetMetadata &dm, int &mpiRanks) 
 {
-	int j_pos = -1, i_pos = -1; 					//3D dataset 
+	int j_pos = -1, i_pos = -1; 					
 	if (iExchangeIndex == 0) {j_pos =2; i_pos = 1;} 	//2D dataset with yz
 	else if (iExchangeIndex == 1) {j_pos = 2; i_pos = 0;} 	//2D dataset with xz
 	else if (iExchangeIndex == 2) {j_pos = 1; i_pos = 0;}	//2D dataset with xy
-
-    //std::cout << "iExchangeIndex " << iExchangeIndex << " j_pos " << j_pos << " i_pos " << i_pos << std::endl;
-	//std::cout << " dm.dimensions[j_pos] " <<  dm.dimensions[j_pos] << "  dm.dimensions[i_pos] " <<  dm.dimensions[i_pos] << std::endl;
-
-	 //std::cout<<"DONE"<<std::endl;
-	// int b; cin>>b;
-	//std::vector<int> touched; touched.assign(input->GetNumberOfPoints(),0);
+    
 #ifdef _WIN32
 	#pragma omp for nowait
 #else
@@ -439,18 +433,10 @@ void CriticalPointExtractor::InitializePointsArray_2D(vtkDataSet * input, vtkDat
 			}
 		}
 	}
-	 //std::cout<<std::endl;
-	 //for(vtkIdType i=0; i<touched.size(); i++){
-	 //	if(touched[i] == 0 || touched[i]>1) 
-	 //		std::cout<<"point "<<i<<" touched "<<touched[i]<<" times"<<std::endl;
-	 //}
-	 //std::cout<<"DONE"<<std::endl;
-	 //int a; cin>>a;
 }
 
 void CriticalPointExtractor::InitializePointsArray_3D(vtkDataSet * input, vtkDataArray * vectors, DataSetMetadata &dm, int &mpiRanks) 
 {	
-	// std::vector<int> touched; touched.assign(input->GetNumberOfPoints(),0);
 #ifdef _WIN32
 	#pragma omp for nowait
 #else
@@ -470,22 +456,13 @@ void CriticalPointExtractor::InitializePointsArray_3D(vtkDataSet * input, vtkDat
 							// -- if we have just one MPI process then we can directly use the point id, since the indexing is given and consistent
 							// -- otherwise, in case of multiple MPI processes we have to derive the global id of the point from some geometric information linked to the grid
 							vtkIdType global_id = mpiRanks == 1 ? id : GlobalUniqueID(&position[id * 3],dm);			
-							Perturbate(&vector[id * 3], global_id, dm.max_global_id);	
-							// touched[id]++;
-							//std::cout<<id<<" ";
+							Perturbate(&vector[id * 3], global_id, dm.max_global_id);								
 						}	
 					}			
 				}
 			}
 		}
-	}		
-	// //std::cout<<std::endl;
-	// for(vtkIdType i=0; i<touched.size(); i++){
-	// 	if(touched[i] == 0 || touched[i]>1) 
-	// 		std::cout<<"point "<<i<<" touched "<<touched[i]<<" times"<<std::endl;
-	// }
-	// std::cout<<"DONE"<<std::endl;
-	// int a; cin>>a;
+	}	
 }
 
 vtkIdType CriticalPointExtractor::GlobalUniqueID(double* pos, DataSetMetadata &dm/*double *spacing, int *global_extent, double * global_bounds*/)
@@ -558,8 +535,6 @@ void CriticalPointExtractor::ComputeCriticalCells()
 		//Remove synchronization with nowait
 		#pragma omp for
 		for (vtkIdType i = 0; i < numSimplices; i++) {
-/*#pragma omp critical			
-			std::cout<<"thread: "<<threadIdx<<" processed "<<i<<std::endl;*/
 			//If the cell contains a the singularity add them to the output and we can break
 			CriticalPointType ret = PointInCell(&vecCellIds[i*numCellIds], vecMatrices[threadIdx]);
 			if (ret != REGULAR) {
