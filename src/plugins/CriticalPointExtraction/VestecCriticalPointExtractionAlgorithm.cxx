@@ -182,11 +182,11 @@ CriticalPointExtractor::CriticalPointExtractor(vtkDataSet* input,
 	//Store vectors and point coordinates for internal usage
 	vtkDataArray* vectors = input->GetPointData()->GetVectors();	
 
-	position = new double[numPoints*3];
-	vector = new double[numPoints*3];
+	position = new double[numPoints*4];
+	vector = new double[numPoints*4];
 
 	//Data that needs to be read and write (half read, half write)
-	long long max_memory = (numPoints*3*3)*sizeof(double) * 2;
+	long long max_memory = (numPoints*4*4)*sizeof(double) * 2;
 	
 	DataSetMetadata dm;	
 	
@@ -307,12 +307,12 @@ CriticalPointExtractor::CriticalPointExtractor(vtkDataSet* input,
 			 #pragma omp for nowait
 			 for(vtkIdType i=0; i < numPoints; i++) 
 			 {
-			 	vectors->GetTuple(i,&vector[i * 3]);
-			 	input->GetPoint(i, &position[i * 3]);
+			 	vectors->GetTuple(i,&vector[i * 4]);
+			 	input->GetPoint(i, &position[i * 4]);
 			 	// -- if we have just one MPI process then we can directly use the point id, since the indexing is given and consistent
 			 	// -- otherwise, in case of multiple MPI processes we have to derive the global id of the point from some geometric information linked to the grid
-			 	vtkIdType global_id = mpiRanks == 1 ? i : GlobalUniqueID(&position[i * 3],dm);						
-			 	Perturbate(&vector[i * 3], global_id, dm.max_global_id);
+			 	vtkIdType global_id = mpiRanks == 1 ? i : GlobalUniqueID(&position[i * 4],dm);						
+			 	Perturbate(&vector[i * 4], global_id, dm.max_global_id);
 			 }
 			std::cout << "[MPI:" << mpiRank << "] [CriticalPointExtractor::identify_critical_points] Error: bad cell type! MPI is not supported here " << std::endl;			
 		}	
@@ -427,13 +427,14 @@ void CriticalPointExtractor::InitializePointsArray_2D(vtkDataSet * input, vtkDat
 			for(vtkIdType y=0; y < 2; y++) {
 				for(vtkIdType x=0; x < 2; x++) {
 					vtkIdType id = i + x + (j+y)*dm.dimensions[i_pos];
-					vectors->GetTuple(id,&vector[id * 3]);
-					input->GetPoint(id, &position[id * 3]);
+					vtkIdType pointerPos = id * 4;
+					vectors->GetTuple(id,&vector[pointerPos]);
+					input->GetPoint(id, &position[pointerPos]);
 
 					// -- if we have just one MPI process then we can directly use the point id, since the indexing is given and consistent
 					// -- otherwise, in case of multiple MPI processes we have to derive the global id of the point from some geometric information linked to the grid
-					vtkIdType global_id = mpiRanks == 1 ? id : GlobalUniqueID(&position[id * 3],dm);			
-					Perturbate(&vector[id * 3], global_id, dm.max_global_id);
+					vtkIdType global_id = mpiRanks == 1 ? id : GlobalUniqueID(&pointerPos[position],dm);			
+					Perturbate(&vector[pointerPos], global_id, dm.max_global_id);
 					//touched[id]++;					
 				}	
 			}
@@ -465,12 +466,13 @@ void CriticalPointExtractor::InitializePointsArray_3D(vtkDataSet * input, vtkDat
 					for(vtkIdType y=0; y < 2; y++) {
 						for(vtkIdType x=0; x < 2; x++) {
 							vtkIdType id = i + x + (j+y)*dm.dimensions[0] + (w+z)*dm.dimensions[0]*dm.dimensions[1];
-							vectors->GetTuple(id,&vector[id * 3]);
-							input->GetPoint(id, &position[id * 3]);
+							vtkIdType pointerPos = id * 4;
+							vectors->GetTuple(id,&vector[pointerPos]);
+							input->GetPoint(id, &position[pointerPos]);
 							// -- if we have just one MPI process then we can directly use the point id, since the indexing is given and consistent
 							// -- otherwise, in case of multiple MPI processes we have to derive the global id of the point from some geometric information linked to the grid
-							vtkIdType global_id = mpiRanks == 1 ? id : GlobalUniqueID(&position[id * 3],dm);			
-							Perturbate(&vector[id * 3], global_id, dm.max_global_id);	
+							vtkIdType global_id = mpiRanks == 1 ? id : GlobalUniqueID(&position[pointerPos],dm);			
+							Perturbate(&vector[pointerPos], global_id, dm.max_global_id);	
 							// touched[id]++;
 							//std::cout<<id<<" ";
 						}	
@@ -594,24 +596,24 @@ void CriticalPointExtractor::writeCriticalCells(vtkSmartPointer<vtkDataSet> outp
 			singularityType->InsertNextTuple1(cellID.type);
 
 			double pCoords1[3];
-			pCoords1[0] = position[vecVertexIds[0] * 3];
-			pCoords1[1] = position[vecVertexIds[0] * 3 + 1];
-			pCoords1[2] = position[vecVertexIds[0] * 3 + 2];
+			pCoords1[0] = position[vecVertexIds[0] * 4];
+			pCoords1[1] = position[vecVertexIds[0] * 4 + 1];
+			pCoords1[2] = position[vecVertexIds[0] * 4 + 2];
 			
 			double pCoords2[3];
-			pCoords2[0] = position[vecVertexIds[1] * 3];
-			pCoords2[1] = position[vecVertexIds[1] * 3 + 1];
-			pCoords2[2] = position[vecVertexIds[1] * 3 + 2];
+			pCoords2[0] = position[vecVertexIds[1] * 4];
+			pCoords2[1] = position[vecVertexIds[1] * 4 + 1];
+			pCoords2[2] = position[vecVertexIds[1] * 4 + 2];
 			
 			double pCoords3[3];
-			pCoords3[0] = position[vecVertexIds[2] * 3];
-			pCoords3[1] = position[vecVertexIds[2] * 3 + 1];
-			pCoords3[2] = position[vecVertexIds[2] * 3 + 2];
+			pCoords3[0] = position[vecVertexIds[2] * 4];
+			pCoords3[1] = position[vecVertexIds[2] * 4 + 1];
+			pCoords3[2] = position[vecVertexIds[2] * 4 + 2];
 
 			double pCoords4[3];
-			pCoords4[0] = position[vecVertexIds[3] * 3];
-			pCoords4[1] = position[vecVertexIds[3] * 3 + 1];
-			pCoords4[2] = position[vecVertexIds[3] * 3 + 2];
+			pCoords4[0] = position[vecVertexIds[3] * 4];
+			pCoords4[1] = position[vecVertexIds[3] * 4 + 1];
+			pCoords4[2] = position[vecVertexIds[3] * 4 + 2];
 
 			double midPoint[3];
 			midPoint[0] = (pCoords1[0] + pCoords2[0] + pCoords3[0] + pCoords4[0]) / 4;
@@ -627,19 +629,19 @@ void CriticalPointExtractor::writeCriticalCells(vtkSmartPointer<vtkDataSet> outp
 			singularityType->InsertNextTuple1(cellID.type);
 
 			double pCoords1[3];
-			pCoords1[0] = position[vecVertexIds[0] * 3];
-			pCoords1[1] = position[vecVertexIds[0] * 3 + 1];
-			pCoords1[2] = position[vecVertexIds[0] * 3 + 2];
+			pCoords1[0] = position[vecVertexIds[0] * 4];
+			pCoords1[1] = position[vecVertexIds[0] * 4 + 1];
+			pCoords1[2] = position[vecVertexIds[0] * 4 + 2];
 			
 			double pCoords2[3];
-			pCoords2[0] = position[vecVertexIds[1] * 3];
-			pCoords2[1] = position[vecVertexIds[1] * 3 + 1];
-			pCoords2[2] = position[vecVertexIds[1] * 3 + 2];
+			pCoords2[0] = position[vecVertexIds[1] * 4];
+			pCoords2[1] = position[vecVertexIds[1] * 4 + 1];
+			pCoords2[2] = position[vecVertexIds[1] * 4 + 2];
 			
 			double pCoords3[3];
-			pCoords3[0] = position[vecVertexIds[2] * 3];
-			pCoords3[1] = position[vecVertexIds[2] * 3 + 1];
-			pCoords3[2] = position[vecVertexIds[2] * 3 + 2];
+			pCoords3[0] = position[vecVertexIds[2] * 4];
+			pCoords3[1] = position[vecVertexIds[2] * 4 + 1];
+			pCoords3[2] = position[vecVertexIds[2] * 4 + 2];
 
 			double midPoint[3];
 			midPoint[0] = (pCoords1[0] + pCoords2[0] + pCoords3[0] ) / 3; 
@@ -734,17 +736,18 @@ double CriticalPointExtractor::ComputeDeterminant(
 		vtkIdType& pointID = tmpIds[i];
 		if (pointID != ZERO_ID)
 		{
+			vtkIdType pointerPos = pointID*4;
 			if(!usePoints)
 			{
-				vecMatrix(i,0) = vector[pointID*3];//vecVectors[pointID][0];// + vecPerturbation[pointID][0] ;
-				vecMatrix(i,1) = vector[pointID*3+1];//vecVectors[pointID][1];// + vecPerturbation[pointID][1] ;
-				vecMatrix(i,2) = vector[pointID*3+2];//vecVectors[pointID][2];// + vecPerturbation[pointID][2] ;
+				vecMatrix(i,0) = vector[pointerPos];//vecVectors[pointID][0];// + vecPerturbation[pointID][0] ;
+				vecMatrix(i,1) = vector[pointerPos+1];//vecVectors[pointID][1];// + vecPerturbation[pointID][1] ;
+				vecMatrix(i,2) = vector[pointerPos+2];//vecVectors[pointID][2];// + vecPerturbation[pointID][2] ;
 			}
 			else
 			{
-				vecMatrix(i,0) = position[pointID*3];//vecPointCoordinates[pointID][0];
-				vecMatrix(i,1) = position[pointID*3+1];//vecPointCoordinates[pointID][1];
-				vecMatrix(i,2) = position[pointID*3+2];//vecPointCoordinates[pointID][2];
+				vecMatrix(i,0) = position[pointerPos];//vecPointCoordinates[pointID][0];
+				vecMatrix(i,1) = position[pointerPos+1];//vecPointCoordinates[pointID][1];
+				vecMatrix(i,2) = position[pointerPos+2];//vecPointCoordinates[pointID][2];
 			}
 		}
 		else
