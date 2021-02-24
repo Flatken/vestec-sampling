@@ -9,6 +9,8 @@ export OMP_PROC_BIND=true #close,master,spread,true,false
 export OMP_PLACES=cores #sockets,cores,threads
 export OMP_SCHEDULE=static #dynamic,static
 
-srun -N $1 -n $2 -c 56 --exclusive ./VestecCatalystEmulator /scratch/VESTEC-DATASETS/lorenz/ .vtk 0.02 $PWD/scripts/criticalPoints_Lorenz.py > criticalPoints_Lorenz_$1_$2_$3.csv
+export SLURM_CPU_BIND=verbose
+
+srun -N $1 -n $2 -c 56 --cpu-bind=no ./VestecCatalystEmulator /scratch/VESTEC-DATASETS/lorenz/ .vtk 0.02 $PWD/scripts/criticalPoints_Lorenz.py > criticalPoints_Lorenz_$1_$2_$3.csv
 
 
