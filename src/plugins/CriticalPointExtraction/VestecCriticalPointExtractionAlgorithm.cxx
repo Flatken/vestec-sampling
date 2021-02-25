@@ -134,17 +134,17 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
 	
 	controller->Barrier();
 	
-	start = std::chrono::steady_clock::now();
-	vtkSmartPointer < vtkMergePoints > clean = vtkSmartPointer < vtkMergePoints >::New(); 
-	clean->SetInputData(reducedData->GetOutput());
-	clean->Update();
-	output->ShallowCopy(clean->GetOutput());
-	vtkIdType numPointsAfter = clean->GetOutput()->GetNumberOfPoints();
-
-	end = std::chrono::steady_clock::now();
-	// if(mpiRank == 0) 
 	if(output->GetNumberOfCells() > 0)
 	{
+		start = std::chrono::steady_clock::now();
+		vtkSmartPointer < vtkMergePoints > clean = vtkSmartPointer < vtkMergePoints >::New(); 
+		clean->SetDataSet(reducedData->GetUnstructuredGridOutput());
+		clean->Update();
+		output->ShallowCopy(clean->GetDataSet());
+		vtkIdType numPointsAfter = clean->GetDataSet()->GetNumberOfPoints();
+
+		end = std::chrono::steady_clock::now();
+	
 		std::cout << "[MPI:" << mpiRank << "] [RequestData::cleanupDataSet] Elapsed time in milliseconds : "
 			<< std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
 			<< " ms" << std::endl;
