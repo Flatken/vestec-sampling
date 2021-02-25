@@ -19,8 +19,7 @@
 #include <vtkVoxel.h>
 #include <vtkPixel.h>
 #include <vtkAggregateDataSetFilter.h>
-#include <vtkCleanPolyData.h>
-#include <vtkCleanUnstructuredGrid.h>
+#include <vtkMergePoints.h>
 #include <vtkDataSetWriter.h>
 #include <vtkImageData.h>
 
@@ -101,6 +100,8 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
 		<< " ms" << std::endl;
 	double constructor_time = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
+	controller->Barrier();
+	
 	start = std::chrono::steady_clock::now();
 	cp_extractor.ComputeCriticalCells();
 	end = std::chrono::steady_clock::now();
@@ -126,13 +127,15 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
 	reducedData->Update();
 	vtkIdType numPointsBefore = reducedData->GetUnstructuredGridOutput()->GetNumberOfPoints();
 	end = std::chrono::steady_clock::now();
-	if(mpiRank == 0) 
+	if(numPointsBefore > 0) 
 	std::cout << "[MPI:" << mpiRank << "] [RequestData::reduceDataSet] Elapsed time in milliseconds : "
 		<< std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
 		<< " ms" << std::endl;
 	
+	controller->Barrier();
+	
 	start = std::chrono::steady_clock::now();
-	vtkSmartPointer < vtkCleanUnstructuredGrid > clean = vtkSmartPointer < vtkCleanUnstructuredGrid >::New(); 
+	vtkSmartPointer < vtkMergePoints > clean = vtkSmartPointer < vtkMergePoints >::New(); 
 	clean->SetInputData(reducedData->GetOutput());
 	clean->Update();
 	output->ShallowCopy(clean->GetOutput());
@@ -185,8 +188,8 @@ CriticalPointExtractor::CriticalPointExtractor(vtkDataSet* input,
 	position = new double[numPoints*3];
 	vector = new double[numPoints*3];
 
-	//Data that needs to be read and write (half read, half write)
-	long long max_memory = (numPoints*3*3)*sizeof(double) * 2;
+	//Data that needs to be written
+	long long max_memory = (numPoints*3*3)*sizeof(double);
 	
 	DataSetMetadata dm;	
 	
@@ -371,8 +374,8 @@ CriticalPointExtractor::CriticalPointExtractor(vtkDataSet* input,
 		}
 	}
 
-	max_memory += numCells*numSimplicesPerCell*numCellIds*sizeof(vtkIdType) * 2;
-	std::cout<<"Memory read/write 3D-case: "<<max_memory<<" (bytes) "<<max_memory / std::pow(1024,2) << "(MBs)"<<std::endl;	
+	max_memory += numCells*numSimplicesPerCell*numCellIds*sizeof(vtkIdType);
+	if(mpiRank == 0) std::cout<<"Memory read/write 3D-case: "<<max_memory<<" (bytes) "<<max_memory / std::pow(1024,2) << "(MBs)"<<std::endl;	
 
 	// /// ==== DEBUG ONLY === ///
 	// /// write to 2 separate files the points and simplexes arrays
@@ -544,7 +547,6 @@ void CriticalPointExtractor::ComputeCriticalCells()
 			}
 		}
 	}
-	std::cout<<"CRITICAL CELLS IDENTIFIED: "<<vecCriticalCellIDs.size()<<std::endl;
 }
 
 void CriticalPointExtractor::writeCriticalCells(vtkSmartPointer<vtkDataSet> output) 
