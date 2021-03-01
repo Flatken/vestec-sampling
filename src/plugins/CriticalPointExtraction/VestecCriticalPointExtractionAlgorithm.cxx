@@ -125,14 +125,15 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
 	vtkSmartPointer < vtkAggregateDataSetFilter > reducedData = vtkSmartPointer < vtkAggregateDataSetFilter >::New();
 	reducedData->SetInputData(output);
 	reducedData->Update();
-	vtkIdType numPointsBefore = reducedData->GetUnstructuredGridOutput()->GetNumberOfPoints();
+	output->ShallowCopy(reducedData->GetUnstructuredGridOutput());
+	vtkIdType numPointsBefore = reducedData->GetUnstructuredGridOutput()->GetNumberOfPoints();	
 	end = std::chrono::steady_clock::now();
 	if(numPointsBefore > 0) 
-	std::cout << "[MPI:" << mpiRank << "] [RequestData::reduceDataSet] Elapsed time in milliseconds : "
+	std::cout << "[MPI:" << mpiRank << "] [RequestData::reduceDataSet_and_MergePoints] Elapsed time in milliseconds : "
 		<< std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
 		<< " ms" << std::endl;
 	
-	controller->Barrier();
+	/*controller->Barrier();
 	
 	if(output->GetNumberOfCells() > 0)
 	{
@@ -150,7 +151,7 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
 			<< " ms" << std::endl;
 		std::cout << "[MPI:" << mpiRank << "] [RequestData::cleanupDataSet] critical cells: " << output->GetNumberOfCells() << std::endl;
 		std::cout << "[MPI:" << mpiRank << "] [RequestData::cleanupDataSet] points removed: " << numPointsBefore - numPointsAfter << std::endl;
-	}
+	}*/
 
 	if(mpiRanks > 1) 
 	{
