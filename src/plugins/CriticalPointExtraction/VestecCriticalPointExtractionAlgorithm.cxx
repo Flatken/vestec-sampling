@@ -22,6 +22,7 @@
 #include <vtkMergePoints.h>
 #include <vtkDataSetWriter.h>
 #include <vtkImageData.h>
+#include <vtkAppendFilter.h>
 
 #include <sstream>
 #include <chrono>
@@ -121,37 +122,56 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
 
 	// Local cleanup done by every worker
 	start = std::chrono::steady_clock::now();	
+	
 	//Collect all critical cells per MPI rank
-	vtkSmartPointer < vtkAggregateDataSetFilter > reducedData = vtkSmartPointer < vtkAggregateDataSetFilter >::New();
-	reducedData->SetInputData(output);
-	reducedData->Update();
-	output->ShallowCopy(reducedData->GetUnstructuredGridOutput());
-	vtkIdType numPointsBefore = reducedData->GetUnstructuredGridOutput()->GetNumberOfPoints();	
-	end = std::chrono::steady_clock::now();
-	if(numPointsBefore > 0) 
-	std::cout << "[MPI:" << mpiRank << "] [RequestData::reduceDataSet_and_MergePoints] Elapsed time in milliseconds : "
-		<< std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
-		<< " ms" << std::endl;
-	
-	/*controller->Barrier();
-	
-	if(output->GetNumberOfCells() > 0)
-	{
-		start = std::chrono::steady_clock::now();
-		vtkSmartPointer < vtkMergePoints > clean = vtkSmartPointer < vtkMergePoints >::New(); 
-		clean->SetDataSet(reducedData->GetUnstructuredGridOutput());
-		clean->Update();
-		output->ShallowCopy(clean->GetDataSet());
-		vtkIdType numPointsAfter = clean->GetDataSet()->GetNumberOfPoints();
+	vtkSmartPointer<vtkUnstructuredGrid> gatheredOutput = vtkSmartPointer<vtkUnstructuredGrid>::New();
+	std::vector<vtkIdType> pointCount(mpiRanks, 0);
+  	vtkIdType numPoints = output->GetNumberOfPoints();
+  	controller->AllGather(&numPoints, &pointCount[0], 1);
 
-		end = std::chrono::steady_clock::now();
+	int receiveProc = 0;
+	vtkIdType maxVal = 0;
+	for (int i = 0; i < mpiRanks; i++)
+	{
+		if (pointCount[i] > maxVal)
+		{
+		maxVal = pointCount[i];
+		receiveProc = i;
+		}
+	}
+
+  	std::vector<vtkSmartPointer<vtkDataObject>> recvBuffer;
+  	controller->Gather(output, recvBuffer, receiveProc);
+
+	if (mpiRank == receiveProc)
+	{
+		if (recvBuffer.size() == 1)
+		{
+			//Nothing since we already have the data (single mpi)
+		}
+		else if (output->IsA("vtkUnstructuredGrid"))
+		{
+		vtkNew<vtkAppendFilter> appendFilter;
+		appendFilter->MergePointsOn();
+		for (std::vector<vtkSmartPointer<vtkDataObject> >::iterator it = recvBuffer.begin();
+			it != recvBuffer.end(); ++it)
+		{
+			appendFilter->AddInputData(*it);
+		}
+		appendFilter->Update();
+		output->ShallowCopy(appendFilter->GetOutput());
+		}
+ 	}
 	
+	end = std::chrono::steady_clock::now();
+	
+	if(mpiRank == receiveProc) 
+	{
 		std::cout << "[MPI:" << mpiRank << "] [RequestData::cleanupDataSet] Elapsed time in milliseconds : "
 			<< std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
 			<< " ms" << std::endl;
 		std::cout << "[MPI:" << mpiRank << "] [RequestData::cleanupDataSet] critical cells: " << output->GetNumberOfCells() << std::endl;
-		std::cout << "[MPI:" << mpiRank << "] [RequestData::cleanupDataSet] points removed: " << numPointsBefore - numPointsAfter << std::endl;
-	}*/
+	}
 
 	if(mpiRanks > 1) 
 	{
