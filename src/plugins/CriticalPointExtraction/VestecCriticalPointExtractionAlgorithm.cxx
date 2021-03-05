@@ -121,16 +121,16 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
 	controller->Barrier();
 
 	// Local cleanup done by every worker
-	start = std::chrono::steady_clock::now();	
+	
 	
 	//Collect all critical cells per MPI rank
-	vtkSmartPointer<vtkUnstructuredGrid> gatheredOutput = vtkSmartPointer<vtkUnstructuredGrid>::New();
-	std::vector<vtkIdType> pointCount(mpiRanks, 0);
-  	vtkIdType numPoints = output->GetNumberOfPoints();
-  	controller->AllGather(&numPoints, &pointCount[0], 1);
+	//vtkSmartPointer<vtkUnstructuredGrid> gatheredOutput = vtkSmartPointer<vtkUnstructuredGrid>::New();
+	//std::vector<vtkIdType> pointCount(mpiRanks, 0);
+  	//vtkIdType numPoints = output->GetNumberOfPoints();
+  	//controller->AllGather(&numPoints, &pointCount[0], 1);
 
 	int receiveProc = 0;
-	vtkIdType maxVal = 0;
+	/*vtkIdType maxVal = 0;
 	for (int i = 0; i < mpiRanks; i++)
 	{
 		if (pointCount[i] > maxVal)
@@ -138,31 +138,38 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
 		maxVal = pointCount[i];
 		receiveProc = i;
 		}
-	}
+	}*/
 
   	std::vector<vtkSmartPointer<vtkDataObject>> recvBuffer;
+	start = std::chrono::steady_clock::now();	
   	controller->Gather(output, recvBuffer, receiveProc);
-
+	end = std::chrono::steady_clock::now();
+	if(mpiRank == receiveProc) 
+	{
+		std::cout << "[MPI:" << mpiRank << "] [RequestData::reduceDataSet] Elapsed time in milliseconds : "
+			<< std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
+			<< " ms" << std::endl;
+	}	
+	
+	//Sync to measure correct time for the clean step
+	controller->Barrier();
+	
+	start = std::chrono::steady_clock::now();	
 	if (mpiRank == receiveProc)
 	{
-		if (recvBuffer.size() == 1)
+		if (recvBuffer.size() > 1 && output->IsA("vtkUnstructuredGrid"))
 		{
-			//Nothing since we already have the data (single mpi)
+			vtkNew<vtkAppendFilter> appendFilter;
+			appendFilter->MergePointsOn();
+			for (std::vector<vtkSmartPointer<vtkDataObject> >::iterator it = recvBuffer.begin();
+				it != recvBuffer.end(); ++it)
+			{
+				appendFilter->AddInputData(*it);
+			}
+			appendFilter->Update();
+			output->ShallowCopy(appendFilter->GetOutput());
 		}
-		else if (output->IsA("vtkUnstructuredGrid"))
-		{
-		vtkNew<vtkAppendFilter> appendFilter;
-		appendFilter->MergePointsOn();
-		for (std::vector<vtkSmartPointer<vtkDataObject> >::iterator it = recvBuffer.begin();
-			it != recvBuffer.end(); ++it)
-		{
-			appendFilter->AddInputData(*it);
-		}
-		appendFilter->Update();
-		output->ShallowCopy(appendFilter->GetOutput());
-		}
- 	}
-	
+ 	}	
 	end = std::chrono::steady_clock::now();
 	
 	if(mpiRank == receiveProc) 
@@ -423,7 +430,8 @@ CriticalPointExtractor::CriticalPointExtractor(vtkDataSet* input,
 		vecCellPerThread[x]->Delete();
 	}
 	vecCellPerThread.clear();
-	if(mpiRank == 0) std::cout << "[MPI:" << mpiRank << "] [CriticalPointExtractor::identify_critical_points] Extracted " << numSimplices/*vecCellIds.size()*/ << " simplices" << std::endl;
+	//if(mpiRank == 0) 
+	std::cout << "[MPI:" << mpiRank << "] [CriticalPointExtractor::identify_critical_points] Extracted " << numSimplices/*vecCellIds.size()*/ << " simplices" << std::endl;
 }
 
 void CriticalPointExtractor::InitializePointsArray_2D(vtkDataSet * input, vtkDataArray * vectors, DataSetMetadata &dm, int &mpiRanks) 
