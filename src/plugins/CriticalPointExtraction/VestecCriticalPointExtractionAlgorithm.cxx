@@ -223,13 +223,7 @@ CriticalPointExtractor::CriticalPointExtractor(vtkDataSet* input,
 	
 	//Get the local bounds of the current MPI process
 	// double local_bounds[6];
-	input->GetBounds(dm.local_bounds);
-	// get global sides
-	double xDim = fabs(dm.local_bounds[1] - dm.local_bounds[0]);
-	double yDim = fabs(dm.local_bounds[3] - dm.local_bounds[2]);
-	double zDim = fabs(dm.local_bounds[5] - dm.local_bounds[4]);	
-
-	// std::cout << "xDim " << xDim << " yDim " << yDim << " zDim " << zDim << std::endl;
+	input->GetBounds(dm.local_bounds);			
 
 	/// then extract some global characteristics of the dataset
 	/// like, 1. global bounds
@@ -243,6 +237,12 @@ CriticalPointExtractor::CriticalPointExtractor(vtkDataSet* input,
 	controller->AllReduce(&dm.local_bounds[5], &dm.global_bounds[5], 1, vtkCommunicator::StandardOperations::MAX_OP);
 
 	int mpiRanks = controller->GetNumberOfProcesses(); // to check how many MPI processes are up and running
+
+	// get global sides
+	double xDim = fabs(dm.global_bounds[1] - dm.global_bounds[0]);
+	double yDim = fabs(dm.global_bounds[3] - dm.global_bounds[2]);
+	double zDim = fabs(dm.global_bounds[5] - dm.global_bounds[4]);	
+	// std::cout << "xDim " << xDim << " yDim " << yDim << " zDim " << zDim << std::endl;
 
 	// 2. global sides
 	// double global_sides[3] = { xDim, yDim, zDim };
