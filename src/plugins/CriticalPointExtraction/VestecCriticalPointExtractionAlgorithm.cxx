@@ -330,6 +330,9 @@ CriticalPointExtractor::CriticalPointExtractor(vtkDataSet* input,
 		//Local variables per thread
 		int threadIdx = omp_get_thread_num();//Thread ID
 
+		/// NOTICE: the following two function initialize the two arrays following a spatial-aware strategy.
+		///		That said, since we use a vtkDataSet object, this is already guaranteed in the input.
+		///		Then, the performance are equivalent, and, thus, we kept the simpler method.
 		/*if(VTK_PIXEL == cellType || VTK_QUAD == cellType)
 			InitializePointsArray_2D(input,vectors,dm,mpiRanks);
 		else if(VTK_VOXEL == cellType || VTK_TETRA == cellType)
@@ -501,17 +504,22 @@ vtkIdType CriticalPointExtractor::GlobalUniqueID(double* pos, DataSetMetadata &d
 {
 	///Function that calculates global unique id
 
-	/// 1. structured coordinates
-	long x = std::lround(pos[0]/dm.spacing[0]-dm.global_bounds[0]);
-	long y = std::lround(pos[1]/dm.spacing[1]-dm.global_bounds[2]);
-	long z = std::lround(pos[2]/dm.spacing[2]-dm.global_bounds[4]);
+	/// 1. transpose the point coordinates to the positive range
+	double posX = pos[0] - dm.global_bounds[0];
+	double posY = pos[1] - dm.global_bounds[1];
+	double posZ = pos[2] - dm.global_bounds[2];
+	
+	/// 2. Compute structured coordinates
+	long x = std::lround(posX/dm.spacing[0]);
+	long y = std::lround(posY/dm.spacing[1]);
+	long z = std::lround(posZ/dm.spacing[2]);
 
-	/// 2. then compute the resolution
+	/// 3. then compute the resolution
 	long resx = dm.global_extent[1]+1;
 	long resy = dm.global_extent[3]+1;
 	long resz = dm.global_extent[5]+1;
 
-	/// 3. then the global id
+	/// 4. then the global id
 	// z * xDim * yDim + y * zDim + x
 	vtkIdType globalid = z * resx * resy + y * resz + x;
 
