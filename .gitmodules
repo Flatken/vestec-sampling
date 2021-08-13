@@ -7,3 +7,6 @@
 [submodule "externals/eigen"]
 	path = externals/eigen
 	url = https://gitlab.com/libeigen/eigen.git
+[submodule "externals/mpir"]
+	path = externals/mpir
+	url = https://github.com/BrianGladman/mpir.git
