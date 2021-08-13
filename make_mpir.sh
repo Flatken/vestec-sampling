@@ -34,9 +34,9 @@ cmake -E make_directory "$INSTALL_DIR/include"
 echo ""
 echo "Building and installing MPIR Library ..."
 
-mkdir $BUILD_DIR/mpir
+cmake -E make_directory "$BUILD_DIR/mpir"
 cd $EXTERNALS_DIR/mpir
-bash autoconf.sh
+bash autogen.sh
 cd $BUILD_DIR/mpir
 $EXTERNALS_DIR/mpir/configure -prefix $INSTALL_DIR
 make
