@@ -58,6 +58,7 @@ cmake %CMAKE_FLAGS% -DCMAKE_INSTALL_PREFIX="%INSTALL_DIR%"^
 	  -DCMAKE_BUILD_TYPE=%BUILD_TYPE%^
 	  -DParaView_DIR=%Paraview_DIR%^
 	  -DEigen3_DIR="%Eigen_DIR%/share/eigen3/cmake"^
+    -DGMP_PREFIX="%EXTERNALS_INSTALL_DIR%/mpir"^
 	  -DUSE_CATALYST=ON^
     -DCMAKE_WINDOWS_EXPORT_ALL_SYMBOLS=On^
     -DEXTERNALS_DIR="%EXTERNALS_INSTALL_DIR%" "%CMAKE_DIR%"  || exit /b
@@ -66,6 +67,7 @@ cmake --build . --config %BUILD_TYPE% --target install --parallel 8  || exit /b
 
 rem Delete empty files installed by cmake
 robocopy "%INSTALL_DIR%\lib" "%INSTALL_DIR%\lib" /s /move || exit /b
+robocopy "%EXTERNALS_INSTALL_DIR%\mpir" "%INSTALL_DIR%\bin" mpir.dll || exit /b
 
 cd "%CURRENT_DIR%"
 echo Finished successfully.
