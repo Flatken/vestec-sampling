@@ -75,6 +75,8 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
     vtkInformationVector **inputVector,
     vtkInformationVector* outputVector )
 {
+	mpf_set_default_prec(256);	
+
 	// get the input and output
 	vtkDataSet* input = vtkDataSet::GetData(inputVector[0], 0);
 	vtkUnstructuredGrid* output = vtkUnstructuredGrid::GetData(outputVector, 0);
@@ -178,6 +180,7 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
 			<< std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
 			<< " ms" << std::endl;
 		std::cout << "[MPI:" << mpiRank << "] [RequestData::cleanupDataSet] critical cells: " << output->GetNumberOfCells() << std::endl;
+		std::cout << "[MPI:" << mpiRank << "] [RequestData::cleanupDataSet] degenerate cases: " << cp_extractor.deg_cases << std::endl;
 	}
 
 	if(mpiRanks > 1) 
@@ -199,6 +202,8 @@ CriticalPointExtractor::CriticalPointExtractor(vtkDataSet* input,
 											   double *currentSingularity, int mpiRank/*,
 											   bool pertubate*/)
 {
+	eps = 1 / std::pow(10,14);
+
 	//Configure openmp
 	numThreads = omp_get_max_threads(); //!< Number of OpenMP threads
 	if(mpiRank == 0) std::cout << "[MPI:" << mpiRank << "] [CriticalPointExtractor] Number of threads: " << numThreads << std::endl;
@@ -213,8 +218,8 @@ CriticalPointExtractor::CriticalPointExtractor(vtkDataSet* input,
 	//Store vectors and point coordinates for internal usage
 	vtkDataArray* vectors = input->GetPointData()->GetVectors();	
 
-	position = new double[numPoints*3];
-	vector = new double[numPoints*3];
+	position = new mpf_float_custom[numPoints*3];
+	vector = new mpf_float_custom[numPoints*3];
 
 	//Data that needs to be written
 	long long max_memory = (numPoints*3*3)*sizeof(double);
@@ -247,7 +252,7 @@ CriticalPointExtractor::CriticalPointExtractor(vtkDataSet* input,
 	// 2. global sides
 	// double global_sides[3] = { xDim, yDim, zDim };
 	// 3. global maximum coordinates
-	double global_max_coords[3] = { dm.global_bounds[1] , dm.global_bounds[3] , dm.global_bounds[5] };
+	mpf_float_custom global_max_coords[3] = { dm.global_bounds[1] , dm.global_bounds[3] , dm.global_bounds[5] };
 	// 4. spacing between points (WARNING: this works only on regular grids!!)	
 	// double spacing[3];
 	if(vtkImageData::SafeDownCast(input))
@@ -329,6 +334,7 @@ CriticalPointExtractor::CriticalPointExtractor(vtkDataSet* input,
 	{
 		//Local variables per thread
 		int threadIdx = omp_get_thread_num();//Thread ID
+		double v[3], p[3]; 
 
 		/// NOTICE: the following two function initialize the two arrays following a spatial-aware strategy.
 		///		That said, since we use a vtkDataSet object, this is already guaranteed in the input.
@@ -341,12 +347,21 @@ CriticalPointExtractor::CriticalPointExtractor(vtkDataSet* input,
 		{
 			 #pragma omp for nowait
 			 for(vtkIdType i=0; i < numPoints; i++) 
-			 {
-			 	vectors->GetTuple(i,&vector[i * 3]);
-			 	input->GetPoint(i, &position[i * 3]);
-			 	// -- if we have just one MPI process then we can directly use the point id, since the indexing is given and consistent
+			 {								
+			 	vectors->GetTuple(i,v);//&vector[i * 3]);
+			 	input->GetPoint(i,p);//&position[i * 3]);
+			
+				vector[i*3] = static_cast<mpf_float_custom>(v[0]);
+				vector[i*3+1] = static_cast<mpf_float_custom>(v[1]);
+				vector[i*3+2] = static_cast<mpf_float_custom>(v[2]);
+
+				position[i*3] = static_cast<mpf_float_custom>(p[0]);
+				position[i*3+1] = static_cast<mpf_float_custom>(p[1]);
+				position[i*3+2] = static_cast<mpf_float_custom>(p[2]);
+
+				 // -- if we have just one MPI process then we can directly use the point id, since the indexing is given and consistent
 			 	// -- otherwise, in case of multiple MPI processes we have to derive the global id of the point from some geometric information linked to the grid
-			 	vtkIdType global_id = mpiRanks == 1 ? i : GlobalUniqueID(&position[i * 3],dm);						
+			 	vtkIdType global_id = mpiRanks == 1 ? i : GlobalUniqueID(&position[i * 3],dm);						 		
 			 	Perturbate(&vector[i * 3], global_id, dm.max_global_id);
 			 }
 			//std::cout << "[MPI:" << mpiRank << "] [CriticalPointExtractor::identify_critical_points] Error: bad cell type! MPI is not supported here " << std::endl;			
@@ -437,7 +452,7 @@ CriticalPointExtractor::CriticalPointExtractor(vtkDataSet* input,
 	std::cout << "[MPI:" << mpiRank << "] [CriticalPointExtractor::identify_critical_points] Extracted " << numSimplices/*vecCellIds.size()*/ << " simplices" << std::endl;
 }
 
-void CriticalPointExtractor::InitializePointsArray_2D(vtkDataSet * input, vtkDataArray * vectors, DataSetMetadata &dm, int &mpiRanks) 
+/*void CriticalPointExtractor::InitializePointsArray_2D(vtkDataSet * input, vtkDataArray * vectors, DataSetMetadata &dm, int &mpiRanks) 
 {
 	int j_pos = -1, i_pos = -1; 					
 	if (iExchangeIndex == 0) {j_pos =2; i_pos = 1;} 	//2D dataset with yz
@@ -498,16 +513,16 @@ void CriticalPointExtractor::InitializePointsArray_3D(vtkDataSet * input, vtkDat
 			}
 		}
 	}	
-}
+}*/
 
-vtkIdType CriticalPointExtractor::GlobalUniqueID(double* pos, DataSetMetadata &dm/*double *spacing, int *global_extent, double * global_bounds*/)
+vtkIdType CriticalPointExtractor::GlobalUniqueID(mpf_float_custom* pos, DataSetMetadata &dm/*double *spacing, int *global_extent, double * global_bounds*/)
 {
 	///Function that calculates global unique id
 
 	/// 1. transpose the point coordinates to the positive range
-	double posX = pos[0] - dm.global_bounds[0];
-	double posY = pos[1] - dm.global_bounds[1];
-	double posZ = pos[2] - dm.global_bounds[2];
+	double posX = pos[0].convert_to<double>() - dm.global_bounds[0];
+	double posY = pos[1].convert_to<double>() - dm.global_bounds[1];
+	double posZ = pos[2].convert_to<double>() - dm.global_bounds[2];
 	
 	/// 2. Compute structured coordinates
 	long x = std::lround(posX/dm.spacing[0]);
@@ -526,7 +541,7 @@ vtkIdType CriticalPointExtractor::GlobalUniqueID(double* pos, DataSetMetadata &d
 	return globalid;
 }
 
-void CriticalPointExtractor::Perturbate(double* values, vtkIdType &id, vtkIdType &max_global_id) {
+void CriticalPointExtractor::Perturbate(mpf_float_custom* values, vtkIdType &id, vtkIdType &max_global_id) {
 	// perturbation function f(e,i,j) = eps^2^i*delta-j
 	// eps ?? --> constant?
 	// i = id (in their implementation is id+1)
@@ -536,13 +551,31 @@ void CriticalPointExtractor::Perturbate(double* values, vtkIdType &id, vtkIdType
 	vtkIdType i = id + 1;
 	double i_norm = static_cast<double>(i)/static_cast<double>(max_global_id);
 	double exp_coeff = i_norm*delta;
-	double j_norm;
+	// mpf_float_custom exp_coeff = i*delta;
+	// double j_norm;
+
+	// if(id==35850 || id==37130 || id==37131) {		
+	// 	std::cout<<"eps: "<<eps<<std::endl;
+	// 	std::cout<<"Point "<<id<<" values-orig: "<<values[0]<<" "<<values[1]<<" "<<values[2]<<std::endl;
+	// }
+	// mpf_float_custom exp;// mpf_init(exp);
+	// mpf_float_custom const2; const2 = 2; //mpf_init_set_si(const2,2);
 
 	for(int j=0; j<3; j++) {
-		j_norm = static_cast<double>(j+1)/3; //since we are normalizing the point id, we need to normalize as well the j-id --> to keep the perturbation small
-		values[j] += std::pow(eps,std::pow(2,exp_coeff-j_norm));
+		// j_norm = static_cast<double>(j+1)/3; //since we are normalizing the point id, we need to normalize as well the j-id --> to keep the perturbation small
+		values[j] += boost::multiprecision::pow(eps,std::pow(2,exp_coeff-j_norm[j]));
+
+		// values[j] += boost::multiprecision::pow(eps,boost::multiprecision::pow(2,exp_coeff-(j+1)));
+
+		// mpf_float_custom meps = eps;
+		// mpf_float_custom res = boost::multiprecision::pow(meps,std::pow(2,exp_coeff-j_norm));
+		// exp = std::pow(2,exp_coeff-j);
+		// values[j] = std::pow(eps,exp.get_d());
 	}
 
+	// if(id==35850 || id==37130 || id==37131) {		
+	// 	std::cout<<"Point "<<id<<" values-pert: "<<values[0]<<" "<<values[1]<<" "<<values[2]<<std::endl;
+	// }
 	/// FOR DEBUG ONLY --> a perturbation should never be 0
 	// if(values[0] == 0 || values[1] == 0 || values[2] == 0) {
 	// 	std::cout << "i_norm on id: " << id << " i_norm " << i_norm << " " << exp_coeff << std::endl;
@@ -562,9 +595,9 @@ void CriticalPointExtractor::ComputeCriticalCells()
     std::vector<DynamicMatrix> vecMatrices;
     vecMatrices.resize(numThreads);
 	if(matrixSize == 4)
-		vecMatrices.assign(numThreads,Eigen::Matrix4d());
+		vecMatrices.assign(numThreads,DynamicMatrix(4,4));//Eigen::Matrix4d());
 	if(matrixSize == 3)
-		vecMatrices.assign(numThreads,Eigen::Matrix3d());	
+		vecMatrices.assign(numThreads,DynamicMatrix(3,3));//Eigen::Matrix3d());	
 
 	//Check for every cell if a critical point (passed singularity as argument) exists
 #pragma omp parallel firstprivate(vecMatrices) //private(vector,position)//private(singularity,ZERO_ID)
@@ -608,24 +641,24 @@ void CriticalPointExtractor::writeCriticalCells(vtkSmartPointer<vtkDataSet> outp
 			singularityType->InsertNextTuple1(cellID.type);
 
 			double pCoords1[3];
-			pCoords1[0] = position[vecVertexIds[0] * 3];
-			pCoords1[1] = position[vecVertexIds[0] * 3 + 1];
-			pCoords1[2] = position[vecVertexIds[0] * 3 + 2];
+			pCoords1[0] = position[vecVertexIds[0] * 3].convert_to<double>();
+			pCoords1[1] = position[vecVertexIds[0] * 3 + 1].convert_to<double>();
+			pCoords1[2] = position[vecVertexIds[0] * 3 + 2].convert_to<double>();
 			
 			double pCoords2[3];
-			pCoords2[0] = position[vecVertexIds[1] * 3];
-			pCoords2[1] = position[vecVertexIds[1] * 3 + 1];
-			pCoords2[2] = position[vecVertexIds[1] * 3 + 2];
+			pCoords2[0] = position[vecVertexIds[1] * 3].convert_to<double>();
+			pCoords2[1] = position[vecVertexIds[1] * 3 + 1].convert_to<double>();
+			pCoords2[2] = position[vecVertexIds[1] * 3 + 2].convert_to<double>();
 			
 			double pCoords3[3];
-			pCoords3[0] = position[vecVertexIds[2] * 3];
-			pCoords3[1] = position[vecVertexIds[2] * 3 + 1];
-			pCoords3[2] = position[vecVertexIds[2] * 3 + 2];
+			pCoords3[0] = position[vecVertexIds[2] * 3].convert_to<double>();
+			pCoords3[1] = position[vecVertexIds[2] * 3 + 1].convert_to<double>();
+			pCoords3[2] = position[vecVertexIds[2] * 3 + 2].convert_to<double>();
 
 			double pCoords4[3];
-			pCoords4[0] = position[vecVertexIds[3] * 3];
-			pCoords4[1] = position[vecVertexIds[3] * 3 + 1];
-			pCoords4[2] = position[vecVertexIds[3] * 3 + 2];
+			pCoords4[0] = position[vecVertexIds[3] * 3].convert_to<double>();
+			pCoords4[1] = position[vecVertexIds[3] * 3 + 1].convert_to<double>();
+			pCoords4[2] = position[vecVertexIds[3] * 3 + 2].convert_to<double>();
 
 			double midPoint[3];
 			midPoint[0] = (pCoords1[0] + pCoords2[0] + pCoords3[0] + pCoords4[0]) / 4;
@@ -641,19 +674,19 @@ void CriticalPointExtractor::writeCriticalCells(vtkSmartPointer<vtkDataSet> outp
 			singularityType->InsertNextTuple1(cellID.type);
 
 			double pCoords1[3];
-			pCoords1[0] = position[vecVertexIds[0] * 3];
-			pCoords1[1] = position[vecVertexIds[0] * 3 + 1];
-			pCoords1[2] = position[vecVertexIds[0] * 3 + 2];
+			pCoords1[0] = position[vecVertexIds[0] * 3].convert_to<double>();
+			pCoords1[1] = position[vecVertexIds[0] * 3 + 1].convert_to<double>();
+			pCoords1[2] = position[vecVertexIds[0] * 3 + 2].convert_to<double>();
 			
 			double pCoords2[3];
-			pCoords2[0] = position[vecVertexIds[1] * 3];
-			pCoords2[1] = position[vecVertexIds[1] * 3 + 1];
-			pCoords2[2] = position[vecVertexIds[1] * 3 + 2];
+			pCoords2[0] = position[vecVertexIds[1] * 3].convert_to<double>();
+			pCoords2[1] = position[vecVertexIds[1] * 3 + 1].convert_to<double>();
+			pCoords2[2] = position[vecVertexIds[1] * 3 + 2].convert_to<double>();
 			
 			double pCoords3[3];
-			pCoords3[0] = position[vecVertexIds[2] * 3];
-			pCoords3[1] = position[vecVertexIds[2] * 3 + 1];
-			pCoords3[2] = position[vecVertexIds[2] * 3 + 2];
+			pCoords3[0] = position[vecVertexIds[2] * 3].convert_to<double>();
+			pCoords3[1] = position[vecVertexIds[2] * 3 + 1].convert_to<double>();
+			pCoords3[2] = position[vecVertexIds[2] * 3 + 2].convert_to<double>();
 
 			double midPoint[3];
 			midPoint[0] = (pCoords1[0] + pCoords2[0] + pCoords3[0] ) / 3; 
@@ -681,15 +714,16 @@ CriticalPointExtractor::CriticalPointType CriticalPointExtractor::PointInCell(co
 		tmpIds = {ids[0],ids[1],ids[2],ids[3]};
 
 	// 1. compute the initial sign of the determinant of the cell
-	double targetDeterminant = ComputeDeterminant(tmpIds, vecMatrix, false, 0);
+	mpf_float_custom targetDeterminant = ComputeDeterminant(tmpIds, vecMatrix, false, 0);
 	bool targetDirection = DeterminantCounterClockWise(targetDeterminant);
 	//Check for non data values (vector is zero and determinant also) 
 	if (targetDeterminant == 0)
 	{
+		this->deg_cases++;
 		return REGULAR;
 	}
 	
-	double tmpDeterminant;
+	mpf_float_custom tmpDeterminant;
 	bool tmpDirection;
 	// 2. for each facet (i.e. an edge in a triangle or a triangle in a tetrahedron) do
 	// 2.1. replace each row of the matrix with the origin vector (0,0) or (0,0,0) given as i to Positive function
@@ -713,9 +747,9 @@ CriticalPointExtractor::CriticalPointType CriticalPointExtractor::PointInCell(co
 		tmpIds = {ids[0],ids[1],ids[2]};
 	else
 		tmpIds = {ids[0],ids[1],ids[2],ids[3]};
-	double initialDeterminant = ComputeDeterminant(tmpIds, vecMatrix, true);	
+	mpf_float_custom initialDeterminant = ComputeDeterminant(tmpIds, vecMatrix, true);	
 	bool initialDirection     = DeterminantCounterClockWise(initialDeterminant);	
-	
+
 	if (initialDirection != targetDirection)
 	{
 		return SADDLE; // we found a saddle
@@ -724,7 +758,7 @@ CriticalPointExtractor::CriticalPointType CriticalPointExtractor::PointInCell(co
 	return SINGULARITY; // the cell is critical, since the sign never change
 }
 
-double CriticalPointExtractor::ComputeDeterminant(	
+mpf_float_custom CriticalPointExtractor::ComputeDeterminant(	
 	std::array<vtkIdType, 4> &tmpIds,
 	DynamicMatrix &vecMatrix,
 	bool usePoints,
@@ -742,6 +776,8 @@ double CriticalPointExtractor::ComputeDeterminant(
 	// 1. Sort and check swap operations (check)
 	int swapOperations = Sort(&tmpIds[0], numIds);
 
+	bool vector_field = false;
+
 	// double vecValues[3];
 	for (vtkIdType i = 0; i < numIds; i++) 
 	{
@@ -753,6 +789,8 @@ double CriticalPointExtractor::ComputeDeterminant(
 				vecMatrix(i,0) = vector[pointID*3];//vecVectors[pointID][0];// + vecPerturbation[pointID][0] ;
 				vecMatrix(i,1) = vector[pointID*3+1];//vecVectors[pointID][1];// + vecPerturbation[pointID][1] ;
 				vecMatrix(i,2) = vector[pointID*3+2];//vecVectors[pointID][2];// + vecPerturbation[pointID][2] ;
+
+				vector_field = true;
 			}
 			else
 			{
@@ -770,18 +808,44 @@ double CriticalPointExtractor::ComputeDeterminant(
 		vecMatrix(i, iExchangeIndex) = 1;
 	}
 
+	int is_simplex = 0;
+
 	// 2. compute determinant sign
-	double det = 0;
-	if(numIds == 4)
-		det = static_cast<Eigen::Matrix4d>(vecMatrix).determinant();
-	else
-		det = static_cast<Eigen::Matrix3d>(vecMatrix).determinant();	
+	mpf_float_custom det = 0;
+	if(numIds == 4) {		
+		det = /*static_cast<Eigen::Matrix4d>*/(vecMatrix).determinant();
+		is_simplex = 1;
+	}
+	else {
+		det = /*static_cast<Eigen::Matrix3d>*/(vecMatrix).determinant();	
+		is_simplex = 2;
+	}
+
+	// if(det == 0) { // special case: all vectors are originally 0, and after the perturbation have small numbers causing an underflow
+	// 	vecMatrix = vecMatrix*std::pow(10,28);
+	// 	det = static_cast<Eigen::Matrix3d>(vecMatrix).determinant();	
+	// }	
 
 	// 3. check the number of swap operation while sorting
 	if (swapOperations % 2 != 0) //Odd
 	{
 		det *= -1;
 	}
+
+	// if(det == 0) {
+	// 	std::cout<<"are we using vector fields? "<<vector_field<<std::endl;
+	// 	std::cout<<"which simplex? "<<is_simplex<<std::endl;
+	// 	std::cout<<tmpIds[0]<<" "<<tmpIds[1]<<" "<<tmpIds[2]<<" "<<tmpIds[3]<<std::endl;		
+	// 	std::cout<<static_cast<double>(tmpIds[0])/40960<<" "<<static_cast<double>(tmpIds[1])/40960<<" "<<static_cast<double>(tmpIds[2])/40960<<" "<<static_cast<double>(tmpIds[3])/40960<<std::endl;
+	// 	std::cout<<vecMatrix<<std::endl;
+	// 	std::cout<<det<<std::endl;
+	// 	vecMatrix = vecMatrix*std::pow(10,14);
+	// 	std::cout<<vecMatrix<<std::endl;
+	// 	std::cout<<static_cast<Eigen::Matrix4d>(vecMatrix).determinant()<<std::endl;
+	// 	// Eigen::SparseLU<Eigen::Matrix4d>   solver(static_cast<Eigen::Matrix4d>(vecMatrix));
+	// 	// solver.logAbsDeterminant();
+	// 	int a; std::cin>>a;
+	// }
 
 	return det;
 }
@@ -878,7 +942,7 @@ int CriticalPointExtractor::Sort4(vtkIdType* ids)
 	return swaps;
 }
 
-bool CriticalPointExtractor::DeterminantCounterClockWise(double& det)
+bool CriticalPointExtractor::DeterminantCounterClockWise(mpf_float_custom& det)
 {
 	if (det > 0)
 		return true;
