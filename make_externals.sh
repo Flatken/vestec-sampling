@@ -86,18 +86,6 @@ cmake -G "Eclipse CDT4 - Unix Makefiles" -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" \
       -DCMAKE_BUILD_TYPE=Release "$EXTERNALS_DIR/ttk"
 cmake --build . --target install --parallel "$(nproc)"
 
-# MPIR -----------------------------------------------------------------------------------------
-echo ""
-echo "Building and installing MPIR Library ..."
-
-cmake -E make_directory "$BUILD_DIR/mpir"
-cd $EXTERNALS_DIR/mpir
-bash autogen.sh
-cd $BUILD_DIR/mpir
-$EXTERNALS_DIR/mpir/configure -prefix $INSTALL_DIR
-make
-make install
-
 echo ""
 
 cd "$CURRENT_DIR"

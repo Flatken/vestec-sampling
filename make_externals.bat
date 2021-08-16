@@ -120,17 +120,6 @@ cmake %CMAKE_FLAGS% -DCMAKE_INSTALL_PREFIX=%INSTALL_DIR%^
       -DCMAKE_BUILD_TYPE=%BUILD_TYPE% "%EXTERNALS_DIR%/ttk"
 cmake --build . --config %BUILD_TYPE% --target install --parallel 12
 
-rem MPIR --------------------------------------------------------------------------------------------
-:mpir
-
-echo .
-echo Building and installing MPIR Library ...
-echo .
-
-rem mkdir "%BUILD_DIR%/mpir" && cd "%BUILD_DIR%/mpir"
-msbuild %EXTERNALS_DIR%\mpir\msvc\vs17\dll_mpir_gc\dll_mpir_gc.vcxproj /p:Configuration=Release /p:Platform=x64 /p:WindowsTargetPlatformVersion=10.0.17763.0
-robocopy %EXTERNALS_DIR%/mpir/dll/x64/Release %INSTALL_DIR%/mpir /s /e 
-
 pause
 
 cd "%CURRENT_DIR%"
