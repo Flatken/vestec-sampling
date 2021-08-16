@@ -75,8 +75,6 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
     vtkInformationVector **inputVector,
     vtkInformationVector* outputVector )
 {
-	mpf_set_default_prec(256);	
-
 	// get the input and output
 	vtkDataSet* input = vtkDataSet::GetData(inputVector[0], 0);
 	vtkUnstructuredGrid* output = vtkUnstructuredGrid::GetData(outputVector, 0);
@@ -218,8 +216,8 @@ CriticalPointExtractor::CriticalPointExtractor(vtkDataSet* input,
 	//Store vectors and point coordinates for internal usage
 	vtkDataArray* vectors = input->GetPointData()->GetVectors();	
 
-	position = new mpf_float_custom[numPoints*3];
-	vector = new mpf_float_custom[numPoints*3];
+	position = new float128[numPoints*3];
+	vector = new float128[numPoints*3];
 
 	//Data that needs to be written
 	long long max_memory = (numPoints*3*3)*sizeof(double);
@@ -252,7 +250,7 @@ CriticalPointExtractor::CriticalPointExtractor(vtkDataSet* input,
 	// 2. global sides
 	// double global_sides[3] = { xDim, yDim, zDim };
 	// 3. global maximum coordinates
-	mpf_float_custom global_max_coords[3] = { dm.global_bounds[1] , dm.global_bounds[3] , dm.global_bounds[5] };
+	float128 global_max_coords[3] = { dm.global_bounds[1] , dm.global_bounds[3] , dm.global_bounds[5] };
 	// 4. spacing between points (WARNING: this works only on regular grids!!)	
 	// double spacing[3];
 	if(vtkImageData::SafeDownCast(input))
@@ -351,13 +349,13 @@ CriticalPointExtractor::CriticalPointExtractor(vtkDataSet* input,
 			 	vectors->GetTuple(i,v);//&vector[i * 3]);
 			 	input->GetPoint(i,p);//&position[i * 3]);
 			
-				vector[i*3] = static_cast<mpf_float_custom>(v[0]);
-				vector[i*3+1] = static_cast<mpf_float_custom>(v[1]);
-				vector[i*3+2] = static_cast<mpf_float_custom>(v[2]);
+				vector[i*3] = static_cast<float128>(v[0]);
+				vector[i*3+1] = static_cast<float128>(v[1]);
+				vector[i*3+2] = static_cast<float128>(v[2]);
 
-				position[i*3] = static_cast<mpf_float_custom>(p[0]);
-				position[i*3+1] = static_cast<mpf_float_custom>(p[1]);
-				position[i*3+2] = static_cast<mpf_float_custom>(p[2]);
+				position[i*3] = static_cast<float128>(p[0]);
+				position[i*3+1] = static_cast<float128>(p[1]);
+				position[i*3+2] = static_cast<float128>(p[2]);
 
 				 // -- if we have just one MPI process then we can directly use the point id, since the indexing is given and consistent
 			 	// -- otherwise, in case of multiple MPI processes we have to derive the global id of the point from some geometric information linked to the grid
@@ -515,7 +513,7 @@ void CriticalPointExtractor::InitializePointsArray_3D(vtkDataSet * input, vtkDat
 	}	
 }*/
 
-vtkIdType CriticalPointExtractor::GlobalUniqueID(mpf_float_custom* pos, DataSetMetadata &dm/*double *spacing, int *global_extent, double * global_bounds*/)
+vtkIdType CriticalPointExtractor::GlobalUniqueID(float128* pos, DataSetMetadata &dm/*double *spacing, int *global_extent, double * global_bounds*/)
 {
 	///Function that calculates global unique id
 
@@ -541,7 +539,7 @@ vtkIdType CriticalPointExtractor::GlobalUniqueID(mpf_float_custom* pos, DataSetM
 	return globalid;
 }
 
-void CriticalPointExtractor::Perturbate(mpf_float_custom* values, vtkIdType &id, vtkIdType &max_global_id) {
+void CriticalPointExtractor::Perturbate(float128* values, vtkIdType &id, vtkIdType &max_global_id) {
 	// perturbation function f(e,i,j) = eps^2^i*delta-j
 	// eps ?? --> constant?
 	// i = id (in their implementation is id+1)
@@ -551,15 +549,15 @@ void CriticalPointExtractor::Perturbate(mpf_float_custom* values, vtkIdType &id,
 	vtkIdType i = id + 1;
 	double i_norm = static_cast<double>(i)/static_cast<double>(max_global_id);
 	double exp_coeff = i_norm*delta;
-	// mpf_float_custom exp_coeff = i*delta;
+	// float128 exp_coeff = i*delta;
 	// double j_norm;
 
 	// if(id==35850 || id==37130 || id==37131) {		
 	// 	std::cout<<"eps: "<<eps<<std::endl;
 	// 	std::cout<<"Point "<<id<<" values-orig: "<<values[0]<<" "<<values[1]<<" "<<values[2]<<std::endl;
 	// }
-	// mpf_float_custom exp;// mpf_init(exp);
-	// mpf_float_custom const2; const2 = 2; //mpf_init_set_si(const2,2);
+	// float128 exp;// mpf_init(exp);
+	// float128 const2; const2 = 2; //mpf_init_set_si(const2,2);
 
 	for(int j=0; j<3; j++) {
 		// j_norm = static_cast<double>(j+1)/3; //since we are normalizing the point id, we need to normalize as well the j-id --> to keep the perturbation small
@@ -567,8 +565,8 @@ void CriticalPointExtractor::Perturbate(mpf_float_custom* values, vtkIdType &id,
 
 		// values[j] += boost::multiprecision::pow(eps,boost::multiprecision::pow(2,exp_coeff-(j+1)));
 
-		// mpf_float_custom meps = eps;
-		// mpf_float_custom res = boost::multiprecision::pow(meps,std::pow(2,exp_coeff-j_norm));
+		// float128 meps = eps;
+		// float128 res = boost::multiprecision::pow(meps,std::pow(2,exp_coeff-j_norm));
 		// exp = std::pow(2,exp_coeff-j);
 		// values[j] = std::pow(eps,exp.get_d());
 	}
@@ -714,7 +712,7 @@ CriticalPointExtractor::CriticalPointType CriticalPointExtractor::PointInCell(co
 		tmpIds = {ids[0],ids[1],ids[2],ids[3]};
 
 	// 1. compute the initial sign of the determinant of the cell
-	mpf_float_custom targetDeterminant = ComputeDeterminant(tmpIds, vecMatrix, false, 0);
+	float128 targetDeterminant = ComputeDeterminant(tmpIds, vecMatrix, false, 0);
 	bool targetDirection = DeterminantCounterClockWise(targetDeterminant);
 	//Check for non data values (vector is zero and determinant also) 
 	if (targetDeterminant == 0)
@@ -723,7 +721,7 @@ CriticalPointExtractor::CriticalPointType CriticalPointExtractor::PointInCell(co
 		return REGULAR;
 	}
 	
-	mpf_float_custom tmpDeterminant;
+	float128 tmpDeterminant;
 	bool tmpDirection;
 	// 2. for each facet (i.e. an edge in a triangle or a triangle in a tetrahedron) do
 	// 2.1. replace each row of the matrix with the origin vector (0,0) or (0,0,0) given as i to Positive function
@@ -747,7 +745,7 @@ CriticalPointExtractor::CriticalPointType CriticalPointExtractor::PointInCell(co
 		tmpIds = {ids[0],ids[1],ids[2]};
 	else
 		tmpIds = {ids[0],ids[1],ids[2],ids[3]};
-	mpf_float_custom initialDeterminant = ComputeDeterminant(tmpIds, vecMatrix, true);	
+	float128 initialDeterminant = ComputeDeterminant(tmpIds, vecMatrix, true);	
 	bool initialDirection     = DeterminantCounterClockWise(initialDeterminant);	
 
 	if (initialDirection != targetDirection)
@@ -758,7 +756,7 @@ CriticalPointExtractor::CriticalPointType CriticalPointExtractor::PointInCell(co
 	return SINGULARITY; // the cell is critical, since the sign never change
 }
 
-mpf_float_custom CriticalPointExtractor::ComputeDeterminant(	
+float128 CriticalPointExtractor::ComputeDeterminant(	
 	std::array<vtkIdType, 4> &tmpIds,
 	DynamicMatrix &vecMatrix,
 	bool usePoints,
@@ -811,7 +809,7 @@ mpf_float_custom CriticalPointExtractor::ComputeDeterminant(
 	int is_simplex = 0;
 
 	// 2. compute determinant sign
-	mpf_float_custom det = 0;
+	float128 det = 0;
 	if(numIds == 4) {		
 		det = /*static_cast<Eigen::Matrix4d>*/(vecMatrix).determinant();
 		is_simplex = 1;
@@ -942,7 +940,7 @@ int CriticalPointExtractor::Sort4(vtkIdType* ids)
 	return swaps;
 }
 
-bool CriticalPointExtractor::DeterminantCounterClockWise(mpf_float_custom& det)
+bool CriticalPointExtractor::DeterminantCounterClockWise(float128& det)
 {
 	if (det > 0)
 		return true;

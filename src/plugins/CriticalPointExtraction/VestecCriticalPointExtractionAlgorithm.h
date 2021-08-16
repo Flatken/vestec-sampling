@@ -12,13 +12,19 @@
 #include <random>
 
 #include <Eigen/Dense>
-#include <gmp.h>
-#include <boost/multiprecision/gmp.hpp>
+// #include <gmp.h>
+// #include <boost/multiprecision/gmp.hpp>
 
-typedef boost::multiprecision::number<boost::multiprecision::gmp_float<128> >    mpf_float_custom;
+// typedef boost::multiprecision::number<boost::multiprecision::gmp_float<128> >    float128;
+#ifdef _MSC_VER
+  #include <boost/multiprecision/cpp_bin_float.hpp>
+  typedef boost::multiprecision::cpp_bin_float_quad    float128;
+#else
+  #include <boost/multiprecision/float128.hpp>
+#endif
 
 //Matrix to compute the determinant
-typedef Eigen::Matrix<mpf_float_custom, Eigen::Dynamic, Eigen::Dynamic, 1, 4, 4> DynamicMatrix;
+typedef Eigen::Matrix<float128, Eigen::Dynamic, Eigen::Dynamic, 1, 4, 4> DynamicMatrix;
 //Forward declaration of vtkDataSet
 class vtkDataSet;
 
@@ -107,7 +113,7 @@ class CriticalPointExtractor {
      * currentSingularity: The singularity e.g. zero vector (0,0,0)
      * vecMatrix: The matrix used to compute the determinant
      */
-    mpf_float_custom ComputeDeterminant(std::array<vtkIdType, 4> &tmpIds, DynamicMatrix &vecMatrix, bool usePoints, int perturbationID = -1);
+    float128 ComputeDeterminant(std::array<vtkIdType, 4> &tmpIds, DynamicMatrix &vecMatrix, bool usePoints, int perturbationID = -1);
    
     /**
      * Check if the singularity is in cell
@@ -119,17 +125,17 @@ class CriticalPointExtractor {
     /**
      * Check if direction of the determinant is positive (counter-clockwise) 
      */
-    bool DeterminantCounterClockWise(mpf_float_custom& det);
+    bool DeterminantCounterClockWise(float128& det);
 
     /**
      * Perturbation based on point id
      */
-    void Perturbate(mpf_float_custom* values, vtkIdType &id, vtkIdType &max_global_id);
+    void Perturbate(float128* values, vtkIdType &id, vtkIdType &max_global_id);
 
     /**
      * Calculate global unique id 
      */
-    vtkIdType GlobalUniqueID(mpf_float_custom* pos, DataSetMetadata &dm/*, double *spacing, int *global_extent, double * global_bounds*/);
+    vtkIdType GlobalUniqueID(float128* pos, DataSetMetadata &dm/*, double *spacing, int *global_extent, double * global_bounds*/);
 
     /**
      * Initialize and Perturbate the points array considering an access pattern that mitigates the NUMA allocation issue (3D-case)
@@ -147,8 +153,8 @@ private:
     //std::vector<double*> vecPointCoordinates; //!< Store point coordinates
     //std::vector<double*> vecVectors; //!< Store vector field
     // std::vector<double*> vecPerturbation; //!< Store vector field perturbation
-    mpf_float_custom* position; //!< Store point coordinates
-	  mpf_float_custom* vector; //!< Store vector field
+    float128* position; //!< Store point coordinates
+	  float128* vector; //!< Store vector field
 	  // double* perturbation;
 //    std::vector<vtkIdType*> vecCellIds;  //!< The point ids for each cell
     vtkIdType* vecCellIds;  //!< The point ids for each cell
@@ -156,7 +162,7 @@ private:
     double singularity[3]; //!< The singularity to identify
     int numThreads; //!< Number of OpenMP threads
     // double eps = 1 / std::pow(10,14);
-    mpf_float_custom eps; //(1 / std::pow(10,14));
+    float128 eps; //(1 / std::pow(10,14));
 	  double delta = 4; // >=n  
     double j_norm[3] = {1.0/3.0,2.0/3.0,3.0/3.0};
     vtkIdType numSimplicesPerCell; 
