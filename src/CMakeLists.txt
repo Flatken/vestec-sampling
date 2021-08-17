@@ -11,6 +11,9 @@ find_package(ParaView REQUIRED)
 find_package (Eigen3 3.3 REQUIRED NO_MODULE)
 find_package(OpenMP)
 
+include_directories("${GMP_PREFIX}")
+link_directories("${GMP_PREFIX}")
+
 find_package(Boost)
 include_directories(${Boost_INCLUDE_DIRS})
 
