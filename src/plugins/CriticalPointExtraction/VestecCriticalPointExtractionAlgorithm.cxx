@@ -178,6 +178,7 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
 			<< std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
 			<< " ms" << std::endl;
 		std::cout << "[MPI:" << mpiRank << "] [RequestData::cleanupDataSet] critical cells: " << output->GetNumberOfCells() << std::endl;
+		std::cout << "[MPI:" << mpiRank << "] [RequestData::cleanupDataSet] degenerate cases: " << cp_extractor.deg_cases << std::endl;
 	}
 
 	if(mpiRanks > 1) 
@@ -686,6 +687,7 @@ CriticalPointExtractor::CriticalPointType CriticalPointExtractor::PointInCell(co
 	//Check for non data values (vector is zero and determinant also) 
 	if (targetDeterminant == 0)
 	{
+		this->deg_cases++;
 		return REGULAR;
 	}
 	
