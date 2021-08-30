@@ -12,17 +12,17 @@
 #include <random>
 
 #include <Eigen/Dense>
-// #include <gmp.h>
-// #include <boost/multiprecision/gmp.hpp>
+#include <gmp.h>
+#include <boost/multiprecision/gmp.hpp>
 
-// typedef boost::multiprecision::number<boost::multiprecision::gmp_float<128> >    float128;
-#ifdef _MSC_VER
-  #include <boost/multiprecision/cpp_bin_float.hpp>
-  typedef boost::multiprecision::cpp_bin_float_quad    float128;
-#else
-  #include <boost/multiprecision/float128.hpp>
-  typedef boost::multiprecision::float128    float128;
-#endif
+typedef boost::multiprecision::number<boost::multiprecision::gmp_float<128> >    float128;
+// #ifdef _MSC_VER
+//  #include <boost/multiprecision/cpp_bin_float.hpp>
+//  typedef boost::multiprecision::cpp_bin_float_quad    float128;
+// #else
+//   #include <boost/multiprecision/float128.hpp>
+//   typedef boost::multiprecision::float128    float128;
+// #endif
 
 //Matrix to compute the determinant
 typedef Eigen::Matrix<float128, Eigen::Dynamic, Eigen::Dynamic, 1, 4, 4> DynamicMatrix;
