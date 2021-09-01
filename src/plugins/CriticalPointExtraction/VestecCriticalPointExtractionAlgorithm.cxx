@@ -32,6 +32,7 @@
 #include <omp.h>
 #include <random>
 #include <array>
+#include <functional> //for std::hash
 
 #include <Eigen/Core>
 
@@ -193,6 +194,7 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
 		if(mpiRank == 0) 
 			std::cout<<"[MPI:" << mpiRank << "] [RequestData] [MAX] Critical Point Extraction time: "<<tot_cp_time<<std::endl;		
 	}
+	
 	return 1;
 }
 
@@ -260,10 +262,26 @@ CriticalPointExtractor::CriticalPointExtractor(vtkDataSet* input,
 	if(vtkImageData::SafeDownCast(input))
 		vtkImageData::SafeDownCast(input)->GetDimensions(dm.dimensions);
 
-	// the global max id is needed for computing the perturbation in each point
-	// -- if we have just one MPI process then we can directly use the number of points value, since the indexing is given and consistent
-	// -- otherwise, in case of multiple MPI processes we have to derive the global id from some geometric information linked to the grid
-	dm.max_global_id = mpiRanks == 1 ? numPoints : GlobalUniqueID(global_max_coords,dm/*.spacing,dm.global_extent,dm.global_bounds*/);	
+	double* pos = new double[3];
+	for(vtkIdType i=0; i < numPoints; i++) 
+	{	 	
+	 	input->GetPoint(i, pos);	
+		vtkIdType hash = ComputeHash(pos);
+				
+		if(dm.min_local_id > hash)
+			dm.min_local_id = hash;
+		if(dm.max_local_id < hash)
+			dm.max_local_id = hash;
+		// std::cout<<"min/max_local_id: "<<dm.min_local_id<<" "<<dm.max_local_id<<std::endl;
+	}
+	controller->AllReduce(&dm.min_local_id, &dm.min_global_id, 1, vtkCommunicator::StandardOperations::MIN_OP);
+	controller->AllReduce(&dm.max_local_id, &dm.max_global_id, 1, vtkCommunicator::StandardOperations::MAX_OP);
+
+	std::cout<<"min/max_global_id: "<<dm.min_global_id<<" "<<dm.max_global_id<<std::endl;
+	// // the global max id is needed for computing the perturbation in each point
+	// // -- if we have just one MPI process then we can directly use the number of points value, since the indexing is given and consistent
+	// // -- otherwise, in case of multiple MPI processes we have to derive the global id from some geometric information linked to the grid
+	// dm.max_global_id = mpiRanks == 1 ? numPoints : GlobalUniqueID(global_max_coords,dm);	
 
 	ZERO_ID = dm.max_global_id + 1; // this is the of the singularity vector
 	/// NOTICE: we do not have to perturbate the singularity vector
@@ -345,10 +363,12 @@ CriticalPointExtractor::CriticalPointExtractor(vtkDataSet* input,
 			 {
 			 	vectors->GetTuple(i,&vector[i * 3]);
 			 	input->GetPoint(i, &position[i * 3]);
-			 	// -- if we have just one MPI process then we can directly use the point id, since the indexing is given and consistent
-			 	// -- otherwise, in case of multiple MPI processes we have to derive the global id of the point from some geometric information linked to the grid
-			 	vtkIdType global_id = mpiRanks == 1 ? i : GlobalUniqueID(&position[i * 3],dm);						
-			 	Perturbate(&vector[i * 3], global_id, dm.max_global_id);
+			 	// // -- if we have just one MPI process then we can directly use the point id, since the indexing is given and consistent
+			 	// // -- otherwise, in case of multiple MPI processes we have to derive the global id of the point from some geometric information linked to the grid
+			 	// vtkIdType global_id = mpiRanks == 1 ? i : GlobalUniqueID(&position[i * 3],dm);	
+			 	// Perturbate(&vector[i * 3], global_id, dm.max_global_id);
+				vtkIdType hash = ComputeHash(&position[i * 3]);
+				Perturbate(&vector[i * 3], hash, dm);
 			 }
 			//std::cout << "[MPI:" << mpiRank << "] [CriticalPointExtractor::identify_critical_points] Error: bad cell type! MPI is not supported here " << std::endl;			
 		}	
@@ -438,7 +458,7 @@ CriticalPointExtractor::CriticalPointExtractor(vtkDataSet* input,
 	std::cout << "[MPI:" << mpiRank << "] [CriticalPointExtractor::identify_critical_points] Extracted " << numSimplices/*vecCellIds.size()*/ << " simplices" << std::endl;
 }
 
-void CriticalPointExtractor::InitializePointsArray_2D(vtkDataSet * input, vtkDataArray * vectors, DataSetMetadata &dm, int &mpiRanks) 
+/*void CriticalPointExtractor::InitializePointsArray_2D(vtkDataSet * input, vtkDataArray * vectors, DataSetMetadata &dm, int &mpiRanks) 
 {
 	int j_pos = -1, i_pos = -1; 					
 	if (iExchangeIndex == 0) {j_pos =2; i_pos = 1;} 	//2D dataset with yz
@@ -499,11 +519,42 @@ void CriticalPointExtractor::InitializePointsArray_3D(vtkDataSet * input, vtkDat
 			}
 		}
 	}	
+}*/
+
+template <class T>
+inline void hash_combine(vtkIdType& seed, const T& v)
+{
+    std::hash<T> constexpr hasher;
+    seed ^= hasher(v) + 0x9e3779b9 + (seed<<6) + (seed>>2);
+}
+
+template <> struct std::hash<double*> {
+    vtkIdType operator()(double* const& p) const {
+        vtkIdType v = 0x778abe;
+        hash_combine(v, p[0]);
+        hash_combine(v, p[1]);
+        hash_combine(v, p[2]);
+		return v;
+		// vtkIdType h1 = std::hash<double>()(p[0]);
+    	// vtkIdType h2 = std::hash<double>()(p[1]);
+    	// vtkIdType h3 = std::hash<double>()(p[2]);
+    	// return (h1 ^ (h2 << 1)) ^ h3;        
+    }
+};
+
+vtkIdType CriticalPointExtractor::ComputeHash(double* pos) 
+{
+	vtkIdType globalid;
+	std::hash<double*> constexpr h;
+	globalid = h(pos);
+	// std::cout<<globalid<<std::endl;
+	// int a; std::cin>>a;
+	return globalid;
 }
 
 vtkIdType CriticalPointExtractor::GlobalUniqueID(double* pos, DataSetMetadata &dm/*double *spacing, int *global_extent, double * global_bounds*/)
 {
-	///Function that calculates global unique id
+	///Function that calculates global unique id (compatible only on regularly distributed data)
 
 	/// 1. transpose the point coordinates to the positive range
 	double posX = pos[0] - dm.global_bounds[0];
@@ -522,7 +573,7 @@ vtkIdType CriticalPointExtractor::GlobalUniqueID(double* pos, DataSetMetadata &d
 
 	/// 4. then the global id
 	// z * xDim * yDim + y * zDim + x
-	vtkIdType globalid = z * resx * resy + y * resz + x;
+	vtkIdType globalid = z * resx * resy + y * resz + x;	
 
 	return globalid;
 }
@@ -537,6 +588,32 @@ void CriticalPointExtractor::Perturbate(double* values, vtkIdType &id, vtkIdType
 	vtkIdType i = id + 1;
 	double i_norm = static_cast<double>(i)/static_cast<double>(max_global_id);
 	double exp_coeff = i_norm*delta;
+	// double exp_coeff = i*delta;
+	double j_norm;
+
+	for(int j=0; j<3; j++) {
+		j_norm = static_cast<double>(j+1)/3; //since we are normalizing the point id, we need to normalize as well the j-id --> to keep the perturbation small
+		values[j] += std::pow(eps,std::pow(2,exp_coeff-j_norm));
+	}
+
+	/// FOR DEBUG ONLY --> a perturbation should never be 0
+	// if(values[0] == 0 || values[1] == 0 || values[2] == 0) {
+	// 	std::cout << "i_norm on id: " << id << " i_norm " << i_norm << " " << exp_coeff << std::endl;
+	// 	std::cout << "perturbation on id: " << id << " " << values[0] << " " << values[1] << " " << values[2] << std::endl;
+	// }
+}
+
+void CriticalPointExtractor::Perturbate(double* values, vtkIdType &id, DataSetMetadata &dm) {
+	// perturbation function f(e,i,j) = eps^2^i*delta-j
+	// eps ?? --> constant?
+	// i = id (in their implementation is id+1)
+	// j = to the component of values --> 0,1,2 (in their implementation is the component +1)
+
+	//eps and delta are constant.. so I compute them one time at the beginning
+	vtkIdType i = id + 1;
+	double i_norm = (static_cast<double>(i)-static_cast<double>(dm.min_global_id))/(static_cast<double>(dm.max_global_id)-static_cast<double>(dm.min_global_id));
+	double exp_coeff = i_norm*delta;
+	// double exp_coeff = i*delta;
 	double j_norm;
 
 	for(int j=0; j<3; j++) {

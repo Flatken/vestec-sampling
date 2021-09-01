@@ -56,7 +56,7 @@ class CriticalPointExtractor {
       double global_bounds[6] = {-1,-1,-1,-1,-1,-1};
       int* global_extent;
       double spacing[3] = {-1,-1,-1};
-      vtkIdType max_global_id;
+      vtkIdType max_global_id, min_global_id, max_local_id=LLONG_MIN, min_local_id=LLONG_MAX;
       int dimensions[3] = {-1,-1,-1};
       ~DataSetMetadata() { 
         delete global_extent;
@@ -64,15 +64,15 @@ class CriticalPointExtractor {
     };
 
     ~CriticalPointExtractor() {     
-      delete position;
-	  delete vector;
+      delete []position;
+	    delete []vector;
 	    // delete perturbation;
      
      /*#pragma omp parallel for
      for(vtkIdType x=0; x < vecCellIds.size(); ++x)
         if(x%(this->numCellIds+1)==0)
           delete vecCellIds[x];*/
-	  delete vecCellIds;
+	    delete []vecCellIds;
 
      //vecCellIds.clear();
      //vecPointCoordinates.clear();
@@ -121,21 +121,27 @@ class CriticalPointExtractor {
      * Perturbation based on point id
      */
     void Perturbate(double* values, vtkIdType &id, vtkIdType &max_global_id);
+    void Perturbate(double* values, vtkIdType &id, DataSetMetadata &dm);
 
     /**
-     * Calculate global unique id 
+     * Calculate global unique id (compatible only on regularly distributed data)
      */
     vtkIdType GlobalUniqueID(double* pos, DataSetMetadata &dm/*, double *spacing, int *global_extent, double * global_bounds*/);
 
     /**
-     * Initialize and Perturbate the points array considering an access pattern that mitigates the NUMA allocation issue (3D-case)
-     */
-    void InitializePointsArray_2D(vtkDataSet* input, vtkDataArray* vectors, DataSetMetadata &dm, int &mpiRanks);
-
-    /**
      * Initialize and Perturbate the points array considering an access pattern that mitigates the NUMA allocation issue (2D-case)
      */
-    void InitializePointsArray_3D(vtkDataSet* input, vtkDataArray* vectors, DataSetMetadata &dm, int &mpiRanks);
+    // void InitializePointsArray_2D(vtkDataSet* input, vtkDataArray* vectors, DataSetMetadata &dm, int &mpiRanks);
+
+    /**
+     * Initialize and Perturbate the points array considering an access pattern that mitigates the NUMA allocation issue (3D-case)
+     */
+    // void InitializePointsArray_3D(vtkDataSet* input, vtkDataArray* vectors, DataSetMetadata &dm, int &mpiRanks);
+
+    /**
+     * 
+     */
+    vtkIdType ComputeHash(double* pos);
     
 private:
     vtkIdType ZERO_ID;  //!< Vertex ID of the singularity: always number of vertices + 1 
