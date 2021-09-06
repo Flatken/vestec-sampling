@@ -172,6 +172,8 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
 		}
  	}	
 	end = std::chrono::steady_clock::now();
+
+	controller->AllReduce(&cp_extractor.local_deg_cases, &cp_extractor.global_deg_cases, 1, vtkCommunicator::StandardOperations::SUM_OP);
 	
 	if(mpiRank == receiveProc) 
 	{
@@ -179,7 +181,7 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
 			<< std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
 			<< " ms" << std::endl;
 		std::cout << "[MPI:" << mpiRank << "] [RequestData::cleanupDataSet] critical cells: " << output->GetNumberOfCells() << std::endl;
-		std::cout << "[MPI:" << mpiRank << "] [RequestData::cleanupDataSet] degenerate cases: " << cp_extractor.deg_cases << std::endl;
+		std::cout << "[MPI:" << mpiRank << "] [RequestData::cleanupDataSet] degenerate cases: " << cp_extractor.global_deg_cases << std::endl;
 	}
 
 	if(mpiRanks > 1) 
@@ -764,7 +766,8 @@ CriticalPointExtractor::CriticalPointType CriticalPointExtractor::PointInCell(co
 	//Check for non data values (vector is zero and determinant also) 
 	if (targetDeterminant == 0)
 	{
-		this->deg_cases++;
+		#pragma omp atomic		
+		this->local_deg_cases++;
 		return REGULAR;
 	}
 	

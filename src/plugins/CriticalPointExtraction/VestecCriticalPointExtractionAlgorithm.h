@@ -163,7 +163,8 @@ private:
 	std::vector<CriticalPoint> vecCriticalCellIDs; //!< Vector of critical cell ids
     vtkIdType numSimplices;
 public: // for debug only
-    int deg_cases = 0;
+    int local_deg_cases = 0;
+    int global_deg_cases = 0;
 };
 
 
