@@ -421,7 +421,7 @@ CriticalPointExtractor::CriticalPointExtractor(vtkDataSet* input,
 				vecCellIds[i*4] = ids->GetId(0); vecCellIds[i*4+1] = ids->GetId(1); vecCellIds[i*4+2] = ids->GetId(2); vecCellIds[i*4+3] = ids->GetId(3);
 			}
 			else {
-				std::cout << "[MPI:" << mpiRank << "] [CriticalPointExtractor::identify_critical_points] Error: unknown cell type " << std::endl;
+				//std::cout << "[MPI:" << mpiRank << "] [CriticalPointExtractor::identify_critical_points] Error: unknown cell type! Type is "<< cellType << std::endl;
 				continue;
 			}	
 			

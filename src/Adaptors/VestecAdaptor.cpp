@@ -41,16 +41,9 @@ void CatalystInitialize(std::vector<std::string> input, double deltaT, int numSc
 {
 	//Store filenames for later usage
 	inputFiles = input;
-
-	if (Processor == NULL)
-	{
-		Processor = vtkCPProcessor::New();
-		Processor->Initialize();
-	}
-	else
-	{
-		Processor->RemoveAllPipelines();
-	}
+	
+	Processor = vtkCPProcessor::New();
+	Processor->Initialize();
 
 	for(int i=4;i<numScripts;i++)
     {
@@ -62,16 +55,8 @@ void CatalystInitialize(std::vector<std::string> input, double deltaT, int numSc
 }
 
 void CatalystFinalize()
-{
-	if (Processor)
-	{
-		Processor->Delete();
-		Processor = NULL;
-	}
-	if (VTKGrid)
-	{
-		VTKGrid = NULL;
-	}
+{	
+	Processor->Finalize();
 }
 
 void CatalystCoProcess( double time, unsigned int timeStep, int lastTimeStep)
