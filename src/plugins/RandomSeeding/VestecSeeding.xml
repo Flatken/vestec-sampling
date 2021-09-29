@@ -6,7 +6,7 @@
         short_help="This filters gets points as input and creates random points around the input points">
      </Documentation>
      <InputProperty
-        name="Input"
+        name="Seeds"
         port_index="0"
         command="SetInputConnection">
            <ProxyGroupDomain name="groups">
@@ -17,6 +17,20 @@
              <DataType value="vtkDataSet"/>
            </DataTypeDomain>
       </InputProperty>
+
+      <InputProperty
+        name="Grid"
+        port_index="1"
+        command="SetInputConnection">
+           <ProxyGroupDomain name="groups">
+             <Group name="sources"/>
+             <Group name="filters"/>
+           </ProxyGroupDomain>
+           <DataTypeDomain name="input_type">
+             <DataType value="vtkDataSet"/>
+           </DataTypeDomain>
+      </InputProperty>
+
       <DoubleVectorProperty name="SeedingRadius"
                             command="SetPercentOfDomain"
                             number_of_elements="1"
@@ -53,7 +67,7 @@
                          attribute_type="Scalars"
                          input_domain_name="inputs_array">
           <RequiredProperties>
-            <Property name="Input"
+            <Property name="Seeds"
                       function="Input" />
           </RequiredProperties>
         </ArrayListDomain>
