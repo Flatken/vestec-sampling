@@ -28,7 +28,7 @@ vtkStandardNewMacro(VestecSeedingAlgorithm);
 //----------------------------------------------------------------------------
 VestecSeedingAlgorithm::VestecSeedingAlgorithm()
 {
-  this->SetNumberOfInputPorts( 1 );
+  this->SetNumberOfInputPorts( 2 );
   this->SetNumberOfOutputPorts( 1 );
 }
 
@@ -192,11 +192,16 @@ int VestecSeedingAlgorithm::RequestData(
   vtkInformation* outInfo = outputVector->GetInformationObject(0);
   vtkPolyData* output = dynamic_cast<vtkPolyData*>(outInfo->Get( vtkDataObject::DATA_OBJECT() ) );
 
-  vtkInformation *inInfoGrid = inputVector[0]->GetInformationObject(0);
+  vtkInformation *inInfoSeeds = inputVector[0]->GetInformationObject(0);
+  vtkDataSet *inputSeeds = dynamic_cast<vtkDataSet*>(inInfoSeeds->Get(vtkDataObject::DATA_OBJECT()));
+
+  vtkInformation *inInfoGrid = inputVector[1]->GetInformationObject(0);
   vtkDataSet *inputGrid = dynamic_cast<vtkDataSet*>(inInfoGrid->Get(vtkDataObject::DATA_OBJECT()));
 
+  
+
   int localNumberOfSeeds = NumberOfPointsAroundSeed;
-  int numPoints = inputGrid->GetNumberOfPoints();
+  int numPoints = inputSeeds->GetNumberOfPoints();
 
   //Resulting points
   vtkPoints* pPoints = vtkPoints::New();
@@ -211,7 +216,7 @@ int VestecSeedingAlgorithm::RequestData(
   {
     //Get the initial position of the point
     double pos[3];
-    inputGrid->GetPoint(p, pos);
+    inputSeeds->GetPoint(p, pos);
 
     //Get lengt of each domain axis
     double bounds[6];
@@ -225,6 +230,10 @@ int VestecSeedingAlgorithm::RequestData(
     double l = 0;
     if(l_x != 0 && l_y != 0 && l_z != 0)
       l = std::min(std::min(l_x, l_y), l_z);
+    else if (l_x == 0)
+      l = std::min(l_y, l_z);
+    else if (l_y == 0)
+      l = std::min(l_x, l_z);
     else
       l = std::min(l_x, l_y);
     
@@ -239,9 +248,9 @@ int VestecSeedingAlgorithm::RequestData(
       genLenght = new RandomNumberGenerator<std::uniform_real_distribution<>>(0,l);
     }else if(DistributionMode == 1)
     {
-      genAngleY = new RandomNumberGenerator<std::normal_distribution<>>(0,M_PI*2);
-      genAngleZ = new RandomNumberGenerator<std::normal_distribution<>>(0,M_PI*2);
-      genLenght = new RandomNumberGenerator<std::normal_distribution<>>(0,l);
+      genAngleY = new RandomNumberGenerator<std::normal_distribution<>>(M_PI, 2);
+      genAngleZ = new RandomNumberGenerator<std::normal_distribution<>>(M_PI, 2);
+      genLenght = new RandomNumberGenerator<std::normal_distribution<>>(0, l/4);
     }else{
       std::cout << "Error: Unknown distribution mode" << std::endl;
     }
@@ -256,6 +265,7 @@ int VestecSeedingAlgorithm::RequestData(
       localNumberOfSeeds = 0;
     }
 
+    
     //Generate the random seeds and add them to the output point array
     for(int n = 0; n < localNumberOfSeeds; ++n)
     {
@@ -269,13 +279,35 @@ int VestecSeedingAlgorithm::RequestData(
         new_pos[0] = pos[0] + distance * std::cos(angleZ) * std::sin(angleY);
         new_pos[1] = pos[1] + distance * std::sin(angleZ);
         new_pos[2] = pos[2] + distance * std::cos(angleZ) * std::cos(angleY);
+      }else if(l_x == 0){
+        new_pos[2] = pos[2] + distance * std::cos(angleY);
+        new_pos[1] = pos[1] + distance * std::sin(angleY);
+        new_pos[0] = 0;
+      }
+      else if(l_y == 0){
+        new_pos[2] = pos[2] + distance * std::cos(angleY);
+        new_pos[0] = pos[0] + distance * std::sin(angleY);
+        new_pos[1] = 0;
       }else{
         new_pos[0] = pos[0] + distance * std::cos(angleY);
         new_pos[1] = pos[1] + distance * std::sin(angleY);
-        new_pos[2] = pos[2];
+        new_pos[2] = 0;
       }
+
       pPoints->InsertNextPoint(new_pos[0], new_pos[1], new_pos[2]);
     }
+
+    //Insert 8 points close to the bounding box
+
+    //pPoints->InsertNextPoint(0.90 * bounds[0], 0.90 * bounds[2], 0.90 * bounds[4]);
+    //pPoints->InsertNextPoint(0.90 * bounds[1], 0.90 * bounds[2], 0.90 * bounds[4]);
+    //pPoints->InsertNextPoint(0.90 * bounds[0], 0.90 * bounds[3], 0.90 * bounds[4]);
+    //pPoints->InsertNextPoint(0.90 * bounds[1], 0.90 * bounds[3], 0.90 * bounds[4]);
+    //pPoints->InsertNextPoint(0.90 * bounds[0], 0.90 * bounds[2], 0.90 * bounds[5]);
+    //pPoints->InsertNextPoint(0.90 * bounds[1], 0.90 * bounds[2], 0.90 * bounds[5]);
+    //pPoints->InsertNextPoint(0.90 * bounds[0], 0.90 * bounds[3], 0.90 * bounds[5]);
+    //pPoints->InsertNextPoint(0.90 * bounds[1], 0.90 * bounds[3], 0.90 * bounds[5]);
+
 
     delete genLenght;
     delete genAngleY;
