@@ -27,20 +27,6 @@ set(CMAKE_INSTALL_RPATH
     "${CMAKE_INSTALL_PREFIX}/lib"
 )
 
-# subdirectories
-# test support (requires that GTest is available)
-# ==============================================================================
- option(ENABLE_TESTING "Perform tests" OFF)
-
- if(ENABLE_TESTING)
-    enable_testing()
-    find_package(GTest REQUIRED)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fprofile-arcs -ftest-coverage")
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fprofile-arcs -ftest-coverage")
-    add_subdirectory(test)
- endif()
-
-
 # Subdirectories
 # ==============================================================================
 add_subdirectory(src)
