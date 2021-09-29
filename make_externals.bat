@@ -19,7 +19,7 @@ rem    make_externals.bat -G "Visual Studio 16 2019" -A x64                     
 rem ---------------------------------------------------------------------------------------------- #
 
 rem The CMake generator and other flags can be passed as parameters.
-set CMAKE_FLAGS=-G "Visual Studio 15 Win64"
+set CMAKE_FLAGS=-G "Ninja"
 IF NOT "%~1"=="" (
   SET CMAKE_FLAGS=%*
 )
@@ -60,11 +60,8 @@ set Qt5_DIR="C:/Qt/Qt5.14.2/5.14.2/msvc2017_64/lib/cmake/Qt5"
 rem Paraview --------------------------------------------------------------------------------------------
 :paraview
 
-rem cd "%EXTERNALS_DIR%/ttk/paraview/patch/"
-rem patch-paraview-msvc.cmd "%EXTERNALS_DIR%/paraview-5.6"
-
 echo .
-echo Building and installing Paraview 5.8 ...
+echo Building and installing Paraview 5.9.1 ...
 echo .
 
 cmake -E make_directory "%BUILD_DIR%/paraview" && cd "%BUILD_DIR%/paraview"
@@ -77,8 +74,8 @@ cmake %CMAKE_FLAGS% -DCMAKE_INSTALL_PREFIX="%INSTALL_DIR%"^
       -DPARAVIEW_USE_MPI=ON^
       -DPARAVIEW_USE_VTKM=OFF^
       -DQt5_DIR="C:/Qt/Qt5.14.2/5.14.2/msvc2017_64/lib/cmake/Qt5"^
-      -DCMAKE_BUILD_TYPE="%BUILD_TYPE%" "%EXTERNALS_DIR%/paraview-5.6"
-cmake --build . --config "%BUILD_TYPE%" --target install --parallel 12
+      -DCMAKE_BUILD_TYPE="%BUILD_TYPE%" "%EXTERNALS_DIR%/paraview"  || goto :error 
+cmake --build . --config "%BUILD_TYPE%" --target install --parallel 12  || goto :error 
 
 rem # EIGEN -----------------------------------------------------------------------------------------
 :eigen
@@ -89,8 +86,8 @@ echo Building and installing Eigen
 cmake -E make_directory "%BUILD_DIR%/eigen" && cd "%BUILD_DIR%/eigen"
 cmake %CMAKE_FLAGS% -DCMAKE_INSTALL_PREFIX=%INSTALL_DIR%^
        -DQt5_DIR=C:/Qt/Qt5.14.2/5.14.2/msvc2017_64/lib/cmake/Qt5^
-       -DCMAKE_BUILD_TYPE=%BUILD_TYPE% "%EXTERNALS_DIR%/eigen"
-cmake --build . --config %BUILD_TYPE% --target install --parallel 12
+       -DCMAKE_BUILD_TYPE=%BUILD_TYPE% "%EXTERNALS_DIR%/eigen"  || goto :error 
+cmake --build . --config %BUILD_TYPE% --target install --parallel 12  || goto :error 
 
 echo .
 
@@ -98,11 +95,13 @@ rem # TTK ----------------------------------------------------------------------
 :ttk
 
 echo .
-echo Building and installing TTK
+echo Building and installing TTK 0.9.9
 echo .
 
-cmake -E remove_directory "%EXTERNALS_DIR%/ttk/paraview/WRLExporter"
-cmake -E remove_directory "%EXTERNALS_DIR%/ttk/core/vtk/ttkWRLExporter"
+rem cmake -E remove_directory "%EXTERNALS_DIR%/ttk/paraview/WRLExporter"
+rem cmake -E remove_directory "%EXTERNALS_DIR%/ttk/core/vtk/ttkWRLExporter"
+rem -DVTK_MODULE_ENABLE_ttkCinemaImaging=DONT_WANT^
+rem -DVTK_MODULE_ENABLE_ttkUserInterfaceBase=DONT_WANT^
 
 cmake -E make_directory "%BUILD_DIR%/ttk" && cd "%BUILD_DIR%/ttk"
 cmake %CMAKE_FLAGS% -DCMAKE_INSTALL_PREFIX=%INSTALL_DIR%^
@@ -113,16 +112,17 @@ cmake %CMAKE_FLAGS% -DCMAKE_INSTALL_PREFIX=%INSTALL_DIR%^
       -DTTK_ENABLE_KAMIKAZE=On^
       -DTTK_ENABLE_MPI=ON^
       -DTTK_BUILD_STANDALONE_APPS=OFF^
-      -DVTK_MODULE_ENABLE_ttkCinemaImaging=DONT_WANT^
-      -DVTK_MODULE_ENABLE_ttkUserInterfaceBase=DONT_WANT^
-	    -DQt5_DIR=C:/Qt/Qt5.14.2/5.14.2/msvc2017_64/lib/cmake/Qt5^
+      -DQt5_DIR=C:/Qt/Qt5.14.2/5.14.2/msvc2017_64/lib/cmake/Qt5^
       -DCMAKE_CXX_FLAGS="/bigobj /EHsc /UBOOST_NO_EXCEPTIONS"^
-      -DCMAKE_BUILD_TYPE=%BUILD_TYPE% "%EXTERNALS_DIR%/ttk"
-cmake --build . --config %BUILD_TYPE% --target install --parallel 12
+      -DCMAKE_BUILD_TYPE=%BUILD_TYPE% "%EXTERNALS_DIR%/ttk"  || goto :error 
+cmake --build . --config %BUILD_TYPE% --target install --parallel 12  || goto :error 
 
 pause
 
 cd "%CURRENT_DIR%"
 echo Finished successfully.
+
+:error
+echo Errors occurred! 
 
 @echo on
