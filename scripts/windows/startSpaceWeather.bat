@@ -1,6 +1,10 @@
 @echo off
-set PV_PLUGIN_PATH=.;paraview-5.8/plugins/VestecPlugins
+
+set DATA_PATH="D:\\vr_data\\VESTEC\\space_weather\\run007"
+set PV_PLUGIN_PATH=.;paraview-5.9/plugins/VestecPlugins;paraview-5.9/plugins/TopologyToolKit
+set NUM_THREADS=6
+set MPI_PROCESSES=1
 
 start smpd -d 3
-mpiexec -env PV_PLUGIN_PATH %PV_PLUGIN_PATH% -env OMP_NUM_THREADS 1 -env OMP_DISPLAY_ENV true -env OMP_PROC_BIND spread -env OMP_PLACES cores -hosts 1 localhost -cores 1 VestecCatalystEmulator.exe "D:\\vr_data\\VESTEC\\space_weather\\run007" .vtk 40 scripts/criticalPoints_SpaceWeather.py
+mpiexec -env OMP_NUM_THREADS %NUM_THREADS% -env PV_PLUGIN_PATH %PV_PLUGIN_PATH% -hosts 1 localhost -cores %MPI_PROCESSES% VestecCatalystEmulator.exe %DATA_PATH% .vtk 12 scripts\criticalPoints_SpaceWeather.py
 @echo on

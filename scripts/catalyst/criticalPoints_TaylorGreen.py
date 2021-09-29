@@ -31,21 +31,6 @@ from paraview import coprocessing
 # --------------------------------------------------------------
 import os
 
-## the path in which the Vestec Plugin is installed is different between linux and windows
-## not clear why this is happening but we have to do the following workaround to correctly link
-## the library files
-
-#if os.name == "posix":
-#	path_parent = os.path.dirname(os.getcwd())
-#	os.chdir(path_parent)
-#	vestec_plugin_path = os.path.join(path_parent,'lib/paraview-5.8/plugins/VestecPlugins/VestecPlugins.so')
-#else:	# windows
-#	vestec_plugin_path = os.path.join(os.getcwd(),'paraview-5.8/plugins/VestecPlugins/VestecPlugins.dll')
-#LoadPlugin(vestec_plugin_path, ns=globals())
-#print("Loading Plugin: "+vestec_plugin_path)
-
-# ----------------------- CoProcessor definition -----------------------
-
 def CreateCoProcessor():
   def _CreatePipeline(coprocessor, datadescription):
     class Pipeline:
@@ -67,14 +52,9 @@ def CreateCoProcessor():
       # create a producer from a simulation input
       grid_ = coprocessor.CreateProducer(datadescription, 'input')
 
-      # create a new 'Tetrahedralize'
-      # tetrahedralize1 = Tetrahedralize(Input=grid_)
-
       # create a new 'VestecCriticalPointExtractionAlgorithm'
       vestecCriticalPointExtractionAlgorithm1 = VestecCriticalPointExtractionAlgorithm(Input=grid_)
-      # vestecCriticalPointExtractionAlgorithm1 = VestecCriticalPointExtractionAlgorithm(Input=tetrahedralize1)
       vestecCriticalPointExtractionAlgorithm1.Array = ['POINTS', 'vec'] # for evaluation datasets
-      #vestecCriticalPointExtractionAlgorithm1.Array = ['POINTS', 'B'] # for space-weather use-case
 
       # ----------------------------------------------------------------
       # finally, restore active source

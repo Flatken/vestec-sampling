@@ -26,26 +26,6 @@ make_cinema_table=False
 from paraview.simple import *
 from paraview import coprocessing
 
-# --------------------------------------------------------------
-# The following loads VESTEC's plugins.
-# --------------------------------------------------------------
-#import os
-
-## the path in which the Vestec Plugin is installed is different between linux and windows
-## not clear why this is happening but we have to do the following workaround to correctly link
-## the library files
-
-#if os.name == "posix":
-#	path_parent = os.path.dirname(os.getcwd())
-#	os.chdir(path_parent)
-#	vestec_plugin_path = os.path.join(path_parent,'lib/paraview-5.8/plugins/VestecPlugins/VestecPlugins.so')
-#else:	# windows
-#	vestec_plugin_path = os.path.join(os.getcwd(),'paraview-5.8\plugins\VestecPlugins\VestecPlugins.dll')
- 
-#LoadPlugin(vestec_plugin_path, ns=globals())
-
-
-
 # ----------------------- CoProcessor definition -----------------------
 
 def CreateCoProcessor():
@@ -73,14 +53,25 @@ def CreateCoProcessor():
       vestecCriticalPointExtractionAlgorithm1 = VestecCriticalPointExtractionAlgorithm(Input=grid_)
       vestecCriticalPointExtractionAlgorithm1.Array = ['POINTS', 'B'] # for space-weather use-case
 
+      # Generate seeds around critical points
+      vestecSeeding = VestecSeedingAlgorithm(Seeds=vestecCriticalPointExtractionAlgorithm1, Grid=grid_)
+      vestecSeeding.SeedingRadius = 10
+      vestecSeeding.NumberOfSeeds = 25
+      vestecSeeding.RandomDistributionMode = 'Normal distribution'
+
+      vestecSamplingAlgorithm = VestecSamplingAlgorithm(Grid=grid_,Seeds=vestecSeeding)
+      vestecSamplingAlgorithm.Vectors = ['POINTS', 'B']
+      vestecSamplingAlgorithm.IntegrationDuration = 100
+      vestecSamplingAlgorithm.StepSize = 12
+
       # ----------------------------------------------------------------
       # finally, restore active source
       SetActiveSource(vestecCriticalPointExtractionAlgorithm1)
       # ----------------------------------------------------------------
 	  
       # Now any catalyst writers
-      writer = servermanager.writers.XMLPUnstructuredGridWriter(Input=vestecCriticalPointExtractionAlgorithm1)
-      coprocessor.RegisterWriter(writer, filename='spaceWeather/VestecCriticalPointExtractionAlgorithm_%t.pvtu', freq=1, paddingamount=0)
+      xMLPPolyDataWriter1 = servermanager.writers.XMLPPolyDataWriter(Input=vestecSamplingAlgorithm)
+      coprocessor.RegisterWriter(xMLPPolyDataWriter1, filename='resultsSpaceWeather/VestecSamplingAlgorithm1_%t.pvtp', freq=1, paddingamount=0)
     return Pipeline()
 
   class CoProcessor(coprocessing.CoProcessor):

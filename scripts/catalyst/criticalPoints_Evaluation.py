@@ -72,28 +72,32 @@ def CreateCoProcessor():
       vestecCriticalPointExtractionAlgorithm1.Array = ['POINTS', 'Vec'] # for evaluation datasets
 
 	    # Generate seeds around critical points
-      vestecSeeding = VestecSeedingAlgorithm(Input=vestecCriticalPointExtractionAlgorithm1)
-      vestecSeeding.SeedingRadius = 10.0
-      vestecSeeding.NumberOfSeeds = 5
-      vestecSeeding.RandomDistributionMode = 'Normal distribution'
-      vestecSeeding.Array = ['POINTS', 'p']
+      vestecSeeding = VestecSeedingAlgorithm(Seeds=vestecCriticalPointExtractionAlgorithm1, Grid=grid_)
+      vestecSeeding.SeedingRadius = 30
+      vestecSeeding.NumberOfSeeds = 10
+      vestecSeeding.RandomDistributionMode = 'Uniform distribution'
 
       # Trace particles
-      vestecSamplingAlgorithm = VestecSamplingAlgorithm(Grid=grid_,Seeds=vestecSeeding)
-      vestecSamplingAlgorithm.Vectors = ['POINTS', 'Vec']
-      vestecSamplingAlgorithm.IntegrationDuration = 1.7
-      vestecSamplingAlgorithm.StepSize = 0.02
+      # vestecSamplingAlgorithm = VestecSamplingAlgorithm(Grid=grid_,Seeds=vestecSeeding)
+      # vestecSamplingAlgorithm.Vectors = ['POINTS', 'Vec']
+      # vestecSamplingAlgorithm.IntegrationDuration = 1.7
+      # vestecSamplingAlgorithm.StepSize = 0.02
       
-      SetActiveSource(vestecSamplingAlgorithm)
+      #SetActiveSource(vestecSamplingAlgorithm)
 
       # ----------------------------------------------------------------
       # finally, restore active source
-      SetActiveSource(vestecCriticalPointExtractionAlgorithm1)
+      SetActiveSource(vestecSeeding)
       # ----------------------------------------------------------------
 	  
       # Now any catalyst writers
-      writer = servermanager.writers.XMLPUnstructuredGridWriter(Input=vestecCriticalPointExtractionAlgorithm1)
-      coprocessor.RegisterWriter(writer, filename='results/VestecCriticalPointExtractionAlgorithm_%t.pvtu', freq=1, paddingamount=0)
+      # writer = servermanager.writers.XMLPUnstructuredGridWriter(Input=vestecSamplingAlgorithm)
+      # coprocessor.RegisterWriter(writer, filename='results/VestecCriticalPointExtractionAlgorithm_%t.pvtu', freq=1, paddingamount=0)
+
+      # Now any catalyst writers
+      xMLPPolyDataWriter1 = servermanager.writers.XMLPPolyDataWriter(Input=vestecSeeding)
+      coprocessor.RegisterWriter(xMLPPolyDataWriter1, filename='results/VestecSamplingAlgorithm1_%t.pvtp', freq=1, paddingamount=0)
+
     return Pipeline()
 
   class CoProcessor(coprocessing.CoProcessor):
