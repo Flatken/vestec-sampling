@@ -19,7 +19,7 @@ rem    make_externals.bat -G "Visual Studio 16 2019" -A x64                     
 rem ---------------------------------------------------------------------------------------------- #
 
 rem The CMake generator and other flags can be passed as parameters.
-set CMAKE_FLAGS=-G "Ninja"
+set CMAKE_FLAGS=-G "Visual Studio 15 Win64"
 IF NOT "%~1"=="" (
   SET CMAKE_FLAGS=%*
 )
@@ -98,11 +98,6 @@ echo .
 echo Building and installing TTK 0.9.9
 echo .
 
-rem cmake -E remove_directory "%EXTERNALS_DIR%/ttk/paraview/WRLExporter"
-rem cmake -E remove_directory "%EXTERNALS_DIR%/ttk/core/vtk/ttkWRLExporter"
-rem -DVTK_MODULE_ENABLE_ttkCinemaImaging=DONT_WANT^
-rem -DVTK_MODULE_ENABLE_ttkUserInterfaceBase=DONT_WANT^
-
 cmake -E make_directory "%BUILD_DIR%/ttk" && cd "%BUILD_DIR%/ttk"
 cmake %CMAKE_FLAGS% -DCMAKE_INSTALL_PREFIX=%INSTALL_DIR%^
       -DParaView_DIR="%BUILD_DIR%/paraview"^
@@ -112,6 +107,7 @@ cmake %CMAKE_FLAGS% -DCMAKE_INSTALL_PREFIX=%INSTALL_DIR%^
       -DTTK_ENABLE_KAMIKAZE=On^
       -DTTK_ENABLE_MPI=ON^
       -DTTK_BUILD_STANDALONE_APPS=OFF^
+      -DVTK_MODULE_ENABLE_ttkCinemaWriter=DONT_WANT^
       -DQt5_DIR=C:/Qt/Qt5.14.2/5.14.2/msvc2017_64/lib/cmake/Qt5^
       -DCMAKE_CXX_FLAGS="/bigobj /EHsc /UBOOST_NO_EXCEPTIONS"^
       -DCMAKE_BUILD_TYPE=%BUILD_TYPE% "%EXTERNALS_DIR%/ttk"  || goto :error 

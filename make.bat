@@ -50,7 +50,7 @@ if exist "%BUILD_DIR%" goto BUILD_DIR_CREATED
 :BUILD_DIR_CREATED
 
 rem configure, compile & install -------------------------------------------------------------------
-set Paraview_DIR=%EXTERNALS_INSTALL_DIR%/lib/cmake/paraview-5.8
+set Paraview_DIR=%EXTERNALS_INSTALL_DIR%/lib/cmake/paraview-5.9
 set Eigen_DIR=%EXTERNALS_INSTALL_DIR%
 
 cd "%BUILD_DIR%"
