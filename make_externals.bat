@@ -114,11 +114,13 @@ cmake %CMAKE_FLAGS% -DCMAKE_INSTALL_PREFIX=%INSTALL_DIR%^
 cmake --build . --config %BUILD_TYPE% --target install --parallel 12  || goto :error 
 
 pause
-
-cd "%CURRENT_DIR%"
-echo Finished successfully.
+goto :end
 
 :error
 echo Errors occurred! 
+
+:end
+cd "%CURRENT_DIR%"
+echo Finished successfully.
 
 @echo on
