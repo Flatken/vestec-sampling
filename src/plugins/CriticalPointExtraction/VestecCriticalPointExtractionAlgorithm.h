@@ -156,6 +156,8 @@ private:
   vtkIdType numSimplicesPerCell; 
 	std::vector<CriticalPoint> vecCriticalCellIDs; //!< Vector of critical cell ids
     vtkIdType numSimplices;
+public: // for debug only
+    int deg_cases = 0;
 };
 
 

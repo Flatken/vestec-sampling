@@ -121,16 +121,16 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
 	controller->Barrier();
 
 	// Local cleanup done by every worker
-	start = std::chrono::steady_clock::now();	
+	
 	
 	//Collect all critical cells per MPI rank
-	vtkSmartPointer<vtkUnstructuredGrid> gatheredOutput = vtkSmartPointer<vtkUnstructuredGrid>::New();
-	std::vector<vtkIdType> pointCount(mpiRanks, 0);
-  	vtkIdType numPoints = output->GetNumberOfPoints();
-  	controller->AllGather(&numPoints, &pointCount[0], 1);
+	//vtkSmartPointer<vtkUnstructuredGrid> gatheredOutput = vtkSmartPointer<vtkUnstructuredGrid>::New();
+	//std::vector<vtkIdType> pointCount(mpiRanks, 0);
+  	//vtkIdType numPoints = output->GetNumberOfPoints();
+  	//controller->AllGather(&numPoints, &pointCount[0], 1);
 
 	int receiveProc = 0;
-	vtkIdType maxVal = 0;
+	/*vtkIdType maxVal = 0;
 	for (int i = 0; i < mpiRanks; i++)
 	{
 		if (pointCount[i] > maxVal)
@@ -138,31 +138,38 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
 		maxVal = pointCount[i];
 		receiveProc = i;
 		}
-	}
+	}*/
 
   	std::vector<vtkSmartPointer<vtkDataObject>> recvBuffer;
+	start = std::chrono::steady_clock::now();	
   	controller->Gather(output, recvBuffer, receiveProc);
-
+	end = std::chrono::steady_clock::now();
+	if(mpiRank == receiveProc) 
+	{
+		std::cout << "[MPI:" << mpiRank << "] [RequestData::reduceDataSet] Elapsed time in milliseconds : "
+			<< std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
+			<< " ms" << std::endl;
+	}	
+	
+	//Sync to measure correct time for the clean step
+	controller->Barrier();
+	
+	start = std::chrono::steady_clock::now();	
 	if (mpiRank == receiveProc)
 	{
-		if (recvBuffer.size() == 1)
+		if (recvBuffer.size() > 1 && output->IsA("vtkUnstructuredGrid"))
 		{
-			//Nothing since we already have the data (single mpi)
+			vtkNew<vtkAppendFilter> appendFilter;
+			appendFilter->MergePointsOn();
+			for (std::vector<vtkSmartPointer<vtkDataObject> >::iterator it = recvBuffer.begin();
+				it != recvBuffer.end(); ++it)
+			{
+				appendFilter->AddInputData(*it);
+			}
+			appendFilter->Update();
+			output->ShallowCopy(appendFilter->GetOutput());
 		}
-		else if (output->IsA("vtkUnstructuredGrid"))
-		{
-		vtkNew<vtkAppendFilter> appendFilter;
-		appendFilter->MergePointsOn();
-		for (std::vector<vtkSmartPointer<vtkDataObject> >::iterator it = recvBuffer.begin();
-			it != recvBuffer.end(); ++it)
-		{
-			appendFilter->AddInputData(*it);
-		}
-		appendFilter->Update();
-		output->ShallowCopy(appendFilter->GetOutput());
-		}
- 	}
-	
+ 	}	
 	end = std::chrono::steady_clock::now();
 	
 	if(mpiRank == receiveProc) 
@@ -171,6 +178,7 @@ int VestecCriticalPointExtractionAlgorithm::RequestData(
 			<< std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
 			<< " ms" << std::endl;
 		std::cout << "[MPI:" << mpiRank << "] [RequestData::cleanupDataSet] critical cells: " << output->GetNumberOfCells() << std::endl;
+		std::cout << "[MPI:" << mpiRank << "] [RequestData::cleanupDataSet] degenerate cases: " << cp_extractor.deg_cases << std::endl;
 	}
 
 	if(mpiRanks > 1) 
@@ -216,13 +224,7 @@ CriticalPointExtractor::CriticalPointExtractor(vtkDataSet* input,
 	
 	//Get the local bounds of the current MPI process
 	// double local_bounds[6];
-	input->GetBounds(dm.local_bounds);
-	// get global sides
-	double xDim = fabs(dm.local_bounds[1] - dm.local_bounds[0]);
-	double yDim = fabs(dm.local_bounds[3] - dm.local_bounds[2]);
-	double zDim = fabs(dm.local_bounds[5] - dm.local_bounds[4]);	
-
-	// std::cout << "xDim " << xDim << " yDim " << yDim << " zDim " << zDim << std::endl;
+	input->GetBounds(dm.local_bounds);			
 
 	/// then extract some global characteristics of the dataset
 	/// like, 1. global bounds
@@ -236,6 +238,12 @@ CriticalPointExtractor::CriticalPointExtractor(vtkDataSet* input,
 	controller->AllReduce(&dm.local_bounds[5], &dm.global_bounds[5], 1, vtkCommunicator::StandardOperations::MAX_OP);
 
 	int mpiRanks = controller->GetNumberOfProcesses(); // to check how many MPI processes are up and running
+
+	// get global sides
+	double xDim = fabs(dm.global_bounds[1] - dm.global_bounds[0]);
+	double yDim = fabs(dm.global_bounds[3] - dm.global_bounds[2]);
+	double zDim = fabs(dm.global_bounds[5] - dm.global_bounds[4]);	
+	// std::cout << "xDim " << xDim << " yDim " << yDim << " zDim " << zDim << std::endl;
 
 	// 2. global sides
 	// double global_sides[3] = { xDim, yDim, zDim };
@@ -323,6 +331,9 @@ CriticalPointExtractor::CriticalPointExtractor(vtkDataSet* input,
 		//Local variables per thread
 		int threadIdx = omp_get_thread_num();//Thread ID
 
+		/// NOTICE: the following two function initialize the two arrays following a spatial-aware strategy.
+		///		That said, since we use a vtkDataSet object, this is already guaranteed in the input.
+		///		Then, the performance are equivalent, and, thus, we kept the simpler method.
 		/*if(VTK_PIXEL == cellType || VTK_QUAD == cellType)
 			InitializePointsArray_2D(input,vectors,dm,mpiRanks);
 		else if(VTK_VOXEL == cellType || VTK_TETRA == cellType)
@@ -423,7 +434,8 @@ CriticalPointExtractor::CriticalPointExtractor(vtkDataSet* input,
 		vecCellPerThread[x]->Delete();
 	}
 	vecCellPerThread.clear();
-	if(mpiRank == 0) std::cout << "[MPI:" << mpiRank << "] [CriticalPointExtractor::identify_critical_points] Extracted " << numSimplices/*vecCellIds.size()*/ << " simplices" << std::endl;
+	//if(mpiRank == 0) 
+	std::cout << "[MPI:" << mpiRank << "] [CriticalPointExtractor::identify_critical_points] Extracted " << numSimplices/*vecCellIds.size()*/ << " simplices" << std::endl;
 }
 
 void CriticalPointExtractor::InitializePointsArray_2D(vtkDataSet * input, vtkDataArray * vectors, DataSetMetadata &dm, int &mpiRanks) 
@@ -493,17 +505,22 @@ vtkIdType CriticalPointExtractor::GlobalUniqueID(double* pos, DataSetMetadata &d
 {
 	///Function that calculates global unique id
 
-	/// 1. structured coordinates
-	long x = std::lround(pos[0]/dm.spacing[0]-dm.global_bounds[0]);
-	long y = std::lround(pos[1]/dm.spacing[1]-dm.global_bounds[2]);
-	long z = std::lround(pos[2]/dm.spacing[2]-dm.global_bounds[4]);
+	/// 1. transpose the point coordinates to the positive range
+	double posX = pos[0] - dm.global_bounds[0];
+	double posY = pos[1] - dm.global_bounds[1];
+	double posZ = pos[2] - dm.global_bounds[2];
+	
+	/// 2. Compute structured coordinates
+	long x = std::lround(posX/dm.spacing[0]);
+	long y = std::lround(posY/dm.spacing[1]);
+	long z = std::lround(posZ/dm.spacing[2]);
 
-	/// 2. then compute the resolution
+	/// 3. then compute the resolution
 	long resx = dm.global_extent[1]+1;
 	long resy = dm.global_extent[3]+1;
 	long resz = dm.global_extent[5]+1;
 
-	/// 3. then the global id
+	/// 4. then the global id
 	// z * xDim * yDim + y * zDim + x
 	vtkIdType globalid = z * resx * resy + y * resz + x;
 
@@ -670,6 +687,7 @@ CriticalPointExtractor::CriticalPointType CriticalPointExtractor::PointInCell(co
 	//Check for non data values (vector is zero and determinant also) 
 	if (targetDeterminant == 0)
 	{
+		this->deg_cases++;
 		return REGULAR;
 	}
 	
