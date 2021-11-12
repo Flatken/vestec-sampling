@@ -658,6 +658,8 @@ void CriticalPointExtractor::ComputeCriticalCells()
 			//If the cell contains a the singularity add them to the output and we can break
 			CriticalPointType ret = PointInCell(&vecCellIds[i*numCellIds], vecMatrices[threadIdx]);
 			if (ret != REGULAR) {
+				/// classify the critical simplex by computing the eigenvalues on its Jacobian
+				ret = ClassifyCriticalSimplex(&vecCellIds[i*numCellIds]);
 				CriticalPoint tmp(i,ret);
 #pragma omp critical
 				vecCriticalCellIDs.push_back(tmp);
@@ -791,19 +793,97 @@ CriticalPointExtractor::CriticalPointType CriticalPointExtractor::PointInCell(co
 		}
 	}
 
-	if(numIds == 3)
+	/*if(numIds == 3)
 		tmpIds = {ids[0],ids[1],ids[2]};
 	else
 		tmpIds = {ids[0],ids[1],ids[2],ids[3]};
 	double initialDeterminant = ComputeDeterminant(tmpIds, vecMatrix, true);	
-	bool initialDirection     = DeterminantCounterClockWise(initialDeterminant);	
+	bool initialDirection     = DeterminantCounterClockWise(initialDeterminant);		
 	
 	if (initialDirection != targetDirection)
 	{
 		return SADDLE; // we found a saddle
-	}
+	}*/	
 
 	return SINGULARITY; // the cell is critical, since the sign never change
+}
+
+CriticalPointExtractor::CriticalPointType CriticalPointExtractor::ClassifyCriticalSimplex(const vtkIdType* ids/*, DynamicMatrix &jacobian*/) {
+	int numIds = numCellIds;
+
+	//in 3D for tetrahedral meshes we have a 3x3 matrix,
+	//while in 2D for triangle meshes we have a 2x2 matrix (we will cast to it)
+	CriticalPointExtractor::CriticalPointType ret=SINGULARITY;
+
+	if(numIds == 4) {
+		Eigen::Matrix3d j;
+		j << vector[ids[3]*3]-vector[ids[0]*3], vector[ids[2]*3]-vector[ids[0]*3], vector[ids[1]*3]-vector[ids[0]*3], 
+			vector[ids[3]*3+1]-vector[ids[0]*3+1], vector[ids[2]*3+1]-vector[ids[0]*3+1], vector[ids[1]*3+1]-vector[ids[0]*3+1], 
+			vector[ids[3]*3+2]-vector[ids[0]*3+2], vector[ids[2]*3+2]-vector[ids[0]*3+2], vector[ids[1]*3+2]-vector[ids[0]*3+2];
+
+		auto ev = j.eigenvalues();
+		//std::cout << "eigenvalues: "<<ev.real()<<" "<<ev.imag()<<std::endl;
+		auto real = ev.real();
+		auto imag = ev.imag();
+		// SADDLE1: re1 > 0 and re2,re3 < 0 and im1 = 0 and im2,im3 != 0 
+		if(real[0] > 0 && real[1] < 0 && real[2] < 0 && imag[0] == 0 && imag[1] != 0 && imag[2] != 0)
+			ret = SADDLE1;
+		// SADDLE2: re1 < 0 and re2,re3 > 0 and im1,im2,im3 = 0 
+		else if(real[0] < 0 && real[1] > 0 && real[2] > 0 && imag[0] == 0 && imag[1] == 0 && imag[2] == 0)
+			ret = SADDLE2;
+		// SADDLE3: re1 > 0 and re2,re3 < 0 and im1,im2,im3 = 0 
+		else if(real[0] > 0 && real[1] < 0 && real[2] < 0 && imag[0] == 0 && imag[1] == 0 && imag[2] == 0)
+			ret = SADDLE3;
+		// SADDLE4: re1 < 0 and re2,re3 > 0 and im1 = 0 and im2,im3 != 0 
+		else if(real[0] < 0 && real[1] > 0 && real[2] > 0 && imag[0] == 0 && imag[1] != 0 && imag[2] != 0)
+			ret = SADDLE4;
+		// ATTRACTIVE FOCUS: re1,re2,re3 < 0 and im1,im2,im3 = 0 
+		else if(real[0] < 0 && real[1] < 0 && real[2] < 0 && imag[0] == 0 && imag[1] == 0 && imag[2] == 0)
+			ret = ATTR_FOCUS;
+		// REPELLING FOCUS: re1,re2,re3 > 0 and im1,im2,im3 = 0 
+		else if(real[0] > 0 && real[1] > 0 && real[2] > 0 && imag[0] == 0 && imag[1] == 0 && imag[2] == 0)
+			ret = REPEL_FOCUS;
+		// ATTRACTING NODE: re1,re2,re3 < 0 and im1 = 0 and im2,im3 != 0 
+		else if(real[0] < 0 && real[1] < 0 && real[2] < 0 && imag[0] == 0 && imag[1] != 0 && imag[2] != 0)
+			ret = ATTR_NODE;
+		// REPELLING NODE: re1,re2,re3 > 0 and im1 = 0 and im2,im3 != 0 
+		else if(real[0] > 0 && real[1] > 0 && real[2] > 0 && imag[0] == 0 && imag[1] != 0 && imag[2] != 0)
+			ret = REPEL_NODE;
+		//int a; std::cin>>a;
+	}
+	else {
+		Eigen::Matrix2d j;
+		j << vector[ids[2]*3]-vector[ids[0]*3], vector[ids[1]*3]-vector[ids[0]*3], 
+			vector[ids[2]*3+1]-vector[ids[0]*3+1], vector[ids[1]*3+1]-vector[ids[0]*3+1];
+
+		auto ev = j.eigenvalues();
+		//std::cout << "eigenvalues: "<<ev.real()<<" "<<ev.imag()<<std::endl;
+		auto real = ev.real();
+		auto imag = ev.imag();
+		// SADDLE: re1*re2 < 0 and im1,im2 = 0 
+		if(real[0] * real[1] < 0 && imag[0] == 0 && imag[1] == 0)
+			ret = SADDLE1;	
+		// ATTRACTIVE FOCUS: re1,re2 < 0 and im1,im2 != 0 	
+		else if(real[0] < 0 && real[1] < 0 && imag[0] != 0 && imag[1] != 0)
+			ret = ATTR_FOCUS;
+		// REPELLING FOCUS: re1,re2 > 0 and im1,im2 != 0 	
+		else if(real[0] > 0 && real[1] > 0 && imag[0] != 0 && imag[1] != 0)
+			ret = REPEL_FOCUS;
+		// ATTRACTIVE NODE: re1,re2 < 0 and im1,im2 = 0 	
+		else if(real[0] < 0 && real[1] < 0 && imag[0] == 0 && imag[1] == 0)
+			ret = ATTR_NODE;
+		// REPELLING NODE: re1,re2 > 0 and im1,im2 = 0 	
+		else if(real[0] > 0 && real[1] > 0 && imag[0] == 0 && imag[1] == 0)
+			ret = REPEL_NODE;
+		// CENTER: re1,re2 = 0 and im1,im2 != 0 	
+		else if(real[0] == 0 && real[1] == 0 && imag[0] != 0 && imag[1] != 0)
+			ret = CENTER;
+		//int a; std::cin>>a;
+	}
+
+	return ret;
+		//auto ev = static_cast<Eigen::Matrix2d>(vejcMatrix).eigenvalues();
+}
 }
 
 double CriticalPointExtractor::ComputeDeterminant(	

@@ -40,7 +40,7 @@ class CriticalPointExtractor {
 
     void writeCriticalCells(vtkSmartPointer<vtkDataSet> output);
 
-    enum CriticalPointType { REGULAR=0, SADDLE=-1, SINGULARITY=1 };
+    enum CriticalPointType { REGULAR=0, SINGULARITY=-1, SADDLE1=1, SADDLE2=2, SADDLE3=3, SADDLE4=4, ATTR_NODE=5, REPEL_NODE=6, ATTR_FOCUS=7, REPEL_FOCUS=8, CENTER=9};
     struct CriticalPoint {
       vtkIdType id;
       CriticalPointType type;
@@ -143,6 +143,10 @@ class CriticalPointExtractor {
      */
     vtkIdType ComputeHash(double* pos);
     
+    /**
+     * 
+     */
+    CriticalPointExtractor::CriticalPointType ClassifyCriticalSimplex(const vtkIdType* ids/*, DynamicMatrix &Jacobian*/);
 private:
     vtkIdType ZERO_ID;  //!< Vertex ID of the singularity: always number of vertices + 1 
     int iExchangeIndex; //!< The row id of the matrix to exchange with the singularity    
