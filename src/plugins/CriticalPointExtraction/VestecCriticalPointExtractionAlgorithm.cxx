@@ -884,6 +884,22 @@ CriticalPointExtractor::CriticalPointType CriticalPointExtractor::ClassifyCritic
 	return ret;
 		//auto ev = static_cast<Eigen::Matrix2d>(vejcMatrix).eigenvalues();
 }
+
+double* CriticalPointExtractor::ComputeCentroid(const vtkIdType* ids) {
+	vtkIdType numDims = (numCellIds == 4) ? 3 : 2;
+	
+	double* centroid = new double[numDims];
+
+	for (vtkIdType d = 0; d < numDims; d++) {
+		double c = 0;
+		for (vtkIdType i = 0; i < numCellIds; i++) {
+			c += position[ids[i]*3 + d];
+		}
+		centroid[d] = c / 4.0;
+	}		
+
+	return centroid;
+
 }
 
 double CriticalPointExtractor::ComputeDeterminant(	

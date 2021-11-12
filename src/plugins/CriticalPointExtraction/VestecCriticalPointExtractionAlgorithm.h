@@ -147,6 +147,12 @@ class CriticalPointExtractor {
      * 
      */
     CriticalPointExtractor::CriticalPointType ClassifyCriticalSimplex(const vtkIdType* ids/*, DynamicMatrix &Jacobian*/);
+
+    /**
+     * 
+     */
+    double* ComputeCentroid(const vtkIdType* ids);
+    
 private:
     vtkIdType ZERO_ID;  //!< Vertex ID of the singularity: always number of vertices + 1 
     int iExchangeIndex; //!< The row id of the matrix to exchange with the singularity    
