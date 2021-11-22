@@ -40,7 +40,7 @@ class CriticalPointExtractor {
 
     void writeCriticalCells(vtkSmartPointer<vtkDataSet> output);
 
-    enum CriticalPointType { REGULAR=0, SINGULARITY=-1, SADDLE1=1, SADDLE2=2, SADDLE3=3, SADDLE4=4, ATTR_NODE=5, REPEL_NODE=6, ATTR_FOCUS=7, REPEL_FOCUS=8, CENTER=9};
+    enum CriticalPointType { DEGENERATED=-1, REPELLING_NODE=0, REPELLING_FOCUS=1, REPELLING_NODE_SADDLE=2, REPELLING_FOCUS_SADDLE=3, ATTRACTING_NODE=4, ATTRACTING_FOCUS=5, ATTRACTING_NODE_SADDLE=6, ATTRACTING_FOCUS_SADDLE=7, SINGULARITY=8};
     struct CriticalPoint {
       vtkIdType id;
       CriticalPointType type;
