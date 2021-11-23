@@ -1,7 +1,7 @@
 @echo off
 
-rem set DATA_PATH="C:\\VESTEC\\Datasets\\taylor_green"
-set DATA_PATH="D:\\vr_data\\LorenzAttractor"
+set DATA_PATH="C:\\VESTEC\\Datasets\\lorenz"
+@REM set DATA_PATH="D:\\vr_data\\LorenzAttractor"
 
 set PV_PLUGIN_PATH=.;paraview-5.9/plugins/VestecPlugins;paraview-5.9/plugins/TopologyToolKit
 set NUM_THREADS=6

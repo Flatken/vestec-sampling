@@ -1,6 +1,7 @@
 @echo off
 
-set DATA_PATH="D:\\vr_data\\VESTEC\\space_weather\\run007"
+set DATA_PATH="C:\\VESTEC\\Datasets\\space_weather\\run007"
+@REM set DATA_PATH="D:\\vr_data\\VESTEC\\space_weather\\run007"
 set PV_PLUGIN_PATH=.;paraview-5.9/plugins/VestecPlugins;paraview-5.9/plugins/TopologyToolKit
 set NUM_THREADS=6
 set MPI_PROCESSES=1
