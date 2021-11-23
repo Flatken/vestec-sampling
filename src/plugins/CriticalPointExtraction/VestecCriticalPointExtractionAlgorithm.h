@@ -40,12 +40,25 @@ class CriticalPointExtractor {
 
     void writeCriticalCells(vtkSmartPointer<vtkDataSet> output);
 
-    enum CriticalPointType { DEGENERATED=-1, REPELLING_NODE=0, REPELLING_FOCUS=1, REPELLING_NODE_SADDLE=2, REPELLING_FOCUS_SADDLE=3, ATTRACTING_NODE=4, ATTRACTING_FOCUS=5, ATTRACTING_NODE_SADDLE=6, ATTRACTING_FOCUS_SADDLE=7, SINGULARITY=8};
+    enum PointType {      
+      UNCLASSIFIED_SINGULARITY=-1,
+      ATTRACTING_NODE=0, 
+      ATTRACTING_FOCUS=1,     
+      ATTRACTING_NODE_SADDLE=2, 
+      ATTRACTING_FOCUS_SADDLE=3, 
+      REPELLING_NODE_SADDLE=4,
+      REPELLING_FOCUS_SADDLE=5,       
+      REPELLING_NODE=6, 
+      REPELLING_FOCUS=7,
+      CENTER_NODE=8,
+      NODE_SADDLE_2D=9,
+      REGULAR_POINT=10
+    };
     struct CriticalPoint {
       vtkIdType id;
-      CriticalPointType type;
+      PointType type;
 
-      CriticalPoint(vtkIdType i, CriticalPointType t) { 
+      CriticalPoint(vtkIdType i, PointType t) { 
         id = i; 
         type = t;
       }
@@ -110,7 +123,7 @@ class CriticalPointExtractor {
      * ids: The vertex ids spanning the cell
      * vecMatrix: The matrix used to compute the determinant
      */ 
-    CriticalPointType PointInCell(const vtkIdType* ids, DynamicMatrix &vecMatrix);
+    PointType PointInCell(const vtkIdType* ids, DynamicMatrix &vecMatrix);
 
     /**
      * Check if direction of the determinant is positive (counter-clockwise) 
@@ -146,12 +159,25 @@ class CriticalPointExtractor {
     /**
      * 
      */
-    CriticalPointExtractor::CriticalPointType ClassifyCriticalSimplex(const vtkIdType* ids/*, DynamicMatrix &Jacobian*/);
+    CriticalPointExtractor::PointType ClassifyCriticalSimplex(const vtkIdType* ids/*, DynamicMatrix &Jacobian*/);
 
     /**
      * 
      */
     double* ComputeCentroid(const vtkIdType* ids);
+
+    /**
+     * 
+     */
+    template<class T> void InitializeMatrices(const vtkIdType* ids, T& coordsMatrix, T& vectorsMatrix);
+    /**
+     * 
+     */
+    template<class T> void CheckEigenvalues(T& ev, int &posReal, int &negReal, int &zeroImag, int &complexImag);
+    /**
+     * 
+     */
+    template<class T> CriticalPointExtractor::PointType GetCriticalSimplexType(T& ev, int &posReal, int &negReal, int &zeroImag, int &complexImag);
     
 private:
     vtkIdType ZERO_ID;  //!< Vertex ID of the singularity: always number of vertices + 1 
@@ -179,6 +205,119 @@ public: // for debug only
     int local_deg_cases = 0;
     int global_deg_cases = 0;
 };
+
+template<class T> void CriticalPointExtractor::InitializeMatrices(const vtkIdType* ids, T& coordsMatrix, T& vectorsMatrix) {
+  int mSize = coordsMatrix.rows();
+  for (int i = 0; i < mSize; i++)
+	{
+		for (int j = 0; j < mSize; j++)
+		{
+			coordsMatrix(i,j) = position[ids[j]*3+i] - position[ids[mSize]*3+i];
+			vectorsMatrix(i,j) = vector[ids[j]*3+i] - vector[ids[mSize]*3+i];
+		}				
+	}
+}
+
+template<class T> void CriticalPointExtractor::CheckEigenvalues(T& ev, int &posReal, int &negReal, int &zeroImag, int &complexImag) {
+  auto real = ev.real();
+	auto imag = ev.imag();		
+
+	for (int i = 0; i < real.size(); i++)
+	{
+		if (imag[i] == 0.0)
+			zeroImag++;
+		else
+			complexImag++;
+
+		if (real[i] < 0)
+			negReal++;
+		else if (real[i] > 0)
+			posReal++;
+	}
+}
+
+template<class T> CriticalPointExtractor::PointType CriticalPointExtractor::GetCriticalSimplexType(T& ev, int &posReal, int &negReal, int &zeroImag, int &complexImag) {
+  int numIds = numCellIds;
+
+  if(numIds == 4) { //3D case - tetrahedra
+    if (posReal + negReal == 3)
+		{
+			switch (posReal)
+			{
+			case 0:
+				if (complexImag == 0)
+					return ATTRACTING_NODE;
+				else
+					return ATTRACTING_FOCUS;
+			case 1:
+				if (complexImag == 0)
+					return ATTRACTING_NODE_SADDLE;
+				else
+					return ATTRACTING_FOCUS_SADDLE;
+			case 2:
+				if (complexImag == 0)
+					return REPELLING_NODE_SADDLE;
+				else
+					return REPELLING_FOCUS_SADDLE;
+			case 3:
+				if (complexImag == 0)
+					return REPELLING_NODE;
+				else
+					return REPELLING_FOCUS;
+			default:
+				{
+					std::cout << "[ERROR] Cannot classify the critical simplex with the following eigenvalues: "<<std::endl
+			  	  <<" real: "<<ev.real()[0]<<" "<<ev.real()[1]<<" "<<ev.real()[2]<<std::endl
+			  	  <<" imag: "<<ev.imag()[0]<<" "<<ev.imag()[1]<<" "<<ev.imag()[2]<<std::endl;
+					int a; std::cin>>a;
+					break;
+				}
+			}
+		} else if (complexImag > 0) {
+			return CENTER_NODE;
+		} else {
+			std::cout << "[ERROR] Cannot classify the critical simplex with the following eigenvalues: "<<std::endl
+				  <<" real: "<<ev.real()[0]<<" "<<ev.real()[1]<<" "<<ev.real()[2]<<std::endl
+			 	  <<" imag: "<<ev.imag()[0]<<" "<<ev.imag()[1]<<" "<<ev.imag()[2]<<std::endl;
+			int a; std::cin>>a;			
+    }     
+  } else { //2D case - triangles
+    if (posReal + negReal == 2)
+		{
+			switch (posReal)
+			{
+			case 0:
+				if (complexImag == 0)
+          return ATTRACTING_NODE;
+				else 
+          return ATTRACTING_FOCUS;
+			case 1:
+				return NODE_SADDLE_2D;
+			case 2:
+				if (complexImag == 0)
+          return REPELLING_NODE;
+				else
+          return REPELLING_FOCUS;
+			default:
+				{
+					std::cout << "[ERROR] Cannot classify the critical simplex with the following eigenvalues: "<<std::endl
+				    <<" real: "<<ev.real()[0]<<" "<<ev.real()[1]<<std::endl
+				    <<" imag: "<<ev.imag()[0]<<" "<<ev.imag()[1]<<std::endl;
+					int a; std::cin>>a;
+					break;
+				}
+			}
+		}
+		else if (complexImag == 2) {
+			return CENTER_NODE;
+		} else {
+			std::cout << "[ERROR] Cannot classify the critical simplex with the following eigenvalues: "<<std::endl
+				    <<" real: "<<ev.real()[0]<<" "<<ev.real()[1]<<std::endl
+				    <<" imag: "<<ev.imag()[0]<<" "<<ev.imag()[1]<<std::endl;
+			int a; std::cin>>a;			
+    }  
+  }
+}
 
 
 class VTK_EXPORT VestecCriticalPointExtractionAlgorithm : public vtkDataSetAlgorithm

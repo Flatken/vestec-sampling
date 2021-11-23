@@ -666,8 +666,8 @@ void CriticalPointExtractor::ComputeCriticalCells()
 		#pragma omp for
 		for (vtkIdType i = 0; i < numSimplices; i++) {
 			//If the cell contains a the singularity add them to the output and we can break
-			CriticalPointType ret = PointInCell(&vecCellIds[i*numCellIds], vecMatrices[threadIdx]);
-			if (ret != DEGENERATED) {
+			PointType ret = PointInCell(&vecCellIds[i*numCellIds], vecMatrices[threadIdx]);
+			if (ret != REGULAR_POINT) {
 				/// classify the critical simplex by computing the eigenvalues on its Jacobian
 				ret = ClassifyCriticalSimplex(&vecCellIds[i*numCellIds]);
 				CriticalPoint tmp(i,ret);
@@ -764,7 +764,7 @@ void CriticalPointExtractor::writeCriticalCells(vtkSmartPointer<vtkDataSet> outp
 	outputData->GetPointData()->AddArray(singularityType);
 }
 
-CriticalPointExtractor::CriticalPointType CriticalPointExtractor::PointInCell(const vtkIdType* ids, DynamicMatrix &vecMatrix) {		
+CriticalPointExtractor::PointType CriticalPointExtractor::PointInCell(const vtkIdType* ids, DynamicMatrix &vecMatrix) {		
 	std::array<vtkIdType, 4> tmpIds;
 	int numIds = numCellIds;
 	if(numIds == 3)
@@ -780,7 +780,7 @@ CriticalPointExtractor::CriticalPointType CriticalPointExtractor::PointInCell(co
 	{
 		#pragma omp atomic		
 		this->local_deg_cases++;
-		return DEGENERATED;
+		return REGULAR_POINT;
 	}
 	
 	double tmpDeterminant;
@@ -799,7 +799,7 @@ CriticalPointExtractor::CriticalPointType CriticalPointExtractor::PointInCell(co
 		// 2.3. check if it changes --> if so return false
 		if (targetDirection != tmpDirection)
 		{
-			return DEGENERATED; // regular cell
+			return REGULAR_POINT; // regular cell
 		}
 	}
 
@@ -815,123 +815,44 @@ CriticalPointExtractor::CriticalPointType CriticalPointExtractor::PointInCell(co
 		return SADDLE; // we found a saddle
 	}*/	
 
-	return SINGULARITY; // the cell is critical, since the sign never change
+	return UNCLASSIFIED_SINGULARITY; // the cell is critical, since the sign never change
 }
 
-CriticalPointExtractor::CriticalPointType CriticalPointExtractor::ClassifyCriticalSimplex(const vtkIdType* ids/*, DynamicMatrix &jacobian*/) {
+CriticalPointExtractor::PointType CriticalPointExtractor::ClassifyCriticalSimplex(const vtkIdType* ids/*, DynamicMatrix &jacobian*/) {
 	int numIds = numCellIds;
 
-	//in 3D for tetrahedral meshes we have a 3x3 matrix,
-	//while in 2D for triangle meshes we have a 2x2 matrix (we will cast to it)
-	CriticalPointExtractor::CriticalPointType ret = DEGENERATED;
+	CriticalPointExtractor::PointType ret = UNCLASSIFIED_SINGULARITY;
+	int posReal = 0;
+	int negReal = 0;
 
-	if(numIds == 4) {
+	int zeroImag = 0;
+	int complexImag = 0;
 
-		Eigen::Matrix3d coords;
-		coords << 	position[ids[0]*3]  -position[ids[3]*3],   position[ids[1]*3]  -position[ids[3]*3],   position[ids[2]*3]  -position[ids[3]*3], 
-					position[ids[0]*3+1]-position[ids[3]*3+1], position[ids[1]*3+1]-position[ids[3]*3+1], position[ids[2]*3+1]-position[ids[3]*3+1], 
-					position[ids[0]*3+2]-position[ids[3]*3+2], position[ids[1]*3+2]-position[ids[3]*3+2], position[ids[2]*3+2]-position[ids[3]*3+2];
+	if(numIds == 4) {//in 3D for tetrahedral meshes we have a 3x3 matrix,
+		Eigen::Matrix3d coordsMatrix;
+		Eigen::Matrix3d vectorsMatrix;
+		InitializeMatrices(ids,coordsMatrix,vectorsMatrix);
 
-		Eigen::Matrix3d values;
-		values << 	vector[ids[0]*3]  -vector[ids[3]*3],   vector[ids[1]*3]  -vector[ids[3]*3],   vector[ids[2]*3]  -vector[ids[3]*3], 
-					vector[ids[0]*3+1]-vector[ids[3]*3+1], vector[ids[1]*3+1]-vector[ids[3]*3+1], vector[ids[2]*3+1]-vector[ids[3]*3+1], 
-					vector[ids[0]*3+2]-vector[ids[3]*3+2], vector[ids[1]*3+2]-vector[ids[3]*3+2], vector[ids[2]*3+2]-vector[ids[3]*3+2];
-
-		Eigen::Matrix3d jacobian;
-		jacobian = coords * values.inverse();
-		auto ev = jacobian.inverse().eigenvalues();
+		Eigen::Matrix3d jacobianMatrix;
+		jacobianMatrix = coordsMatrix * vectorsMatrix.inverse();
+		auto ev = jacobianMatrix.inverse().eigenvalues();
+		CheckEigenvalues(ev,posReal,negReal,zeroImag,complexImag);
 		
-		auto real = ev.real();
-		auto imag = ev.imag();
+		ret = GetCriticalSimplexType(ev,posReal,negReal,zeroImag,complexImag);		
+	} else {//while in 2D for triangle meshes we have a 2x2 matrix
+		Eigen::Matrix2d coordsMatrix;
+		Eigen::Matrix2d vectorsMatrix;
+		InitializeMatrices(ids,coordsMatrix,vectorsMatrix);
+		
+		Eigen::Matrix2d jacobianMatrix;
+		jacobianMatrix = coordsMatrix * vectorsMatrix.inverse();
+		auto ev = jacobianMatrix.inverse().eigenvalues();
+		CheckEigenvalues(ev,posReal,negReal,zeroImag,complexImag);
 
-		int posReal = 0;
-		int negReal = 0;
-
-		int countReal = 0;
-		int countComplex = 0;
-
-		for (int i = 0; i < 3; i++)
-		{
-			if (imag[i] == 0.0)
-			{
-				countReal++;
-			}
-			else
-			{
-				countComplex++;
-			}
-
-			if (real[i] < 0)
-			{
-				negReal++;
-			}
-			else if (real[i] > 0)
-			{
-				posReal++;
-			}
-		}
-
-		if (posReal + negReal == 3)
-		{
-			switch (posReal)
-			{
-			case 0:
-				if (countComplex == 0)
-				{
-					ret = ATTRACTING_NODE;
-				}
-				else
-				{
-					ret = ATTRACTING_FOCUS;
-				}
-				break;
-			case 1:
-				if (countComplex == 0)
-				{
-					ret = ATTRACTING_NODE_SADDLE;
-				}
-				else
-				{
-					ret = ATTRACTING_FOCUS_SADDLE;
-				}
-				break;
-			case 2:
-				if (countComplex == 0)
-				{
-					ret = REPELLING_NODE_SADDLE;
-				}
-				else
-				{
-					ret = REPELLING_FOCUS_SADDLE;
-				}
-				break;
-			case 3:
-				if (countComplex == 0)
-				{
-					ret = REPELLING_NODE;
-				}
-				else
-				{
-					ret = REPELLING_FOCUS;
-				}
-				break;
-			default:
-				{
-					std::cout << "[Error] Can not classify critical point " << std::endl;
-					std::cout << "Imag: " << imag << std::endl;
-					std::cout << "Real: " << real << std::endl;
-					int a; std::cin>>a;
-					break;
-				}
-			}
-		}
-	}
-	else {
-		//TODO
+		ret = GetCriticalSimplexType(ev,posReal,negReal,zeroImag,complexImag);
 	}
 
 	return ret;
-		//auto ev = static_cast<Eigen::Matrix2d>(vejcMatrix).eigenvalues();
 }
 
 double* CriticalPointExtractor::ComputeCentroid(const vtkIdType* ids) {
@@ -948,7 +869,6 @@ double* CriticalPointExtractor::ComputeCentroid(const vtkIdType* ids) {
 	}		
 
 	return centroid;
-
 }
 
 double CriticalPointExtractor::ComputeDeterminant(	
