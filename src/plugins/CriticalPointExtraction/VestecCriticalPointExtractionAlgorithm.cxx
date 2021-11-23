@@ -264,11 +264,14 @@ CriticalPointExtractor::CriticalPointExtractor(vtkDataSet* input,
 	if(vtkImageData::SafeDownCast(input))
 		vtkImageData::SafeDownCast(input)->GetDimensions(dm.dimensions);
 
+	/// this for loop is mostly needed to initialize the ZERO_ID
+	/// and (for debug) to check if the hashing function create non-unique keys
 	double* pos = new double[3];
 	for(vtkIdType i=0; i < numPoints; i++) 
 	{	 	
 	 	input->GetPoint(i, pos);	
 		vtkIdType hash = ComputeHash(pos);
+		global_id_uniqueness_map[hash]++;
 				
 		if(dm.min_local_id > hash)
 			dm.min_local_id = hash;
@@ -279,7 +282,14 @@ CriticalPointExtractor::CriticalPointExtractor(vtkDataSet* input,
 	controller->AllReduce(&dm.min_local_id, &dm.min_global_id, 1, vtkCommunicator::StandardOperations::MIN_OP);
 	controller->AllReduce(&dm.max_local_id, &dm.max_global_id, 1, vtkCommunicator::StandardOperations::MAX_OP);
 
+	int duplicated_hash = 0;
+	for(auto gid : global_id_uniqueness_map) {
+		if(gid.second > 1)
+			duplicated_hash++;
+	}
+
 	std::cout<<"min/max_global_id: "<<dm.min_global_id<<" "<<dm.max_global_id<<std::endl;
+	std::cout<<"duplicated hash keys: "<<duplicated_hash<<std::endl;
 	// // the global max id is needed for computing the perturbation in each point
 	// // -- if we have just one MPI process then we can directly use the number of points value, since the indexing is given and consistent
 	// // -- otherwise, in case of multiple MPI processes we have to derive the global id from some geometric information linked to the grid

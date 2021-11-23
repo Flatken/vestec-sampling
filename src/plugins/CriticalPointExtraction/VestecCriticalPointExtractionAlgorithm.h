@@ -168,10 +168,13 @@ private:
     double singularity[3]; //!< The singularity to identify
     int numThreads; //!< Number of OpenMP threads
     double eps = 1 / std::pow(10,14);
-	double delta = 4; // >=n  
-  vtkIdType numSimplicesPerCell; 
-	std::vector<CriticalPoint> vecCriticalCellIDs; //!< Vector of critical cell ids
+	  double delta = 4; // >=n  
+    vtkIdType numSimplicesPerCell; 
+	  std::vector<CriticalPoint> vecCriticalCellIDs; //!< Vector of critical cell ids
     vtkIdType numSimplices;
+    
+    std::map<vtkIdType,int> global_id_uniqueness_map; // for debug only
+    
 public: // for debug only
     int local_deg_cases = 0;
     int global_deg_cases = 0;
