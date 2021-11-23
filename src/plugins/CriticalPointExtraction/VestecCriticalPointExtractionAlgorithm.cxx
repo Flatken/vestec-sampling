@@ -871,6 +871,40 @@ double* CriticalPointExtractor::ComputeCentroid(const vtkIdType* ids) {
 	return centroid;
 }
 
+double* CriticalPointExtractor::ComputeBarycentricCoordinates(const vtkIdType* ids) {
+	// int numIds = numCellIds;	
+	vtkIdType numDims = (numCellIds == 4) ? 3 : 2;	
+	
+	Eigen::MatrixXd vectorsMatrix(numDims,numDims);
+	double* baricenter = new double[numDims];
+	double* lambda = new double[numDims];
+
+	// here we initialize the vector matrix as v[i] - v[numDims]
+  	for (int i = 0; i < numDims; i++) {		
+		for (int j = 0; j < numDims; j++)
+			vectorsMatrix(i,j) = vector[ids[j]*3+i] - vector[ids[numDims]*3+i];
+	}
+	vectorsMatrix = vectorsMatrix.inverse();
+	// here we compute the barycentric coordinates on zero --> lambda] = T^-1(i) * vector[id[numDims]]
+	for (int i = 0; i < numDims; i++)			
+		for (int j = 0; j < numDims; j++)
+			lambda[i] += vectorsMatrix(i,j) * vector[ids[numDims]*3+j];
+	// computed the multiplication coefficient for the last vertex of the triangle/tetrahedron
+	double mult_coeff = 1;
+	for (int i = 0; i < numDims; i++)
+		mult_coeff -= lambda[i];
+	// now we have to compute the barycentric interpolation to get the coordinates
+	// (in 2D) b[i] = lambda[0]*pos[0][i] + lambda[1]*pos[1][i] + pos[2][i] * mult_coeff
+	// (in 3D) b[i] = lambda[0]*pos[0][i] + lambda[1]*pos[1][i] + lambda[2]*pos[2][i] + pos[3][i] * mult_coeff
+	for (int i = 0; i < numDims; i++) {
+		for (int j = 0; j < numDims; j++)
+			baricenter[i] += position[ids[j]*3+i] * lambda[j];
+		baricenter[i] += position[ids[numDims]*3+i] * mult_coeff;
+	}
+
+	return baricenter;
+}
+
 double CriticalPointExtractor::ComputeDeterminant(	
 	std::array<vtkIdType, 4> &tmpIds,
 	DynamicMatrix &vecMatrix,

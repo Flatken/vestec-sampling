@@ -157,9 +157,13 @@ class CriticalPointExtractor {
     vtkIdType ComputeHash(double* pos);
     
     /**
-     * 
+     * Advanced Critical Simplex Classification
+     * Implementing method from: 
+     *    A. Globus, C. Levit and T. Lasinski, 
+     *    "A tool for visualizing the topology of three-dimensional vector fields," 
+     *    Proceeding Visualization '91, 1991, pp. 33-40, doi: 10.1109/VISUAL.1991.175773.
      */
-    CriticalPointExtractor::PointType ClassifyCriticalSimplex(const vtkIdType* ids/*, DynamicMatrix &Jacobian*/);
+    CriticalPointExtractor::PointType ClassifyCriticalSimplex(const vtkIdType* ids);
 
     /**
      * 
@@ -178,6 +182,12 @@ class CriticalPointExtractor {
      * 
      */
     template<class T> CriticalPointExtractor::PointType GetCriticalSimplexType(T& ev, int &posReal, int &negReal, int &zeroImag, int &complexImag);
+
+    /**
+     * Computes the barycentric coordinates of a simplex
+     * The method implemented is nicely explained at the following link: https://en.wikipedia.org/wiki/Barycentric_coordinate_system#Barycentric_coordinates_on_triangles
+     */
+    double* ComputeBarycentricCoordinates(const vtkIdType* ids);
     
 private:
     vtkIdType ZERO_ID;  //!< Vertex ID of the singularity: always number of vertices + 1 
