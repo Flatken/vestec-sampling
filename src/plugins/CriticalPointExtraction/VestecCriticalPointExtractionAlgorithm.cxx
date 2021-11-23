@@ -556,9 +556,11 @@ double* CriticalPointExtractor::ComputeBarycentricCoordinates(const vtkIdType* i
 	}
 	vectorsMatrix = vectorsMatrix.inverse();
 	// here we compute the barycentric coordinates on zero --> lambda] = T^-1(i) * vector[id[numDims]]
-	for (int i = 0; i < numDims; i++)			
+	for (int i = 0; i < numDims; i++) {
+		lambda[i] = 0;
 		for (int j = 0; j < numDims; j++)
 			lambda[i] += vectorsMatrix(i,j) * vector[ids[numDims]*3+j];
+	}	
 	// computed the multiplication coefficient for the last vertex of the triangle/tetrahedron
 	double mult_coeff = 1;
 	for (int i = 0; i < numDims; i++)
