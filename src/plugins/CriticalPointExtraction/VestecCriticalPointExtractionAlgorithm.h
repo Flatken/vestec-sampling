@@ -15,6 +15,7 @@
 
 //Matrix to compute the determinant
 typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 1, 4, 4> DynamicMatrix;
+
 //Forward declaration of vtkDataSet
 class vtkDataSet;
 
@@ -31,15 +32,21 @@ class CriticalPointExtractor {
     /**
      * Store vector and points in internal data structure 
      */
-    CriticalPointExtractor(vtkDataSet* input, double* currentSingularity, int mpiRank/*, bool pertubate = true*/);
+    CriticalPointExtractor(vtkDataSet* input, double* currentSingularity, int mpiRank, bool pertubate = true);
 
     /**
      * Identify the critical cells 
      */
     void ComputeCriticalCells();
 
+    /*
+     * Save output into a vtk file
+     */ 
     void writeCriticalCells(vtkSmartPointer<vtkDataSet> output);
 
+    /**
+     * Point types used for classification (2D and 3D)
+     */
     enum PointType {      
       UNCLASSIFIED_SINGULARITY=-1,
       ATTRACTING_NODE=0, 
@@ -54,6 +61,11 @@ class CriticalPointExtractor {
       NODE_SADDLE_2D=9,
       REGULAR_POINT=10
     };
+
+    /**
+     * Meta data about a critical point
+     * id = simplex id in the global array
+     */
     struct CriticalPoint {
       vtkIdType id;
       PointType type;
@@ -64,33 +76,18 @@ class CriticalPointExtractor {
       }
     };
 
+    /**
+     *  Meta data about the vtk input dataset
+     */
     struct DataSetMetadata {
       double local_bounds[6] = {-1,-1,-1,-1,-1,-1};
-      double global_bounds[6] = {-1,-1,-1,-1,-1,-1};
-      int* global_extent;
-      double spacing[3] = {-1,-1,-1};
-      vtkIdType max_global_id, min_global_id, max_local_id=LLONG_MIN, min_local_id=LLONG_MAX;
-      int dimensions[3] = {-1,-1,-1};
-      ~DataSetMetadata() { 
-        delete global_extent;
-      }
+      vtkIdType max_global_id=LLONG_MIN, min_global_id=LLONG_MAX, max_local_id=LLONG_MIN, min_local_id=LLONG_MAX;
     };
 
     ~CriticalPointExtractor() {     
       delete []position;
 	    delete []vector;
-	    // delete perturbation;
-     
-     /*#pragma omp parallel for
-     for(vtkIdType x=0; x < vecCellIds.size(); ++x)
-        if(x%(this->numCellIds+1)==0)
-          delete vecCellIds[x];*/
 	    delete []vecCellIds;
-
-     //vecCellIds.clear();
-     //vecPointCoordinates.clear();
-     //vecVectors.clear();
-    //  vecPerturbation.clear();
     }
     
   private:
@@ -131,28 +128,12 @@ class CriticalPointExtractor {
     bool DeterminantCounterClockWise(double& det);
 
     /**
-     * Perturbation based on point id
+     * Perturbation based on a unique hash which is normalized
      */
-    void Perturbate(double* values, vtkIdType &id, vtkIdType &max_global_id);
-    void Perturbate(double* values, vtkIdType &id, DataSetMetadata &dm);
+    void Perturbate(double* values, vtkIdType &hash, DataSetMetadata &dm);
 
     /**
-     * Calculate global unique id (compatible only on regularly distributed data)
-     */
-    vtkIdType GlobalUniqueID(double* pos, DataSetMetadata &dm/*, double *spacing, int *global_extent, double * global_bounds*/);
-
-    /**
-     * Initialize and Perturbate the points array considering an access pattern that mitigates the NUMA allocation issue (2D-case)
-     */
-    // void InitializePointsArray_2D(vtkDataSet* input, vtkDataArray* vectors, DataSetMetadata &dm, int &mpiRanks);
-
-    /**
-     * Initialize and Perturbate the points array considering an access pattern that mitigates the NUMA allocation issue (3D-case)
-     */
-    // void InitializePointsArray_3D(vtkDataSet* input, vtkDataArray* vectors, DataSetMetadata &dm, int &mpiRanks);
-
-    /**
-     * 
+     * Compute a hash for a given position. Two same positions in a distributed setup should produce the same hash
      */
     vtkIdType ComputeHash(double* pos);
     
@@ -166,20 +147,17 @@ class CriticalPointExtractor {
     CriticalPointExtractor::PointType ClassifyCriticalSimplex(const vtkIdType* ids);
 
     /**
-     * 
-     */
-    double* ComputeCentroid(const vtkIdType* ids);
-
-    /**
-     * 
+     * Initialize the matrices for critical simplex classification (either 3x3 or 2x2)
      */
     template<class T> void InitializeMatrices(const vtkIdType* ids, T& coordsMatrix, T& vectorsMatrix);
+
     /**
-     * 
+     * Compute statistic of the real and imaginary parts of the eigenvalues
      */
     template<class T> void CheckEigenvalues(T& ev, int &posReal, int &negReal, int &zeroImag, int &complexImag);
+
     /**
-     * 
+     * Classify the critical simplex
      */
     template<class T> CriticalPointExtractor::PointType GetCriticalSimplexType(T& ev, int &posReal, int &negReal, int &zeroImag, int &complexImag);
 
@@ -192,28 +170,41 @@ class CriticalPointExtractor {
 private:
     vtkIdType ZERO_ID;  //!< Vertex ID of the singularity: always number of vertices + 1 
     int iExchangeIndex; //!< The row id of the matrix to exchange with the singularity    
-    //std::vector<double*> vecPointCoordinates; //!< Store point coordinates
-    //std::vector<double*> vecVectors; //!< Store vector field
-    // std::vector<double*> vecPerturbation; //!< Store vector field perturbation
-    double* position; //!< Store point coordinates
-	  double* vector; //!< Store vector field
-	  // double* perturbation;
-//    std::vector<vtkIdType*> vecCellIds;  //!< The point ids for each cell
-    vtkIdType* vecCellIds;  //!< The point ids for each cell
-    int numCellIds;
-    double singularity[3]; //!< The singularity to identify
-    int numThreads; //!< Number of OpenMP threads
-    double eps = 1 / std::pow(10,14);
-	  double delta = 4; // >=n  
-    vtkIdType numSimplicesPerCell; 
-	  std::vector<CriticalPoint> vecCriticalCellIDs; //!< Vector of critical cell ids
-    vtkIdType numSimplices;
+    double* position;   //!< Store point coordinates
+	  double* vector;     //!< Store vector field
+
+    vtkIdType* vecCellIds;              //!< The point ids for each cell
+    int numCellIds;                     //!< The number of vertices per simplex
+    double singularity[3];              //!< The singularity to identify normally (0,0,0)
+    int numThreads;                     //!< Number of OpenMP threads
+    double eps = 1 / std::pow(10,14);   //!< A very small constant used for perturbation
+	  double delta = 4;                   //!< A constant used for perturbatino (must be greater than >= numCellIds)   
+    vtkIdType numSimplicesPerCell;      //!< The algorithms just works with simplices. In case of a regular grid we have to create e.g. 5 tetra per voxel
+	  std::vector<CriticalPoint> vecCriticalCellIDs;  //!< vector for storing the critical simplices
+    vtkIdType numSimplices;                         //!< Total number of simplices
     
-    std::map<vtkIdType,int> global_id_uniqueness_map; // for debug only
-    
+    std::map<vtkIdType,int> global_id_uniqueness_map; // for debug only  
 public: // for debug only
-    int local_deg_cases = 0;
+    int local_deg_cases  = 0;
     int global_deg_cases = 0;
+};
+
+
+template <class T>
+inline void hash_combine(vtkIdType& seed, const T& v)
+{
+    std::hash<T> constexpr hasher;
+    seed ^= hasher(v) + 0x9e3779b9 + (seed<<6) + (seed>>2);
+}
+
+template <> struct std::hash<double*> {
+    vtkIdType operator()(double* const& p) const {
+        vtkIdType v = 0x778abe;
+        hash_combine(v, p[0]);
+        hash_combine(v, p[1]);
+        hash_combine(v, p[2]);
+		return v;
+    }
 };
 
 template<class T> void CriticalPointExtractor::InitializeMatrices(const vtkIdType* ids, T& coordsMatrix, T& vectorsMatrix) {
@@ -279,8 +270,7 @@ template<class T> CriticalPointExtractor::PointType CriticalPointExtractor::GetC
 					std::cout << "[ERROR] Cannot classify the critical simplex with the following eigenvalues: "<<std::endl
 			  	  <<" real: "<<ev.real()[0]<<" "<<ev.real()[1]<<" "<<ev.real()[2]<<std::endl
 			  	  <<" imag: "<<ev.imag()[0]<<" "<<ev.imag()[1]<<" "<<ev.imag()[2]<<std::endl;
-					int a; std::cin>>a;
-					break;
+					return UNCLASSIFIED_SINGULARITY;
 				}
 			}
 		} else if (complexImag > 0) {
@@ -288,8 +278,8 @@ template<class T> CriticalPointExtractor::PointType CriticalPointExtractor::GetC
 		} else {
 			std::cout << "[ERROR] Cannot classify the critical simplex with the following eigenvalues: "<<std::endl
 				  <<" real: "<<ev.real()[0]<<" "<<ev.real()[1]<<" "<<ev.real()[2]<<std::endl
-			 	  <<" imag: "<<ev.imag()[0]<<" "<<ev.imag()[1]<<" "<<ev.imag()[2]<<std::endl;
-			int a; std::cin>>a;			
+			 	  <<" imag: "<<ev.imag()[0]<<" "<<ev.imag()[1]<<" "<<ev.imag()[2]<<std::endl;	
+      return UNCLASSIFIED_SINGULARITY;
     }     
   } else { //2D case - triangles
     if (posReal + negReal == 2)
@@ -313,8 +303,7 @@ template<class T> CriticalPointExtractor::PointType CriticalPointExtractor::GetC
 					std::cout << "[ERROR] Cannot classify the critical simplex with the following eigenvalues: "<<std::endl
 				    <<" real: "<<ev.real()[0]<<" "<<ev.real()[1]<<std::endl
 				    <<" imag: "<<ev.imag()[0]<<" "<<ev.imag()[1]<<std::endl;
-					int a; std::cin>>a;
-					break;
+					return UNCLASSIFIED_SINGULARITY;
 				}
 			}
 		}
@@ -324,12 +313,14 @@ template<class T> CriticalPointExtractor::PointType CriticalPointExtractor::GetC
 			std::cout << "[ERROR] Cannot classify the critical simplex with the following eigenvalues: "<<std::endl
 				    <<" real: "<<ev.real()[0]<<" "<<ev.real()[1]<<std::endl
 				    <<" imag: "<<ev.imag()[0]<<" "<<ev.imag()[1]<<std::endl;
-			int a; std::cin>>a;			
+      return UNCLASSIFIED_SINGULARITY;
     }  
   }
 }
 
-
+/**
+ * VTK Wrapper to execute the above algorithm  
+ */
 class VTK_EXPORT VestecCriticalPointExtractionAlgorithm : public vtkDataSetAlgorithm
 {
 public:
