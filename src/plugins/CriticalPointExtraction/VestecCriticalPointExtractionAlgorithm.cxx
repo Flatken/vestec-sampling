@@ -23,6 +23,7 @@
 #include <vtkDataSetWriter.h>
 #include <vtkImageData.h>
 #include <vtkAppendFilter.h>
+#include <vtkMatrix3x3.h>
 
 #include <sstream>
 #include <chrono>
@@ -280,9 +281,13 @@ CriticalPointExtractor::CriticalPointExtractor(vtkDataSet* input,
 			vectors->GetTuple(i,&vector[i * 3]);
 			input->GetPoint(i, &position[i * 3]);
 
-			// We use a unique hash for perturbating the vector field
-			vtkIdType hash = ComputeHash(&position[i * 3]);
-			Perturbate(&vector[i * 3], hash, dm);
+			//Perturbate the input field to get stable results by removing degenerated cases
+			if(pertubate)
+			{
+				// We use a unique hash for perturbating the vector field
+				vtkIdType hash = ComputeHash(&position[i * 3]);
+				Perturbate(&vector[i * 3], hash, dm);
+			}
 		}
 	
 		#pragma omp for
@@ -449,10 +454,10 @@ void CriticalPointExtractor::writeCriticalCells(vtkSmartPointer<vtkDataSet> outp
 		const vtkIdType* vecVertexIds = &vecCellIds[positionInArray];
 		vtkSmartPointer<vtkIdList> newPointIDs = vtkSmartPointer<vtkIdList>::New();	
 
-		double* barycenter = ComputeBarycentricCoordinates(vecVertexIds);
+		Eigen::Vector3d barycenter = ComputeBarycentricCoordinates(vecVertexIds);
 		singularityType->InsertNextTuple1(cellID.type);
 
-		vtkIdType newPointID = pointArray->InsertNextPoint(barycenter[0], barycenter[1], barycenter[2]);
+		vtkIdType newPointID = pointArray->InsertNextPoint(barycenter(0), barycenter(1), barycenter(2));
 		newPointIDs->InsertNextId(newPointID);
 		cellArray->InsertNextCell(newPointIDs);
 	}
@@ -541,39 +546,67 @@ CriticalPointExtractor::PointType CriticalPointExtractor::ClassifyCriticalSimple
 	return ret;
 }
 
-double* CriticalPointExtractor::ComputeBarycentricCoordinates(const vtkIdType* ids) {
+Eigen::Vector3d CriticalPointExtractor::ComputeBarycentricCoordinates(const vtkIdType* ids) {
 	// int numIds = numCellIds;	
 	vtkIdType numDims = (numCellIds == 4) ? 3 : 2;	
 	
-	Eigen::MatrixXd vectorsMatrix(numDims,numDims);
-	double* baricenter = new double[3]{0,0,0};
-	double* lambda = new double[numDims];
+	Eigen::Matrix3d vectorsMatrix = Eigen::Matrix3d::Identity();
+	Eigen::Vector3d baricenter(0,0,0);
 
-	// here we initialize the vector matrix as v[i] - v[numDims]
-  	for (int i = 0; i < numDims; i++) {		
-		for (int j = 0; j < numDims; j++)
-			vectorsMatrix(i,j) = vector[ids[j]*3+i] - vector[ids[numDims]*3+i];
-	}
-	vectorsMatrix = vectorsMatrix.inverse();
-	// here we compute the barycentric coordinates on zero --> lambda] = T^-1(i) * vector[id[numDims]]
-	for (int i = 0; i < numDims; i++) {
-		lambda[i] = 0;
-		for (int j = 0; j < numDims; j++)
-			lambda[i] += vectorsMatrix(i,j) * vector[ids[numDims]*3+j];
-	}	
-	// computed the multiplication coefficient for the last vertex of the triangle/tetrahedron
-	double mult_coeff = 1;
-	for (int i = 0; i < numDims; i++)
-		mult_coeff -= lambda[i];
-	// now we have to compute the barycentric interpolation to get the coordinates
-	// (in 2D) b[i] = lambda[0]*pos[0][i] + lambda[1]*pos[1][i] + pos[2][i] * mult_coeff
-	// (in 3D) b[i] = lambda[0]*pos[0][i] + lambda[1]*pos[1][i] + lambda[2]*pos[2][i] + pos[3][i] * mult_coeff
-	for (int i = 0; i < numDims; i++) {
-		for (int j = 0; j < numDims; j++)
-			baricenter[i] += position[ids[j]*3+i] * lambda[j];
-		baricenter[i] += position[ids[numDims]*3+i] * mult_coeff;
-	}
+	// Initialize matrix f(T) for triagle in 2D and tetra in 3D
+  	if(numDims == 2)
+		if(iExchangeIndex == 2)
+		vectorsMatrix << 	vector[ids[2]*3]   - vector[ids[0]*3],   vector[ids[2]*3] -   vector[ids[1]*3],   0,
+							vector[ids[2]*3+1] - vector[ids[0]*3+1], vector[ids[2]*3+1] - vector[ids[1]*3+1], 0,
+							vector[ids[2]*3+2] - vector[ids[0]*3+2], vector[ids[2]*3+2] - vector[ids[1]*3+2], 1;
+		
+		if(iExchangeIndex == 0)
+		vectorsMatrix << 	1, vector[ids[2]*3]   - vector[ids[0]*3],   vector[ids[2]*3] -   vector[ids[1]*3],
+							0, vector[ids[2]*3+1] - vector[ids[0]*3+1], vector[ids[2]*3+1] - vector[ids[1]*3+1],
+							0, vector[ids[2]*3+2] - vector[ids[0]*3+2], vector[ids[2]*3+2] - vector[ids[1]*3+2];
 
+		if(iExchangeIndex == 1)
+		vectorsMatrix << 	vector[ids[2]*3]   - vector[ids[0]*3], 0,  vector[ids[2]*3] -   vector[ids[1]*3],
+							vector[ids[2]*3+1] - vector[ids[0]*3+1], 1, vector[ids[2]*3+1] - vector[ids[1]*3+1],
+							vector[ids[2]*3+2] - vector[ids[0]*3+2], 0, vector[ids[2]*3+2] - vector[ids[1]*3+2];
+	if(numDims == 3)
+		vectorsMatrix << 	vector[ids[3]*3]   - vector[ids[0]*3],   vector[ids[3]*3]   - vector[ids[1]*3],   vector[ids[3]*3]   - vector[ids[2]*3],
+							vector[ids[3]*3+1] - vector[ids[0]*3+1], vector[ids[3]*3+1] - vector[ids[1]*3+1], vector[ids[3]*3+1] - vector[ids[2]*3+1],
+							vector[ids[3]*3+2] - vector[ids[0]*3+2], vector[ids[3]*3+2] - vector[ids[1]*3+2], vector[ids[3]*3+2] - vector[ids[2]*3+2];
+	
+	std::cout << "iExchangeIndex "<< iExchangeIndex << std::endl;
+	std::cout << "vectorsMatrix" << std::endl;
+	std::cout << vectorsMatrix << std::endl;
+	std::cout <<std::endl;
+	
+	//Invert the matrix
+	Eigen::Matrix3d invMatrix = vectorsMatrix.inverse();
+
+	std::cout << "invMatrix" << std::endl;
+	std::cout << invMatrix << std::endl;
+    std::cout << std::endl;
+
+	//Barycentric coordinates of the last vertex (3D)
+	Eigen::Vector3d vertPosition;
+	vertPosition << vector[ids[numDims]*3], vector[ids[numDims]*3+1], vector[ids[numDims]*3+2];
+
+	//f(T)^-1 * r-last
+	Eigen::Vector3d lambda = invMatrix * vertPosition;
+	std::cout << "lambda" << std::endl;
+	std::cout << lambda << std::endl;
+    std::cout << std::endl;
+	if(numDims == 2)
+	{
+		baricenter(0) = position[ids[0]*3]   * lambda(0) + position[ids[1]*3]   * lambda(1) + position[ids[2]*3]   * (1 - lambda(0) - lambda(1));
+		baricenter(1) = position[ids[0]*3+1] * lambda(0) + position[ids[1]*3+1] * lambda(1) + position[ids[2]*3+1] * (1 - lambda(0) - lambda(1));
+		baricenter(2) = position[ids[0]*3+2] * lambda(0) + position[ids[1]*3+2] * lambda(1) + position[ids[2]*3+2] * (1 - lambda(0) - lambda(1));	
+	}
+	else if(numDims == 3)
+	{
+		baricenter(0) = position[ids[0]*3]   * lambda(0) + position[ids[1]*3]   * lambda(1) + position[ids[2]*3]   * lambda(2) + position[ids[3]*3]   * (1 - lambda(0) - lambda(1) - lambda(2));
+		baricenter(1) = position[ids[0]*3+1] * lambda(0) + position[ids[1]*3+1] * lambda(1) + position[ids[2]*3+1] * lambda(2) + position[ids[3]*3+1] * (1 - lambda(0) - lambda(1) - lambda(2));
+		baricenter(2) = position[ids[0]*3+2] * lambda(0) + position[ids[1]*3+2] * lambda(1) + position[ids[2]*3+2] * lambda(2) + position[ids[3]*3+2] * (1 - lambda(0) - lambda(1) - lambda(2));
+	}
 	return baricenter;
 }
 

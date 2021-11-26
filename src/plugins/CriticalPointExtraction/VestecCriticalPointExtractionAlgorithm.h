@@ -165,7 +165,7 @@ class CriticalPointExtractor {
      * Computes the barycentric coordinates of a simplex
      * The method implemented is nicely explained at the following link: https://en.wikipedia.org/wiki/Barycentric_coordinate_system#Barycentric_coordinates_on_triangles
      */
-    double* ComputeBarycentricCoordinates(const vtkIdType* ids);
+    Eigen::Vector3d ComputeBarycentricCoordinates(const vtkIdType* ids);
     
 private:
     vtkIdType ZERO_ID;  //!< Vertex ID of the singularity: always number of vertices + 1 
@@ -341,6 +341,8 @@ protected:
     vtkInformationVector* outputVector );
 
   virtual int FillOutputPortInformation(int port, vtkInformation* info) override;
+
+  
 
 private:
   VestecCriticalPointExtractionAlgorithm( const VestecCriticalPointExtractionAlgorithm& ); // Not implemented.
