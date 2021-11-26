@@ -547,67 +547,79 @@ CriticalPointExtractor::PointType CriticalPointExtractor::ClassifyCriticalSimple
 }
 
 Eigen::Vector3d CriticalPointExtractor::ComputeBarycentricCoordinates(const vtkIdType* ids) {
-	// int numIds = numCellIds;	
+
 	vtkIdType numDims = (numCellIds == 4) ? 3 : 2;	
 	
 	Eigen::Matrix3d vectorsMatrix = Eigen::Matrix3d::Identity();
-	Eigen::Vector3d baricenter(0,0,0);
+	Eigen::Vector3d barycenter(0,0,0);
 
-	// Initialize matrix f(T) for triagle in 2D and tetra in 3D
-  	if(numDims == 2)
+	// Initialize matrix f(T) for triangle in 2D and tetra in 3D
+  	if(numDims == 2) {
+		// in 2D the points still have three components, but only two axes are varying.
+		// for this reason, we have to tweak the matrix initialization
 		if(iExchangeIndex == 2)
-		vectorsMatrix << 	vector[ids[2]*3]   - vector[ids[0]*3],   vector[ids[2]*3] -   vector[ids[1]*3],   0,
-							vector[ids[2]*3+1] - vector[ids[0]*3+1], vector[ids[2]*3+1] - vector[ids[1]*3+1], 0,
-							vector[ids[2]*3+2] - vector[ids[0]*3+2], vector[ids[2]*3+2] - vector[ids[1]*3+2], 1;
+			vectorsMatrix << 	vector[ids[2]*3]   - vector[ids[0]*3],   vector[ids[2]*3] -   vector[ids[1]*3],   0,
+								vector[ids[2]*3+1] - vector[ids[0]*3+1], vector[ids[2]*3+1] - vector[ids[1]*3+1], 0,
+								vector[ids[2]*3+2] - vector[ids[0]*3+2], vector[ids[2]*3+2] - vector[ids[1]*3+2], 1;
 		
 		if(iExchangeIndex == 0)
-		vectorsMatrix << 	1, vector[ids[2]*3]   - vector[ids[0]*3],   vector[ids[2]*3] -   vector[ids[1]*3],
-							0, vector[ids[2]*3+1] - vector[ids[0]*3+1], vector[ids[2]*3+1] - vector[ids[1]*3+1],
-							0, vector[ids[2]*3+2] - vector[ids[0]*3+2], vector[ids[2]*3+2] - vector[ids[1]*3+2];
+			vectorsMatrix << 	1, vector[ids[2]*3]   - vector[ids[0]*3],   vector[ids[2]*3] -   vector[ids[1]*3],
+								0, vector[ids[2]*3+1] - vector[ids[0]*3+1], vector[ids[2]*3+1] - vector[ids[1]*3+1],
+								0, vector[ids[2]*3+2] - vector[ids[0]*3+2], vector[ids[2]*3+2] - vector[ids[1]*3+2];
 
 		if(iExchangeIndex == 1)
-		vectorsMatrix << 	vector[ids[2]*3]   - vector[ids[0]*3], 0,  vector[ids[2]*3] -   vector[ids[1]*3],
-							vector[ids[2]*3+1] - vector[ids[0]*3+1], 1, vector[ids[2]*3+1] - vector[ids[1]*3+1],
-							vector[ids[2]*3+2] - vector[ids[0]*3+2], 0, vector[ids[2]*3+2] - vector[ids[1]*3+2];
-	if(numDims == 3)
+			vectorsMatrix << 	vector[ids[2]*3]   - vector[ids[0]*3], 0,  vector[ids[2]*3] -   vector[ids[1]*3],
+								vector[ids[2]*3+1] - vector[ids[0]*3+1], 1, vector[ids[2]*3+1] - vector[ids[1]*3+1],
+								vector[ids[2]*3+2] - vector[ids[0]*3+2], 0, vector[ids[2]*3+2] - vector[ids[1]*3+2];
+	}
+	else if(numDims == 3)
 		vectorsMatrix << 	vector[ids[3]*3]   - vector[ids[0]*3],   vector[ids[3]*3]   - vector[ids[1]*3],   vector[ids[3]*3]   - vector[ids[2]*3],
 							vector[ids[3]*3+1] - vector[ids[0]*3+1], vector[ids[3]*3+1] - vector[ids[1]*3+1], vector[ids[3]*3+1] - vector[ids[2]*3+1],
 							vector[ids[3]*3+2] - vector[ids[0]*3+2], vector[ids[3]*3+2] - vector[ids[1]*3+2], vector[ids[3]*3+2] - vector[ids[2]*3+2];
 	
-	std::cout << "iExchangeIndex "<< iExchangeIndex << std::endl;
-	std::cout << "vectorsMatrix" << std::endl;
-	std::cout << vectorsMatrix << std::endl;
-	std::cout <<std::endl;
-	
 	//Invert the matrix
 	Eigen::Matrix3d invMatrix = vectorsMatrix.inverse();
 
-	std::cout << "invMatrix" << std::endl;
-	std::cout << invMatrix << std::endl;
-    std::cout << std::endl;
-
-	//Barycentric coordinates of the last vertex (3D)
+	//Barycentric coordinates of the last vertex
 	Eigen::Vector3d vertPosition;
 	vertPosition << vector[ids[numDims]*3], vector[ids[numDims]*3+1], vector[ids[numDims]*3+2];
 
 	//f(T)^-1 * r-last
 	Eigen::Vector3d lambda = invMatrix * vertPosition;
-	std::cout << "lambda" << std::endl;
-	std::cout << lambda << std::endl;
-    std::cout << std::endl;
+
 	if(numDims == 2)
 	{
-		baricenter(0) = position[ids[0]*3]   * lambda(0) + position[ids[1]*3]   * lambda(1) + position[ids[2]*3]   * (1 - lambda(0) - lambda(1));
-		baricenter(1) = position[ids[0]*3+1] * lambda(0) + position[ids[1]*3+1] * lambda(1) + position[ids[2]*3+1] * (1 - lambda(0) - lambda(1));
-		baricenter(2) = position[ids[0]*3+2] * lambda(0) + position[ids[1]*3+2] * lambda(1) + position[ids[2]*3+2] * (1 - lambda(0) - lambda(1));	
+		// same comment here. Only two lambda values are valid, and, thus 
+		// we have to tweak the barycenter initialization
+		if(iExchangeIndex == 2) 
+		{
+			barycenter(0) = position[ids[0]*3]   * lambda(0) + position[ids[1]*3]   * lambda(1) + position[ids[2]*3]   * (1 - lambda(0) - lambda(1));
+			barycenter(1) = position[ids[0]*3+1] * lambda(0) + position[ids[1]*3+1] * lambda(1) + position[ids[2]*3+1] * (1 - lambda(0) - lambda(1));
+			barycenter(2) = position[ids[0]*3+2] * lambda(0) + position[ids[1]*3+2] * lambda(1) + position[ids[2]*3+2] * (1 - lambda(0) - lambda(1));	
+		}
+		
+		if(iExchangeIndex == 1) 
+		{
+			barycenter(0) = position[ids[0]*3]   * lambda(0) + position[ids[1]*3]   * lambda(2) + position[ids[2]*3]   * (1 - lambda(0) - lambda(2));
+			barycenter(1) = position[ids[0]*3+1] * lambda(0) + position[ids[1]*3+1] * lambda(2) + position[ids[2]*3+1] * (1 - lambda(0) - lambda(2));
+			barycenter(2) = position[ids[0]*3+2] * lambda(0) + position[ids[1]*3+2] * lambda(2) + position[ids[2]*3+2] * (1 - lambda(0) - lambda(2));
+		}
+		
+		if(iExchangeIndex == 0) 
+		{
+			barycenter(0) = position[ids[0]*3]   * lambda(1) + position[ids[1]*3]   * lambda(2) + position[ids[2]*3]   * (1 - lambda(1) - lambda(2));
+			barycenter(1) = position[ids[0]*3+1] * lambda(1) + position[ids[1]*3+1] * lambda(2) + position[ids[2]*3+1] * (1 - lambda(1) - lambda(2));
+			barycenter(2) = position[ids[0]*3+2] * lambda(1) + position[ids[1]*3+2] * lambda(2) + position[ids[2]*3+2] * (1 - lambda(1) - lambda(2));	
+		}
 	}
 	else if(numDims == 3)
 	{
-		baricenter(0) = position[ids[0]*3]   * lambda(0) + position[ids[1]*3]   * lambda(1) + position[ids[2]*3]   * lambda(2) + position[ids[3]*3]   * (1 - lambda(0) - lambda(1) - lambda(2));
-		baricenter(1) = position[ids[0]*3+1] * lambda(0) + position[ids[1]*3+1] * lambda(1) + position[ids[2]*3+1] * lambda(2) + position[ids[3]*3+1] * (1 - lambda(0) - lambda(1) - lambda(2));
-		baricenter(2) = position[ids[0]*3+2] * lambda(0) + position[ids[1]*3+2] * lambda(1) + position[ids[2]*3+2] * lambda(2) + position[ids[3]*3+2] * (1 - lambda(0) - lambda(1) - lambda(2));
+		barycenter(0) = position[ids[0]*3]   * lambda(0) + position[ids[1]*3]   * lambda(1) + position[ids[2]*3]   * lambda(2) + position[ids[3]*3]   * (1 - lambda(0) - lambda(1) - lambda(2));
+		barycenter(1) = position[ids[0]*3+1] * lambda(0) + position[ids[1]*3+1] * lambda(1) + position[ids[2]*3+1] * lambda(2) + position[ids[3]*3+1] * (1 - lambda(0) - lambda(1) - lambda(2));
+		barycenter(2) = position[ids[0]*3+2] * lambda(0) + position[ids[1]*3+2] * lambda(1) + position[ids[2]*3+2] * lambda(2) + position[ids[3]*3+2] * (1 - lambda(0) - lambda(1) - lambda(2));
 	}
-	return baricenter;
+	
+	return barycenter;
 }
 
 double CriticalPointExtractor::ComputeDeterminant(	
