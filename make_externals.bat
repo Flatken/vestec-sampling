@@ -61,7 +61,7 @@ rem Paraview -------------------------------------------------------------------
 :paraview
 
 echo .
-echo Building and installing Paraview 5.9.1 ...
+echo Building and installing Paraview 5.10.1 ...
 echo .
 
 cmake -E make_directory "%BUILD_DIR%/paraview" && cd "%BUILD_DIR%/paraview"
@@ -93,9 +93,11 @@ echo .
 
 rem # TTK -----------------------------------------------------------------------------------------
 :ttk
-
+rem # cannot use the most recent TTK 1.1.0 since it requires cmake 3.21 
+rem # (we have in DLR software center version 3.18)
+rem # if we keep ttkMergeTreeClustering enabled we get the following error -> fatal error C1083: Cannot open include file: 'vtkGeometryFilter.h': No such file or directory
 echo .
-echo Building and installing TTK 0.9.9
+echo Building and installing TTK 1.0.0
 echo .
 
 cmake -E make_directory "%BUILD_DIR%/ttk" && cd "%BUILD_DIR%/ttk"
@@ -108,6 +110,7 @@ cmake %CMAKE_FLAGS% -DCMAKE_INSTALL_PREFIX=%INSTALL_DIR%^
       -DTTK_ENABLE_MPI=ON^
       -DTTK_BUILD_STANDALONE_APPS=OFF^
       -DVTK_MODULE_ENABLE_ttkCinemaWriter=DONT_WANT^
+      -DVTK_MODULE_ENABLE_ttkMergeTreeClustering=DONT_WANT^
       -DQt5_DIR=C:/Qt/Qt5.14.2/5.14.2/msvc2017_64/lib/cmake/Qt5^
       -DCMAKE_CXX_FLAGS="/bigobj /EHsc /UBOOST_NO_EXCEPTIONS"^
       -DCMAKE_BUILD_TYPE=%BUILD_TYPE% "%EXTERNALS_DIR%/ttk"  || goto :error 
