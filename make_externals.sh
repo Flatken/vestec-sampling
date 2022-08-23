@@ -30,12 +30,8 @@ cmake -E make_directory "$INSTALL_DIR/share"
 cmake -E make_directory "$INSTALL_DIR/bin"
 cmake -E make_directory "$INSTALL_DIR/include"
 
-# TTK patch paraview--------------------------------------------------------------------------------
-#cd $EXTERNALS_DIR/ttk/paraview/patch/
-#./patch-paraview-5.6.0.sh $EXTERNALS_DIR/paraview-5.6
-
 # Paraview -----------------------------------------------------------------------------------------
-echo "Building and installing Paraview ..."
+echo "Building and installing Paraview 5.10.1"
 echo ""
 echo ""
 
@@ -48,7 +44,7 @@ cmake -G "Eclipse CDT4 - Unix Makefiles" -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" \
       -DPARAVIEW_USE_QT=ON \
       -DPARAVIEW_USE_MPI=ON \
       -DPARAVIEW_USE_VTKM=OFF \
-      -DCMAKE_BUILD_TYPE=Release "$EXTERNALS_DIR/paraview-5.6" 
+      -DCMAKE_BUILD_TYPE=Release "$EXTERNALS_DIR/paraview" 
 cmake --build . --target install --parallel "$(nproc)"
 
 
@@ -64,13 +60,9 @@ cmake --build . --target install --parallel "$(nproc)"
 echo ""
 
 # TTK -------------------------------------------------------------------------------------------
-
 echo ""
-echo "Building and installing TTK ..."
+echo "Building and installing TTK 1.0.0"
 echo ""
-
-cmake -E remove_directory "$EXTERNALS_DIR/ttk/paraview/WRLExporter"
-cmake -E remove_directory "$EXTERNALS_DIR/ttk/core/vtk/ttkWRLExporter" 
 
 cmake -E make_directory "$BUILD_DIR/ttk" && cd "$BUILD_DIR/ttk"
 cmake -G "Eclipse CDT4 - Unix Makefiles" -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" \
@@ -83,6 +75,8 @@ cmake -G "Eclipse CDT4 - Unix Makefiles" -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" \
       -DTTK_BUILD_STANDALONE_APPS=OFF \
       -DVTK_MODULE_ENABLE_ttkCinemaImaging=DONT_WANT \
       -DVTK_MODULE_ENABLE_ttkUserInterfaceBase=DONT_WANT \
+      -DVTK_MODULE_ENABLE_ttkMergeTreeClustering=DONT_WANT \
+      -DVTK_MODULE_ENABLE_ttkWRLExporter=DONT_WANT \
       -DCMAKE_BUILD_TYPE=Release "$EXTERNALS_DIR/ttk"
 cmake --build . --target install --parallel "$(nproc)"
 
